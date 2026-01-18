@@ -34,6 +34,7 @@ export default function KnowledgeTree({
 }: KnowledgeTreeProps) {
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [buildingChildren, setBuildingChildren] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchNodeTree = () => {
     fetch(`/api/nodes/${rootNodeId}`)
@@ -59,12 +60,22 @@ export default function KnowledgeTree({
 
   const handleBuildChildren = async (nodeId: string) => {
     setBuildingChildren(nodeId);
+    setErrorMessage(null);
     try {
-      await fetch(`/api/nodes/${nodeId}/build-children`, {
+      const response = await fetch(`/api/nodes/${nodeId}/build-children`, {
         method: "POST",
       });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorMessage(
+          data.message || data.error || "Failed to build children",
+        );
+        setBuildingChildren(null);
+      }
     } catch (error) {
       console.error("Failed to build children:", error);
+      setErrorMessage("An error occurred while building children");
       setBuildingChildren(null);
     }
   };
@@ -187,6 +198,41 @@ export default function KnowledgeTree({
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {errorMessage && (
+        <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-md animate-fade-in">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-medium text-red-800">{errorMessage}</p>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="ml-3 flex-shrink-0 text-red-500 hover:text-red-700"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col items-center">
         {renderNode(rootNode, 0)}
       </div>

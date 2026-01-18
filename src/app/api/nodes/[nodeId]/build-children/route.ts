@@ -17,7 +17,10 @@ export async function POST(
     // Check depth limit (max 3 layers: 0, 1, 2)
     if (node.depth >= 2) {
       return NextResponse.json(
-        { error: 'Maximum depth reached. Cannot create more children.' },
+        { 
+          error: 'Maximum depth limit reached',
+          message: 'The free plan allows a maximum of 3 layers of nodes. Upgrade to create deeper hierarchies.'
+        },
         { status: 400 }
       )
     }

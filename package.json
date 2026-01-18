@@ -10,7 +10,7 @@
     "worker": "tsx src/worker/index.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate --skip-validate || true"
+    "postinstall": "bash scripts/postinstall.sh"
   },
   "dependencies": {
     "next": "14.1.0",

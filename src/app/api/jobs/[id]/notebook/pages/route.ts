@@ -25,15 +25,15 @@ export async function POST(
   try {
     const { title, content } = await request.json()
 
-    if (!title || !content) {
-      return NextResponse.json({ error: 'Title and content are required' }, { status: 400 })
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
     const page = await prisma.notebookPage.create({
       data: {
         jobId: params.id,
         title,
-        content,
+        content: content || '',
       },
     })
 

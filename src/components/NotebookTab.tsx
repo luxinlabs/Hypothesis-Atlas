@@ -94,14 +94,14 @@ export default function NotebookTab({ jobId }: NotebookTabProps) {
     }
   };
 
-  const handleCreatePage = async () => {
+  const handleCreatePage = async (title: string) => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/jobs/${jobId}/notebook/pages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: `Page ${pages.length + 1}`,
+          title: title || `Page ${pages.length + 1}`,
           content: "",
         }),
       });
@@ -313,8 +313,8 @@ export default function NotebookTab({ jobId }: NotebookTabProps) {
         />
       </div>
 
-      {/* Right Panel */}
-      <div className="w-96">
+      {/* Right Panel - Chat or Top 3 Ideas */}
+      <div className="w-[500px]">
         {top3Ideas ? (
           <div className="h-full overflow-y-auto p-4 bg-white">
             <div className="mb-4">

@@ -7,7 +7,7 @@ interface PageListProps {
   pages: NotebookPage[];
   currentPage: NotebookPage | null;
   onPageSelect: (page: NotebookPage) => void;
-  onPageCreate: () => void;
+  onPageCreate: (title: string) => void;
   onPageDelete: (pageId: string) => void;
   isLoading?: boolean;
 }
@@ -28,8 +28,9 @@ export default function PageList({
 
     setIsCreating(true);
     try {
-      await onPageCreate();
+      await onPageCreate(newPageTitle.trim());
       setNewPageTitle("");
+      setIsCreating(false);
     } finally {
       setIsCreating(false);
     }

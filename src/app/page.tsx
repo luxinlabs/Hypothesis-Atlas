@@ -51,6 +51,51 @@ const BIOTECH_TERMS = [
   { text: "AlphaFold", value: 90 },
   { text: "neural organoids", value: 83 },
   { text: "brain mapping", value: 81 },
+  { text: "synaptic plasticity", value: 86 },
+  { text: "neurodegeneration", value: 84 },
+  { text: "blood-brain barrier", value: 82 },
+  { text: "mitochondrial dysfunction", value: 78 },
+  { text: "autophagy", value: 80 },
+  { text: "senescence", value: 77 },
+  { text: "telomere biology", value: 79 },
+  { text: "circadian rhythms", value: 75 },
+  { text: "gut-brain axis", value: 83 },
+  { text: "extracellular vesicles", value: 81 },
+  { text: "liquid biopsy", value: 85 },
+  { text: "tumor microenvironment", value: 84 },
+  { text: "cancer metabolism", value: 82 },
+  { text: "immune checkpoint", value: 87 },
+  { text: "cytokine storm", value: 79 },
+  { text: "antibody-drug conjugates", value: 86 },
+  { text: "bispecific antibodies", value: 84 },
+  { text: "cell-free DNA", value: 80 },
+  { text: "ATAC-seq", value: 78 },
+  { text: "ChIP-seq", value: 77 },
+  { text: "Hi-C sequencing", value: 76 },
+  { text: "long-read sequencing", value: 85 },
+  { text: "metagenomics", value: 83 },
+  { text: "pharmacogenomics", value: 81 },
+  { text: "systems biology", value: 82 },
+  { text: "network medicine", value: 80 },
+  { text: "digital pathology", value: 79 },
+  { text: "AI drug discovery", value: 91 },
+  { text: "protein engineering", value: 88 },
+  { text: "directed evolution", value: 85 },
+  { text: "synthetic genomes", value: 84 },
+  { text: "minimal cells", value: 76 },
+  { text: "biosensors", value: 82 },
+  { text: "microfluidics", value: 80 },
+  { text: "organ-on-chip", value: 87 },
+  { text: "3D bioprinting", value: 86 },
+  { text: "decellularization", value: 78 },
+  { text: "scaffold biomaterials", value: 81 },
+  { text: "hydrogels", value: 79 },
+  { text: "nanoparticles", value: 83 },
+  { text: "quantum dots", value: 77 },
+  { text: "FRET imaging", value: 75 },
+  { text: "super-resolution microscopy", value: 84 },
+  { text: "light-sheet microscopy", value: 82 },
+  { text: "two-photon imaging", value: 80 },
 ];
 
 export default function Home() {
@@ -79,11 +124,34 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      {/* Top Navigation Bar */}
+      <div className="absolute top-0 right-0 p-6 z-10">
+        <button
+          onClick={() => setShowJobManagement(true)}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/90 backdrop-blur-sm text-gray-800 rounded-xl hover:bg-white transition-all shadow-lg hover:shadow-xl font-semibold border border-gray-200"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+            />
+          </svg>
+          View All Jobs
+        </button>
+      </div>
+
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16 animate-fade-in">
           <div className="inline-block mb-4">
             <div className="flex items-center justify-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
@@ -106,13 +174,13 @@ export default function Home() {
           <p className="text-2xl text-gray-700 mb-3 font-medium">
             AI-Powered Evidence Mapping for Biotech Research
           </p>
-          <p className="text-base text-gray-600 max-w-2xl mx-auto">
+          <p className="text-base text-gray-600 max-w-2xl mx-auto leading-relaxed">
             Explore cutting-edge research topics • Discover connections • Map
             the evidence landscape
           </p>
-          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
+          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500 flex-wrap">
             <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-              45+ Topics
+              90+ Topics
             </span>
             <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
               Real-time Analysis
@@ -120,36 +188,20 @@ export default function Home() {
             <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full font-medium">
               Multi-source
             </span>
-          </div>
-
-          {/* View All Jobs Button */}
-          <div className="mt-8">
-            <button
-              onClick={() => setShowJobManagement(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl font-semibold"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                />
-              </svg>
-              View All Jobs
-            </button>
+            <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full font-medium">
+              LLM-Powered
+            </span>
           </div>
         </div>
 
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-10 mb-8 border border-gray-200/50 hover:shadow-3xl transition-shadow duration-300">
+        <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-10 mb-8 border border-gray-200/50 hover:shadow-3xl transition-shadow duration-300">
           <div className="mb-6 text-center">
-            <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+            <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-2">
               Click any topic to begin
+            </p>
+            <p className="text-xs text-gray-500">
+              Instantly generate evidence maps from papers, datasets, and
+              research signals
             </p>
           </div>
           <WordCloudComponent

@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id          String   @id @default(cuid())
+  topicQuery  String
+  status      String   @default("pending")
+  rootNodeId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  sources     Source[]
+  nodes       Node[]
+  events      ProgressEvent[]
+  
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ProgressEvent {
+  id        String   @id @default(cuid())
+  jobId     String
+  stage     String
+  status    String
+  message   String
+  count     Int?
+  timestamp BigInt
+  createdAt DateTime @default(now())
+  
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+model Source {
+  id              String   @id @default(cuid())
+  jobId           String
+  type            String
+  title           String
+  url             String?
+  publishedAt     DateTime?
+  authorsJson     String?
+  venue           String?
+  snippet         String?
+  externalId      String?
+  reliabilityTier String
+  createdAt       DateTime @default(now())
+  
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  nodeSources     NodeSource[]
+  
+  @@index([jobId])
+  @@index([type])
+  @@index([reliabilityTier])
+}
+
+model Node {
+  id                  String   @id @default(cuid())
+  jobId               String
+  parentId            String?
+  label               String
+  summary             String   @db.Text
+  methodsJson         String?  @db.Text
+  findingsJson        String?  @db.Text
+  disagreementsJson   String?  @db.Text
+  openProblemsJson    String?  @db.Text
+  createdAt           DateTime @default(now())
+  
+  job                 Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  parent              Node?    @relation("NodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children            Node[]   @relation("NodeChildren")
+  nodeSources         NodeSource[]
+  
+  @@index([jobId])
+  @@index([parentId])
+}
+
+model NodeSource {
+  id        String   @id @default(cuid())
+  nodeId    String
+  sourceId  String
+  role      String
+  createdAt DateTime @default(now())
+  
+  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  source    Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  
+  @@unique([nodeId, sourceId])
+  @@index([nodeId])
+  @@index([sourceId])
+}

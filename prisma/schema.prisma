@@ -15,9 +15,13 @@ model Job {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  sources     Source[]
-  nodes       Node[]
-  events      ProgressEvent[]
+  sources       Source[]
+  nodes         Node[]
+  events        ProgressEvent[]
+  notebookPages NotebookPage[]
+  messages      NotebookMessage[]
+  candidates    CandidateTopic[]
+  top3Ideas     Top3Ideas?
   
   @@index([status])
   @@index([createdAt])
@@ -95,4 +99,64 @@ model NodeSource {
   @@unique([nodeId, sourceId])
   @@index([nodeId])
   @@index([sourceId])
+}
+
+model NotebookPage {
+  id        String   @id @default(cuid())
+  jobId     String
+  title     String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  messages  NotebookMessage[]
+  
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+model NotebookMessage {
+  id            String   @id @default(cuid())
+  jobId         String
+  pageId        String?
+  role          String   // 'user' | 'assistant'
+  content       String   @db.Text
+  citationsJson String?  @db.Text
+  createdAt     DateTime @default(now())
+  
+  job           Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  page          NotebookPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  
+  @@index([jobId])
+  @@index([pageId])
+  @@index([createdAt])
+}
+
+model CandidateTopic {
+  id            String   @id @default(cuid())
+  jobId         String
+  label         String
+  status        String   @default("active") // 'active' | 'archived' | 'selected'
+  evidenceJson  String?  @db.Text
+  score         Float?
+  createdAt     DateTime @default(now())
+  
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Top3Ideas {
+  id          String   @id @default(cuid())
+  jobId       String   @unique
+  generatedAt DateTime @default(now())
+  ideasJson   String   @db.Text
+  traceJson   String?  @db.Text
+  
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  @@index([jobId])
 }

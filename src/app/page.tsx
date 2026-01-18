@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import WordCloudComponent from "@/components/WordCloud";
+import JobManagement from "@/components/JobManagement";
 
 const BIOTECH_TERMS = [
   { text: "neural implant stability", value: 100 },
@@ -55,6 +56,7 @@ const BIOTECH_TERMS = [
 export default function Home() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showJobManagement, setShowJobManagement] = useState(false);
 
   const handleWordClick = async (word: string) => {
     setIsLoading(true);
@@ -119,6 +121,29 @@ export default function Home() {
               Multi-source
             </span>
           </div>
+
+          {/* View All Jobs Button */}
+          <div className="mt-8">
+            <button
+              onClick={() => setShowJobManagement(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                />
+              </svg>
+              View All Jobs
+            </button>
+          </div>
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-10 mb-8 border border-gray-200/50 hover:shadow-3xl transition-shadow duration-300">
@@ -182,6 +207,11 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Job Management Modal */}
+      {showJobManagement && (
+        <JobManagement onClose={() => setShowJobManagement(false)} />
+      )}
     </main>
   );
 }

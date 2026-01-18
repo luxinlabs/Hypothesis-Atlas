@@ -11,6 +11,7 @@ A biotech research evidence mapping platform that automatically discovers, analy
 - **Detailed Analysis**: Methods, findings, disagreements, and open problems for each node
 - **Epistemic Guardrails**: Clear labeling of source reliability (peer-reviewed, preprint, dataset, social signal)
 - **LLM-Powered Synthesis**: Uses Groq API for hypothesis clustering and analysis (with fallback)
+- **Notebook & Topic Copilot**: Research notebook with markdown editor, AI chat, and topic convergence to top 3 ideas
 
 ## Tech Stack
 
@@ -108,6 +109,25 @@ This starts the BullMQ worker that processes evidence mapping jobs.
 4. Explore the knowledge tree by clicking nodes
 5. View detailed analysis in the right panel
 
+### Using the Notebook & Topic Copilot
+
+1. After evidence mapping completes, click the **"Notebook & Topic Copilot"** tab
+2. **Create notebook pages**: Click the + button to add pages for your research notes
+3. **Write in markdown**: Use the editor to document your thoughts (auto-saves)
+4. **Chat with the AI**: Ask questions about research directions, topic selection, or methodology
+5. **Manage candidate topics**:
+   - Add topics manually or get suggestions from the AI
+   - Select multiple topics by clicking the checkboxes
+   - Archive unwanted topics
+6. **Converge to Top 3**: With topics selected, click "Converge to Top 3" to generate structured research ideas
+
+The AI provides:
+
+- Grounded responses citing your actual sources
+- Suggested research topics based on the evidence
+- Structured research ideas with methods, data needs, and citations
+- Acknowledgment of limitations when evidence is insufficient
+
 ### Demo Topic
 
 Try **"neural implant stability"** for a comprehensive demo that includes:
@@ -127,8 +147,17 @@ ATLAS/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── jobs/          # Job creation and status endpoints
+│   │   │   │   ├── [id]/
+│   │   │   │   │   ├── notebook/
+│   │   │   │   │   │   ├── pages/    # Notebook pages CRUD
+│   │   │   │   │   │   ├── messages/ # Chat messages
+│   │   │   │   │   │   └── chat/     # AI chat endpoint
+│   │   │   │   │   ├── candidates/  # Candidate topics CRUD
+│   │   │   │   │   └── converge/    # Generate top 3 ideas
+│   │   │   │   └── events/
+│   │   │   ├── jobs/          # Job creation and status endpoints
 │   │   │   └── nodes/         # Node detail endpoints
-│   │   ├── job/[id]/          # Job progress page
+│   │   ├── job/[id]/          # Job progress page with notebook tab
 │   │   ├── layout.tsx
 │   │   ├── page.tsx           # Landing page with word cloud
 │   │   └── globals.css
@@ -136,7 +165,12 @@ ATLAS/
 │   │   ├── WordCloud.tsx      # Interactive word cloud
 │   │   ├── ProgressTimeline.tsx
 │   │   ├── KnowledgeTree.tsx  # Tree visualization
-│   │   └── NodeDetail.tsx     # Node analysis panel
+│   │   ├── NodeDetail.tsx     # Node analysis panel
+│   │   ├── NotebookTab.tsx    # Main notebook interface
+│   │   ├── PageList.tsx       # Notebook pages sidebar
+│   │   ├── MarkdownEditor.tsx # Markdown editor with auto-save
+│   │   ├── ChatPanel.tsx      # AI chat interface
+│   │   └── CandidateTopics.tsx # Topic management
 │   ├── lib/
 │   │   ├── apis/              # External API integrations
 │   │   │   ├── openalex.ts
@@ -147,7 +181,8 @@ ATLAS/
 │   │   ├── redis.ts           # Redis connection
 │   │   ├── queue.ts           # BullMQ queue
 │   │   ├── groq.ts            # Groq LLM client
-│   │   └── events.ts          # Progress event store
+│   │   ├── events.ts          # Progress event store
+│   │   └── notebook-types.ts  # TypeScript types for notebook
 │   └── worker/
 │       ├── index.ts           # BullMQ worker
 │       └── processor.ts       # Evidence mapping pipeline
@@ -192,12 +227,49 @@ Each stage emits progress events via SSE for real-time UI updates.
 
 - Links nodes to sources with roles: supporting, contradicting, background, signal
 
+### NotebookPage
+
+- Research notebook pages with markdown content
+- Linked to jobs for organization
+
+### NotebookMessage
+
+- Chat messages between user and AI copilot
+- Stores citations and context
+
+### CandidateTopic
+
+- Potential research topics suggested by AI or user
+- Status: active, archived, selected
+- Includes evidence and scoring
+
+### Top3Ideas
+
+- Final converged research ideas
+- Structured JSON with methods, citations, next steps
+- One record per job
+
 ## API Endpoints
+
+### Job Management
 
 - `POST /api/jobs` - Create new evidence mapping job
 - `GET /api/jobs/[id]` - Get job status and root node ID
 - `GET /api/jobs/[id]/events` - SSE stream of progress events
 - `GET /api/nodes/[nodeId]` - Get node details with sources and children
+
+### Notebook & Topic Copilot
+
+- `GET /api/jobs/[id]/notebook/pages` - List notebook pages
+- `POST /api/jobs/[id]/notebook/pages` - Create new notebook page
+- `GET /api/notebook/pages/[pageId]` - Get page with messages
+- `PUT /api/notebook/pages/[pageId]` - Update page content
+- `DELETE /api/notebook/pages/[pageId]` - Delete page
+- `GET /api/jobs/[id]/notebook/messages` - Get chat messages
+- `POST /api/jobs/[id]/notebook/chat` - Send message to AI copilot
+- `GET /api/jobs/[id]/candidates` - List candidate topics
+- `POST /api/jobs/[id]/candidates` - Add candidate topic
+- `POST /api/jobs/[id]/converge` - Generate top 3 research ideas
 
 ## Epistemic Guardrails
 

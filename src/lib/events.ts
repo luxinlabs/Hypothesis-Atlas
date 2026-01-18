@@ -34,7 +34,7 @@ export async function getProgressEvents(jobId: string): Promise<ProgressEvent[]>
       orderBy: { createdAt: 'asc' },
     })
     
-    return events.map(e => ({
+    return events.map((e: any): ProgressEvent => ({
       jobId: e.jobId,
       stage: e.stage,
       status: e.status as 'started' | 'progress' | 'completed' | 'error',

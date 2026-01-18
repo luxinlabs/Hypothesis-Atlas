@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import ProgressTimeline from "@/components/ProgressTimeline";
 import KnowledgeTree from "@/components/KnowledgeTree";
 import NodeDetail from "@/components/NodeDetail";
+import NotebookTab from "@/components/NotebookTab";
 
 interface Job {
   id: string;
@@ -28,6 +29,9 @@ export default function JobPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [events, setEvents] = useState<ProgressEvent[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"knowledge" | "notebook">(
+    "knowledge",
+  );
 
   useEffect(() => {
     const fetchJob = () => {
@@ -35,7 +39,8 @@ export default function JobPage() {
         .then((res) => res.json())
         .then((data) => {
           setJob(data);
-          if (data.rootNodeId && !selectedNodeId) {
+          // Only set selectedNodeId if it hasn't been set yet
+          if (data.rootNodeId && selectedNodeId === null) {
             setSelectedNodeId(data.rootNodeId);
           }
         })
@@ -62,7 +67,7 @@ export default function JobPage() {
     return () => {
       eventSource.close();
     };
-  }, [jobId]);
+  }, [jobId, selectedNodeId]);
 
   if (!job) {
     return (
@@ -130,45 +135,21 @@ export default function JobPage() {
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-89px)]">
-        <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200 overflow-y-auto shadow-sm">
-          <ProgressTimeline events={events} />
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-8">
-          {job.rootNodeId ? (
-            <KnowledgeTree
-              rootNodeId={job.rootNodeId}
-              selectedNodeId={selectedNodeId}
-              onNodeSelect={setSelectedNodeId}
-              events={events}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center bg-white/80 backdrop-blur-sm rounded-2xl p-12 shadow-lg">
-                <div className="relative mb-6">
-                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 mx-auto"></div>
-                  <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 mx-auto absolute top-0 left-1/2 -ml-8"></div>
-                </div>
-                <p className="text-lg font-semibold text-gray-800 mb-2">
-                  Building Knowledge Tree
-                </p>
-                <p className="text-sm text-gray-600">
-                  Analyzing sources and creating nodes...
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="w-96 bg-white/80 backdrop-blur-sm border-l border-gray-200 overflow-y-auto shadow-sm">
-          {selectedNodeId ? (
-            <NodeDetail nodeId={selectedNodeId} />
-          ) : (
-            <div className="p-8 text-center">
-              <div className="bg-gray-50 rounded-xl p-8 border-2 border-dashed border-gray-300">
+      {/* Tab Navigation */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab("knowledge")}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "knowledge"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center gap-2">
                 <svg
-                  className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                  className="w-5 h-5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -177,19 +158,107 @@ export default function JobPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                   />
                 </svg>
-                <p className="text-gray-600 font-medium">
-                  Select a node to view details
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Click any node in the knowledge tree
-                </p>
+                Knowledge Tree
               </div>
-            </div>
-          )}
+            </button>
+            <button
+              onClick={() => setActiveTab("notebook")}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "notebook"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+                Notebook & Topic Copilot
+              </div>
+            </button>
+          </nav>
         </div>
+      </div>
+
+      <div className="flex h-[calc(100vh-89px-49px)]">
+        {activeTab === "knowledge" ? (
+          <>
+            <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200 overflow-y-auto shadow-sm">
+              <ProgressTimeline events={events} />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8">
+              {job.rootNodeId ? (
+                <KnowledgeTree
+                  rootNodeId={job.rootNodeId}
+                  selectedNodeId={selectedNodeId}
+                  onNodeSelect={setSelectedNodeId}
+                  events={events}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center bg-white/80 backdrop-blur-sm rounded-2xl p-12 shadow-lg">
+                    <div className="relative mb-6">
+                      <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 mx-auto"></div>
+                      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 mx-auto absolute top-0 left-1/2 -ml-8"></div>
+                    </div>
+                    <p className="text-lg font-semibold text-gray-800 mb-2">
+                      Building Knowledge Tree
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Analyzing sources and creating nodes...
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="w-96 bg-white/80 backdrop-blur-sm border-l border-gray-200 overflow-y-auto shadow-sm">
+              {selectedNodeId ? (
+                <NodeDetail nodeId={selectedNodeId} />
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="bg-gray-50 rounded-xl p-8 border-2 border-dashed border-gray-300">
+                    <svg
+                      className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <p className="text-gray-600 font-medium">
+                      Select a node to view details
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Click any node in the knowledge tree
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <NotebookTab jobId={jobId} />
+        )}
       </div>
     </div>
   );

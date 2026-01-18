@@ -75,6 +75,7 @@ model Node {
   findingsJson        String?  @db.Text
   disagreementsJson   String?  @db.Text
   openProblemsJson    String?  @db.Text
+  depth               Int      @default(0)
   createdAt           DateTime @default(now())
   
   job                 Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)

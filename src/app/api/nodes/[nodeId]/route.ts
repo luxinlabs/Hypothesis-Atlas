@@ -10,6 +10,11 @@ export async function GET(
       where: { id: params.nodeId },
       include: {
         children: {
+          include: {
+            children: {
+              orderBy: { createdAt: 'asc' },
+            },
+          },
           orderBy: { createdAt: 'asc' },
         },
         nodeSources: {
@@ -30,7 +35,7 @@ export async function GET(
     const disagreements = node.disagreementsJson ? JSON.parse(node.disagreementsJson) : []
     const openProblems = node.openProblemsJson ? JSON.parse(node.openProblemsJson) : []
 
-    const sources = node.nodeSources.map(ns => ({
+    const sources = node.nodeSources.map((ns: any) => ({
       ...ns.source,
       role: ns.role,
       authors: ns.source.authorsJson ? JSON.parse(ns.source.authorsJson) : [],
@@ -44,6 +49,7 @@ export async function GET(
       findings,
       disagreements,
       openProblems,
+      depth: node.depth,
       children: node.children,
       sources,
     })

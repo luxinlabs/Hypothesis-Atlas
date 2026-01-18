@@ -420,3 +420,99 @@ Provide at least 3 items for each array.`)
     timestamp: Date.now(),
   })
 }
+
+// Export function to build children for any node (for multi-layer trees)
+export async function buildChildrenForNode(
+  jobId: string,
+  parentNodeId: string,
+  parentLabel: string,
+  depth: number
+) {
+  try {
+    await emitProgressEvent({
+      jobId,
+      stage: 'build_children',
+      status: 'started',
+      message: `Building children for ${parentLabel}`,
+      timestamp: Date.now(),
+    })
+
+    // Get sources associated with the parent node
+    const parentNode = await prisma.node.findUnique({
+      where: { id: parentNodeId },
+      include: {
+        nodeSources: {
+          include: { source: true },
+        },
+      },
+    })
+
+    if (!parentNode) {
+      throw new Error('Parent node not found')
+    }
+
+    const sources = parentNode.nodeSources.map((ns: any) => ns.source)
+    const sourceTitles = sources.slice(0, 15).map((s: any) => s.title)
+
+    const prompt = `Based on the research topic "${parentLabel}" and these papers:
+${sourceTitles.join('\n')}
+
+Identify 3-5 distinct subtopics or research directions within this area. Return as JSON:
+{
+  "subtopics": [
+    {"label": "Subtopic 1", "description": "Brief description"},
+    {"label": "Subtopic 2", "description": "Brief description"},
+    ...
+  ]
+}`
+
+    const result = await generateWithGroq(prompt)
+    const subtopics = result.subtopics || []
+
+    for (const subtopic of subtopics.slice(0, 5)) {
+      const childAnalysis = await generateWithGroq(`Analyze the subtopic "${subtopic.label}" (${subtopic.description}) in the context of "${parentLabel}".
+
+You MUST respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
+{
+  "summary": "2-3 sentence overview of this specific subtopic",
+  "methods": ["specific method 1", "specific method 2"],
+  "findings": ["key finding 1", "key finding 2"],
+  "openProblems": ["challenge 1", "research gap 1"]
+}
+
+Provide at least 2 items for each array.`)
+
+      await prisma.node.create({
+        data: {
+          jobId,
+          parentId: parentNodeId,
+          label: subtopic.label,
+          summary: childAnalysis.summary || subtopic.description,
+          methodsJson: JSON.stringify(childAnalysis.methods || []),
+          findingsJson: JSON.stringify(childAnalysis.findings || []),
+          disagreementsJson: JSON.stringify([]),
+          openProblemsJson: JSON.stringify(childAnalysis.openProblems || []),
+          depth,
+        },
+      })
+    }
+
+    await emitProgressEvent({
+      jobId,
+      stage: 'build_children',
+      status: 'completed',
+      message: `Created ${subtopics.length} child nodes for ${parentLabel}`,
+      count: subtopics.length,
+      timestamp: Date.now(),
+    })
+  } catch (error) {
+    console.error('Error building child nodes:', error)
+    await emitProgressEvent({
+      jobId,
+      stage: 'build_children',
+      status: 'error',
+      message: `Failed to build children: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      timestamp: Date.now(),
+    })
+  }
+}

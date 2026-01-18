@@ -207,6 +207,7 @@ export default function JobPage() {
                   selectedNodeId={selectedNodeId}
                   onNodeSelect={setSelectedNodeId}
                   events={events}
+                  jobId={jobId}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full">

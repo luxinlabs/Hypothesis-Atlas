@@ -320,12 +320,128 @@ npm run db:push
 - Implement collaborative filtering for topic recommendations
 - Add export to Markdown/PDF
 
+## Deployment to Vercel
+
+### Prerequisites
+
+1. **Vercel Account**: Sign up at [vercel.com](https://vercel.com)
+2. **PostgreSQL Database**: Use [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres), [Neon](https://neon.tech), or [Supabase](https://supabase.com)
+3. **Redis Instance**: Use [Upstash Redis](https://upstash.com) (free tier available)
+4. **Groq API Key**: Get from [console.groq.com](https://console.groq.com)
+
+### Step-by-Step Deployment
+
+#### 1. Set Up External Services
+
+**PostgreSQL Database:**
+
+- Create a PostgreSQL database (recommended: Vercel Postgres or Neon)
+- Copy the connection string (format: `postgresql://user:password@host:port/database`)
+
+**Redis:**
+
+- Create an Upstash Redis database
+- Copy the Redis URL (format: `redis://default:password@host:port`)
+
+#### 2. Deploy to Vercel
+
+**Option A: Deploy via Vercel CLI**
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy from project root
+vercel
+
+# Follow the prompts to link your project
+```
+
+**Option B: Deploy via GitHub**
+
+1. Push your code to GitHub
+2. Go to [vercel.com/new](https://vercel.com/new)
+3. Import your GitHub repository
+4. Configure the project (Vercel will auto-detect Next.js)
+
+#### 3. Configure Environment Variables
+
+In your Vercel project settings, add these environment variables:
+
+```
+DATABASE_URL=postgresql://user:password@host:port/database
+REDIS_URL=redis://default:password@host:port
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+#### 4. Initialize Database Schema
+
+After deployment, run this command locally to push the schema to your production database:
+
+```bash
+# Set your production DATABASE_URL temporarily
+DATABASE_URL="your_production_db_url" npm run db:push
+```
+
+#### 5. Important Notes for Production
+
+**Background Worker:**
+
+- The background worker (`npm run worker`) cannot run on Vercel's serverless functions
+- Options:
+  - **Option 1**: Deploy worker separately on a service like [Railway](https://railway.app) or [Render](https://render.com)
+  - **Option 2**: Use Vercel's [Background Functions](https://vercel.com/docs/functions/background-functions) (Pro plan required)
+  - **Option 3**: The app will fallback to setTimeout-based processing (works but less reliable)
+
+**Recommended Architecture for Production:**
+
+```
+┌─────────────────┐
+│  Vercel (Web)   │ ← Next.js app
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+┌───▼──┐  ┌──▼────┐
+│ DB   │  │ Redis │
+│(Neon)│  │(Upstash)
+└──────┘  └───┬───┘
+              │
+      ┌───────▼────────┐
+      │ Worker Service │ ← Railway/Render
+      │ (npm run worker)│
+      └────────────────┘
+```
+
+**Deploy Worker to Railway (Recommended):**
+
+1. Create account at [railway.app](https://railway.app)
+2. Create new project from GitHub repo
+3. Set build command: `npm install`
+4. Set start command: `npm run worker`
+5. Add same environment variables (DATABASE_URL, REDIS_URL, GROQ_API_KEY)
+
+### Vercel Configuration
+
+The `vercel.json` file is already configured with:
+
+- Build command that generates Prisma client
+- Environment variable references
+- Optimized build settings
+
+### Post-Deployment
+
+1. Visit your Vercel deployment URL
+2. Click on a biotech topic to create a job
+3. Monitor the progress timeline
+4. Explore the knowledge tree and notebook features
+
 ## Troubleshooting
 
 **Worker not processing jobs?**
 
-- Check Redis is running: `docker ps`
-- Verify environment variables in `.env`
+- Check Redis is running: `docker ps` (local) or verify Upstash connection (production)
+- Verify environment variables in `.env` or Vercel settings
 - Jobs will auto-fallback to setTimeout if Redis unavailable
 
 **No papers found?**
@@ -341,9 +457,15 @@ npm run db:push
 
 **Database connection errors?**
 
-- Ensure PostgreSQL container is running
-- Check DATABASE_URL in `.env`
+- Ensure PostgreSQL container is running (local) or database is accessible (production)
+- Check DATABASE_URL in `.env` or Vercel settings
 - Run `npm run db:push` to sync schema
+
+**Vercel deployment fails?**
+
+- Check build logs in Vercel dashboard
+- Ensure all environment variables are set
+- Verify Prisma schema is valid: `npx prisma validate`
 
 ## License
 

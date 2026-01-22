@@ -13,24 +13,32 @@ if (REDIS_URL && typeof window === 'undefined') {
       enableOfflineQueue: false,
       lazyConnect: true,
       retryStrategy: (times) => {
-        if (times > 3) return null
+        // Stop retrying after 3 attempts
+        if (times > 3) {
+          console.warn('Redis connection failed after 3 retries, using fallback mode')
+          return null
+        }
         return Math.min(times * 100, 2000)
       },
     })
     
     redis.on('error', (err) => {
       console.warn('Redis connection error:', err.message)
+      // Don't let errors propagate
+    })
+    
+    redis.on('close', () => {
+      console.warn('Redis connection closed')
     })
 
-    // Attempt to connect, but don't crash if it fails
-    redis.connect().catch((err) => {
-      console.warn('Redis not available, using fallback mode:', err.message)
-      redis = null
-    })
+    // Don't attempt to connect immediately - let it connect on first use
+    // This prevents errors during module initialization
   } catch (error) {
     console.warn('Redis initialization failed, will use fallback mode')
     redis = null
   }
+} else {
+  console.log('REDIS_URL not set, using fallback mode for job processing')
 }
 
 export { redis }

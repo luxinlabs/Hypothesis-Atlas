@@ -10,7 +10,7 @@ let evidenceQueue: Queue<JobData> | null = null
 
 if (redis) {
   evidenceQueue = new Queue<JobData>('evidence-mapping', {
-    connection: redis,
+    connection: redis as any,
   })
 }
 

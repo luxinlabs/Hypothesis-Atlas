@@ -15,7 +15,7 @@ const worker = new Worker(
     await processEvidenceMapping(job.data)
   },
   {
-    connection: redis,
+    connection: redis as any,
     concurrency: 2,
   }
 )

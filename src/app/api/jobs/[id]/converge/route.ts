@@ -6,8 +6,11 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  let selectedTopics: string[] = []
+  
   try {
-    const { selectedTopics } = await request.json()
+    const body = await request.json()
+    selectedTopics = body.selectedTopics
 
     if (!selectedTopics || !Array.isArray(selectedTopics) || selectedTopics.length === 0) {
       return NextResponse.json({ error: 'Selected topics are required' }, { status: 400 })

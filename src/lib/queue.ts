@@ -1,4 +1,3 @@
-import { Queue, Worker, Job as BullJob } from 'bullmq'
 import { redis } from './redis'
 
 export interface JobData {
@@ -6,20 +5,29 @@ export interface JobData {
   topicQuery: string
 }
 
-let evidenceQueue: Queue<JobData> | null = null
+let evidenceQueue: any = null
 
-if (redis) {
-  evidenceQueue = new Queue<JobData>('evidence-mapping', {
-    connection: redis as any,
-  })
+// Only import and create queue if Redis is available
+// This prevents bullmq from trying to connect when REDIS_URL is not set
+async function initQueue() {
+  if (redis && !evidenceQueue) {
+    const { Queue } = await import('bullmq')
+    evidenceQueue = new Queue<JobData>('evidence-mapping', {
+      connection: redis as any,
+    })
+  }
+  return evidenceQueue
 }
 
 export { evidenceQueue }
 
 export async function addEvidenceMappingJob(jobId: string, topicQuery: string) {
-  if (evidenceQueue) {
-    await evidenceQueue.add('map-evidence', { jobId, topicQuery })
+  const queue = await initQueue()
+  
+  if (queue) {
+    await queue.add('map-evidence', { jobId, topicQuery })
   } else {
+    // Fallback: process directly without queue
     const { processEvidenceMapping } = await import('../worker/processor')
     setTimeout(() => {
       processEvidenceMapping({ jobId, topicQuery })

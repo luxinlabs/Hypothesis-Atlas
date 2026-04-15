@@ -58,18 +58,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log('Creating job for topic:', topicQuery)
     const job = await prisma.job.create({
       data: {
         topicQuery,
         status: 'pending',
       },
     })
+    console.log('Job created:', job.id)
 
+    console.log('Adding job to queue...')
     await addEvidenceMappingJob(job.id, topicQuery)
+    console.log('Job added to queue')
 
     return NextResponse.json({ jobId: job.id })
   } catch (error) {
     console.error('Error creating job:', error)
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack')
     return NextResponse.json(
       { error: 'Failed to create job' },
       { status: 500 }

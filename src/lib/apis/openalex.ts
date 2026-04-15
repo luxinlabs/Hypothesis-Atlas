@@ -24,6 +24,7 @@ export async function searchOpenAlex(query: string, limit: number = 30): Promise
       headers: {
         'User-Agent': 'HypothesisAtlas/1.0 (mailto:research@example.com)',
       },
+      signal: AbortSignal.timeout(15000),
     })
 
     if (!response.ok) {

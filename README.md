@@ -2,6 +2,10 @@
 
 A biotech research evidence mapping platform that automatically discovers, analyzes, and visualizes scientific knowledge from multiple sources including peer-reviewed papers, datasets, and social signals.
 
+## Demo
+
+- YouTube walkthrough: https://youtu.be/RuZt-DyZ1bE
+
 ## Features
 
 - **Interactive Word Cloud**: Explore biotech topics including neural interfaces, CRISPR, single-cell RNA-seq, and more
@@ -27,71 +31,60 @@ A biotech research evidence mapping platform that automatically discovers, analy
 - Docker and Docker Compose (for PostgreSQL and Redis)
 - Groq API key (optional but recommended)
 
-## Setup Instructions
+## Quick Start
 
-### 1. Clone and Install Dependencies
+### 1) Install dependencies
 
 ```bash
-cd ATLAS
 npm install
 ```
 
-### 2. Configure Environment Variables
+### 2) Configure environment variables
 
-Copy the example environment file and add your Groq API key:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
+Create `.env` (or update existing) with:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/hypothesis_atlas?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/hypothesis_atlas?schema=public"
 REDIS_URL="redis://localhost:6379"
 GROQ_API_KEY="your_groq_api_key_here"
 ```
 
-**Note**: Get a free Groq API key at https://console.groq.com. The app will work without it using fallback logic, but results will be less sophisticated.
+Get a free Groq API key at https://console.groq.com.
 
-### 3. Start PostgreSQL and Redis
+### 3) Start local infrastructure
 
 ```bash
-docker-compose up -d
+make infra-up
 ```
 
 This starts:
 
-- PostgreSQL on port 5432
-- Redis on port 6379
+- PostgreSQL on host port `5433`
+- Redis on host port `6379`
 
-### 4. Initialize Database
-
-```bash
-npm run db:push
-```
-
-This creates all necessary tables using Prisma.
-
-### 5. Start the Development Server
+### 4) Initialize database schema
 
 ```bash
-npm run dev
+make db-push
 ```
 
-The app will be available at `http://localhost:3000`
+### 5) Start app and worker (two terminals)
 
-### 6. Start the Background Worker
-
-In a separate terminal:
+Terminal A:
 
 ```bash
-npm run worker
+make dev
 ```
 
-This starts the BullMQ worker that processes evidence mapping jobs.
+Terminal B:
 
-**Note**: If Redis is not available, jobs will automatically fall back to setTimeout-based processing.
+```bash
+make worker
+```
+
+App URL: `http://localhost:3000`
+
+> The worker is required for queue-based processing. If `REDIS_URL` is unset, the app falls back to in-process `setTimeout` handling.
 
 ## Usage
 
@@ -187,6 +180,9 @@ ATLAS/
 │       ├── index.ts           # BullMQ worker
 │       └── processor.ts       # Evidence mapping pipeline
 ├── docker-compose.yml
+├── Makefile
+├── railway.json              # Worker deploy config for Railway
+├── LICENSE
 ├── package.json
 └── README.md
 ```
@@ -320,123 +316,83 @@ npm run db:push
 - Implement collaborative filtering for topic recommendations
 - Add export to Markdown/PDF
 
-## Deployment to Vercel
+## Deployment (Production)
 
-### Prerequisites
+### Architecture (recommended)
 
-1. **Vercel Account**: Sign up at [vercel.com](https://vercel.com)
-2. **PostgreSQL Database**: Use [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres), [Neon](https://neon.tech), or [Supabase](https://supabase.com)
-3. **Redis Instance**: Use [Upstash Redis](https://upstash.com) (free tier available)
-4. **Groq API Key**: Get from [console.groq.com](https://console.groq.com)
+- **Web app**: Vercel (`Next.js`)
+- **Database**: Neon / Supabase / Vercel Postgres
+- **Queue**: Upstash Redis (or equivalent Redis)
+- **Worker**: Railway (runs `npm run worker`)
 
-### Step-by-Step Deployment
+### Why worker is separate
 
-#### 1. Set Up External Services
+`npm run worker` does not run inside Vercel serverless deployments. Queue-based processing in production requires a separate worker service.
 
-**PostgreSQL Database:**
+### 1) Deploy web app to Vercel
 
-- Create a PostgreSQL database (recommended: Vercel Postgres or Neon)
-- Copy the connection string (format: `postgresql://user:password@host:port/database`)
-
-**Redis:**
-
-- Create an Upstash Redis database
-- Copy the Redis URL (format: `redis://default:password@host:port`)
-
-#### 2. Deploy to Vercel
-
-**Option A: Deploy via Vercel CLI**
+Set these env vars in Vercel project settings:
 
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy from project root
-vercel
-
-# Follow the prompts to link your project
-```
-
-**Option B: Deploy via GitHub**
-
-1. Push your code to GitHub
-2. Go to [vercel.com/new](https://vercel.com/new)
-3. Import your GitHub repository
-4. Configure the project (Vercel will auto-detect Next.js)
-
-#### 3. Configure Environment Variables
-
-In your Vercel project settings, add these environment variables:
-
-```
 DATABASE_URL=postgresql://user:password@host:port/database
 REDIS_URL=redis://default:password@host:port
 GROQ_API_KEY=your_groq_api_key_here
 ```
 
-#### 4. Initialize Database Schema
-
-After deployment, run this command locally to push the schema to your production database:
+Deploy:
 
 ```bash
-# Set your production DATABASE_URL temporarily
+make deploy-web
+```
+
+### 2) Deploy worker to Railway
+
+This repo includes `railway.json` with `startCommand: npm run worker`.
+
+Railway steps:
+
+1. Create a new Railway project from this GitHub repo.
+2. Add env vars: `DATABASE_URL`, `REDIS_URL`, `GROQ_API_KEY`.
+3. Deploy (Railway will use `railway.json` automatically).
+4. Confirm worker logs show: `Worker started and listening for jobs...`
+
+### 3) Push schema to production database
+
+```bash
 DATABASE_URL="your_production_db_url" npm run db:push
 ```
 
-#### 5. Important Notes for Production
-
-**Background Worker:**
-
-- The background worker (`npm run worker`) cannot run on Vercel's serverless functions
-- Options:
-  - **Option 1**: Deploy worker separately on a service like [Railway](https://railway.app) or [Render](https://render.com)
-  - **Option 2**: Use Vercel's [Background Functions](https://vercel.com/docs/functions/background-functions) (Pro plan required)
-  - **Option 3**: The app will fallback to setTimeout-based processing (works but less reliable)
-
-**Recommended Architecture for Production:**
-
-```
-┌─────────────────┐
-│  Vercel (Web)   │ ← Next.js app
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    │         │
-┌───▼──┐  ┌──▼────┐
-│ DB   │  │ Redis │
-│(Neon)│  │(Upstash)
-└──────┘  └───┬───┘
-              │
-      ┌───────▼────────┐
-      │ Worker Service │ ← Railway/Render
-      │ (npm run worker)│
-      └────────────────┘
-```
-
-**Deploy Worker to Railway (Recommended):**
-
-1. Create account at [railway.app](https://railway.app)
-2. Create new project from GitHub repo
-3. Set build command: `npm install`
-4. Set start command: `npm run worker`
-5. Add same environment variables (DATABASE_URL, REDIS_URL, GROQ_API_KEY)
-
-### Vercel Configuration
-
-The `vercel.json` file is already configured with:
-
-- Build command that generates Prisma client
-- Environment variable references
-- Optimized build settings
-
-### Post-Deployment
-
-1. Visit your Vercel deployment URL
-2. Click on a biotech topic to create a job
-3. Monitor the progress timeline
-4. Explore the knowledge tree and notebook features
-
 ## Troubleshooting
+
+**Jobs stuck at "Initializing pipeline"?**
+
+This is the most common issue - it means the worker isn't running:
+
+1. **Check if worker is running:**
+
+   ```bash
+   pgrep -f "npm run worker" || echo "Worker not running"
+   ```
+
+2. **Start the worker:**
+
+   ```bash
+   # In a separate terminal
+   npm run worker
+   ```
+
+3. **Verify Redis is accessible:**
+
+   ```bash
+   docker exec -it hypothesis_atlas_redis redis-cli ping
+   # Should return: PONG
+   ```
+
+4. **Alternative without Redis:**
+   ```bash
+   # Temporarily remove REDIS_URL from .env
+   # Jobs will use setTimeout fallback (slower but works)
+   ```
 
 **Worker not processing jobs?**
 
@@ -467,9 +423,26 @@ The `vercel.json` file is already configured with:
 - Ensure all environment variables are set
 - Verify Prisma schema is valid: `npx prisma validate`
 
+## Contributing
+
+Contributions are welcome.
+
+1. Fork the repo and create a feature branch.
+2. Keep changes focused and include clear commit messages.
+3. Update docs for any behavior/config changes.
+4. Open a PR with a concise description and screenshots/logs if relevant.
+
+For larger changes, open an issue first to discuss approach.
+
+## Security
+
+- Never commit secrets (`DATABASE_URL`, `REDIS_URL`, `GROQ_API_KEY`).
+- Use environment variables in local/dev/prod.
+- Report security issues privately to project maintainers.
+
 ## License
 
-MIT
+This project is licensed under the MIT License. See `LICENSE` for details.
 
 ## Acknowledgments
 

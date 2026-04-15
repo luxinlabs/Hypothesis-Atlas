@@ -12,14 +12,18 @@ export async function searchPubMed(query: string, limit: number = 20): Promise<P
   try {
     const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json&sort=relevance`
     
-    const searchResponse = await fetch(searchUrl)
+    const searchResponse = await fetch(searchUrl, {
+      signal: AbortSignal.timeout(10000)
+    })
     const searchData = await searchResponse.json()
     
     const ids = searchData.esearchresult?.idlist || []
     if (ids.length === 0) return []
     
     const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${ids.join(',')}&retmode=xml`
-    const fetchResponse = await fetch(fetchUrl)
+    const fetchResponse = await fetch(fetchUrl, {
+      signal: AbortSignal.timeout(15000)
+    })
     const xmlText = await fetchResponse.text()
     
     return parsePubMedXML(xmlText)

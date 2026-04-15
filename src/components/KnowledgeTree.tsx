@@ -66,11 +66,18 @@ export default function KnowledgeTree({
         method: "POST",
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         setErrorMessage(
           data.message || data.error || "Failed to build children",
         );
+        setBuildingChildren(null);
+        return;
+      }
+
+      if (data.alreadyBuilt) {
+        fetchNodeTree();
         setBuildingChildren(null);
       }
     } catch (error) {

@@ -12,7 +12,10 @@ export async function searchGEO(query: string, limit: number = 15): Promise<GEOD
   try {
     const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gds&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json`
     
-    const searchResponse = await fetch(searchUrl)
+    // Add 10 second timeout to prevent hanging
+    const searchResponse = await fetch(searchUrl, { 
+      signal: AbortSignal.timeout(10000)
+    })
     if (!searchResponse.ok) {
       console.warn(`GEO search failed with status ${searchResponse.status}`)
       return []
@@ -24,7 +27,9 @@ export async function searchGEO(query: string, limit: number = 15): Promise<GEOD
     if (ids.length === 0) return []
     
     const summaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=gds&id=${ids.join(',')}&retmode=json`
-    const summaryResponse = await fetch(summaryUrl)
+    const summaryResponse = await fetch(summaryUrl, {
+      signal: AbortSignal.timeout(10000)
+    })
     
     if (!summaryResponse.ok) {
       console.warn(`GEO summary failed with status ${summaryResponse.status}`)

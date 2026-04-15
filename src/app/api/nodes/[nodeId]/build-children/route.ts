@@ -31,10 +31,12 @@ export async function POST(
     })
 
     if (existingChildren > 0) {
-      return NextResponse.json(
-        { error: 'Children already exist for this node' },
-        { status: 400 }
-      )
+      return NextResponse.json({
+        message: 'Children already exist for this node',
+        nodeId: params.nodeId,
+        alreadyBuilt: true,
+        childCount: existingChildren,
+      })
     }
 
     // Trigger the build process directly

@@ -1,10 +1,11 @@
 SHELL := /bin/bash
 
-.PHONY: help install infra-up infra-down infra-restart db-push db-studio dev worker build start lint test deploy-web deploy-preview deploy-worker-note
+.PHONY: help install laptop-install infra-up infra-down infra-restart db-push db-studio dev worker build start lint test deploy-web deploy-preview deploy-worker-note
 
 help:
 	@echo "Available targets:"
 	@echo "  make install            Install npm dependencies"
+	@echo "  make laptop-install     One-command local setup for laptops"
 	@echo "  make infra-up           Start local Postgres + Redis with Docker"
 	@echo "  make infra-down         Stop local Postgres + Redis"
 	@echo "  make infra-restart      Restart local Postgres + Redis"
@@ -22,6 +23,9 @@ help:
 
 install:
 	npm install
+
+laptop-install:
+	bash scripts/laptop-install.sh
 
 infra-up:
 	docker-compose up -d

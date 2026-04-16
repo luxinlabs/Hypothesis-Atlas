@@ -22,6 +22,41 @@ interface ProgressEvent {
   timestamp: number;
 }
 
+type Theme = "dark" | "light" | "vibrant";
+
+const THEME_STYLES = {
+  dark: {
+    page: "bg-[#0a0a0f] text-white",
+    pageSoft: "bg-zinc-900/90 border-zinc-800",
+    pageMuted: "bg-zinc-900/80 border-zinc-800",
+    tabBar: "bg-zinc-900 border-zinc-800",
+    tabActive: "border-indigo-400 text-indigo-300",
+    tabIdle: "text-zinc-400 hover:text-zinc-200 hover:border-zinc-600",
+    title:
+      "bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent",
+  },
+  light: {
+    page: "bg-gradient-to-b from-white to-zinc-50 text-zinc-900",
+    pageSoft: "bg-white/90 border-gray-200",
+    pageMuted: "bg-white/80 border-gray-200",
+    tabBar: "bg-white border-gray-200",
+    tabActive: "border-blue-500 text-blue-600",
+    tabIdle: "text-gray-500 hover:text-gray-700 hover:border-gray-300",
+    title:
+      "bg-gradient-to-r from-blue-800 to-indigo-800 bg-clip-text text-transparent",
+  },
+  vibrant: {
+    page: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50 text-zinc-900",
+    pageSoft: "bg-white/80 border-rose-200",
+    pageMuted: "bg-white/85 border-zinc-200",
+    tabBar: "bg-white/80 border-rose-200",
+    tabActive: "border-fuchsia-500 text-fuchsia-700",
+    tabIdle: "text-zinc-500 hover:text-zinc-700 hover:border-zinc-300",
+    title:
+      "bg-gradient-to-r from-fuchsia-700 to-orange-700 bg-clip-text text-transparent",
+  },
+} as const;
+
 export default function JobPage() {
   const params = useParams();
   const jobId = params.id as string;
@@ -32,6 +67,16 @@ export default function JobPage() {
   const [activeTab, setActiveTab] = useState<"knowledge" | "notebook">(
     "knowledge",
   );
+  const [theme, setTheme] = useState<Theme>("light");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme") as Theme | null;
+    if (saved && ["dark", "light", "vibrant"].includes(saved)) {
+      setTheme(saved);
+    }
+  }, []);
+
+  const t = THEME_STYLES[theme];
 
   useEffect(() => {
     const fetchJob = () => {
@@ -71,7 +116,9 @@ export default function JobPage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      <div
+        className={`min-h-screen flex items-center justify-center ${t.page}`}
+      >
         <div className="text-center">
           <div className="relative mb-6">
             <div className="animate-spin rounded-full h-20 w-20 border-4 border-gray-200 mx-auto"></div>
@@ -86,8 +133,10 @@ export default function JobPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 px-6 py-5 shadow-sm">
+    <div className={`min-h-screen ${t.page} transition-all duration-500`}>
+      <header
+        className={`${t.pageSoft} backdrop-blur-sm border-b px-6 py-5 shadow-sm`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -106,10 +155,10 @@ export default function JobPage() {
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className={`text-2xl font-bold ${t.title}`}>
                 {job.topicQuery}
               </h1>
-              <p className="text-xs text-gray-500 font-mono mt-0.5">
+              <p className="text-xs text-zinc-500 font-mono mt-0.5">
                 ID: {job.id.slice(0, 12)}...
               </p>
             </div>
@@ -136,15 +185,15 @@ export default function JobPage() {
       </header>
 
       {/* Tab Navigation */}
-      <div className="bg-white border-b border-gray-200">
+      <div className={`${t.tabBar} border-b`}>
         <div className="px-6">
           <nav className="flex space-x-8">
             <button
               onClick={() => setActiveTab("knowledge")}
               className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === "knowledge"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  ? t.tabActive
+                  : `border-transparent ${t.tabIdle}`
               }`}
             >
               <div className="flex items-center gap-2">
@@ -168,8 +217,8 @@ export default function JobPage() {
               onClick={() => setActiveTab("notebook")}
               className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === "notebook"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  ? t.tabActive
+                  : `border-transparent ${t.tabIdle}`
               }`}
             >
               <div className="flex items-center gap-2">
@@ -197,7 +246,7 @@ export default function JobPage() {
         {activeTab === "knowledge" ? (
           <>
             <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200 overflow-y-auto shadow-sm">
-              <ProgressTimeline events={events} />
+              <ProgressTimeline events={events} theme={theme} />
             </div>
 
             <div className="flex-1 overflow-y-auto p-8">
@@ -208,6 +257,7 @@ export default function JobPage() {
                   onNodeSelect={setSelectedNodeId}
                   events={events}
                   jobId={jobId}
+                  theme={theme}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full">
@@ -227,9 +277,11 @@ export default function JobPage() {
               )}
             </div>
 
-            <div className="w-96 bg-white/80 backdrop-blur-sm border-l border-gray-200 overflow-y-auto shadow-sm">
+            <div
+              className={`w-96 ${t.pageMuted} backdrop-blur-sm border-l overflow-y-auto shadow-sm`}
+            >
               {selectedNodeId ? (
-                <NodeDetail nodeId={selectedNodeId} />
+                <NodeDetail nodeId={selectedNodeId} theme={theme} />
               ) : (
                 <div className="p-8 text-center">
                   <div className="bg-gray-50 rounded-xl p-8 border-2 border-dashed border-gray-300">
@@ -258,7 +310,7 @@ export default function JobPage() {
             </div>
           </>
         ) : (
-          <NotebookTab jobId={jobId} />
+          <NotebookTab jobId={jobId} theme={theme} />
         )}
       </div>
     </div>

@@ -7,16 +7,20 @@ interface ChatPanelProps {
   messages: NotebookMessage[];
   onSendMessage: (message: string) => void;
   isLoading?: boolean;
+  theme?: "dark" | "light" | "vibrant";
 }
 
 export default function ChatPanel({
   messages,
   onSendMessage,
   isLoading = false,
+  theme = "light",
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isDark = theme === "dark";
+  const isVibrant = theme === "vibrant";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -86,17 +90,29 @@ export default function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-        <h3 className="font-semibold text-gray-900">Topic Copilot</h3>
-        <p className="text-xs text-gray-600 mt-1">
+    <div
+      className={`flex flex-col h-full ${isDark ? "bg-zinc-900" : isVibrant ? "bg-white/90" : "bg-white"}`}
+    >
+      <div
+        className={`p-4 border-b ${isDark ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50"}`}
+      >
+        <h3
+          className={`font-semibold ${isDark ? "text-zinc-100" : "text-gray-900"}`}
+        >
+          Topic Copilot
+        </h3>
+        <p
+          className={`text-xs mt-1 ${isDark ? "text-zinc-400" : "text-gray-600"}`}
+        >
           Chat about research ideas grounded in your sources
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
+          <div
+            className={`text-center py-8 ${isDark ? "text-zinc-400" : "text-gray-500"}`}
+          >
             <svg
               className="w-12 h-12 text-gray-300 mx-auto mb-3"
               fill="none"
@@ -184,7 +200,7 @@ export default function ChatPanel({
 
       <form
         onSubmit={handleSubmit}
-        className="p-4 border-t border-gray-200 bg-gray-50"
+        className={`p-4 border-t ${isDark ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-gray-50"}`}
       >
         <div className="flex gap-2">
           <textarea

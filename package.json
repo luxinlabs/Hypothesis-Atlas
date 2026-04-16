@@ -13,24 +13,26 @@
     "postinstall": "bash scripts/postinstall.sh"
   },
   "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "bullmq": "^5.1.0",
+    "groq-sdk": "^0.3.0",
+    "ioredis": "^5.3.2",
     "next": "14.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@prisma/client": "^5.8.0",
-    "bullmq": "^5.1.0",
-    "ioredis": "^5.3.2",
-    "groq-sdk": "^0.3.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.17",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.4",
     "postcss": "^8.4.33",
-    "tailwindcss": "^3.4.1",
     "prisma": "^5.8.0",
-    "tsx": "^4.7.0"
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
   }
 }

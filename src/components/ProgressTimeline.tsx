@@ -10,7 +10,47 @@ interface ProgressEvent {
 
 interface ProgressTimelineProps {
   events: ProgressEvent[];
+  theme?: "dark" | "light" | "vibrant";
 }
+
+const THEME_STYLES = {
+  dark: {
+    title: "text-zinc-100",
+    subtitle: "text-zinc-400",
+    pending: "text-zinc-500",
+    message: "text-zinc-300",
+    timestamp: "text-zinc-500",
+    count: "text-indigo-200 bg-indigo-500/20",
+    completeCard: "bg-green-500/10 border-green-500/30",
+    completeTitle: "text-green-300",
+    completeText: "text-green-400",
+    empty: "text-zinc-400 bg-zinc-900/70",
+  },
+  light: {
+    title: "text-gray-900",
+    subtitle: "text-gray-600",
+    pending: "text-gray-500",
+    message: "text-gray-600",
+    timestamp: "text-gray-400",
+    count: "text-blue-600 bg-blue-100",
+    completeCard: "bg-green-50 border-green-200",
+    completeTitle: "text-green-800",
+    completeText: "text-green-600",
+    empty: "text-gray-500 bg-gray-50",
+  },
+  vibrant: {
+    title: "text-zinc-900",
+    subtitle: "text-zinc-600",
+    pending: "text-zinc-500",
+    message: "text-zinc-600",
+    timestamp: "text-zinc-400",
+    count: "text-fuchsia-700 bg-fuchsia-100",
+    completeCard: "bg-green-50/80 border-green-200",
+    completeTitle: "text-green-800",
+    completeText: "text-green-600",
+    empty: "text-zinc-500 bg-white/70",
+  },
+} as const;
 
 const PIPELINE_STAGES = [
   { key: "init", label: "Initialization", icon: "🚀" },
@@ -36,7 +76,12 @@ const stageLabels: Record<string, string> = {
   error: "Error",
 };
 
-export default function ProgressTimeline({ events }: ProgressTimelineProps) {
+export default function ProgressTimeline({
+  events,
+  theme = "light",
+}: ProgressTimelineProps) {
+  const t = THEME_STYLES[theme];
+
   const getStageStatus = (stageKey: string) => {
     const stageEvents = events.filter((e) => e.stage === stageKey);
     if (stageEvents.length === 0) return "pending";
@@ -54,10 +99,10 @@ export default function ProgressTimeline({ events }: ProgressTimelineProps) {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-2">
+        <h2 className={`text-lg font-bold mb-2 ${t.title}`}>
           Pipeline Progress
         </h2>
-        <p className="text-xs text-gray-600">Evidence mapping stages</p>
+        <p className={`text-xs ${t.subtitle}`}>Evidence mapping stages</p>
       </div>
 
       <div className="space-y-3">
@@ -117,23 +162,25 @@ export default function ProgressTimeline({ events }: ProgressTimelineProps) {
                     {stage.label}
                   </span>
                   {stageEvent?.count !== undefined && (
-                    <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                    <span
+                      className={`text-xs font-bold px-2 py-1 rounded-full ${t.count}`}
+                    >
                       {stageEvent.count}
                     </span>
                   )}
                 </div>
                 {stageEvent && (
                   <>
-                    <p className="text-xs text-gray-600 mb-1">
+                    <p className={`text-xs mb-1 ${t.message}`}>
                       {stageEvent.message}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className={`text-xs ${t.timestamp}`}>
                       {new Date(stageEvent.timestamp).toLocaleTimeString()}
                     </p>
                   </>
                 )}
                 {!stageEvent && isPending && (
-                  <p className="text-xs text-gray-400">Waiting...</p>
+                  <p className={`text-xs ${t.pending}`}>Waiting...</p>
                 )}
               </div>
             </div>
@@ -142,14 +189,14 @@ export default function ProgressTimeline({ events }: ProgressTimelineProps) {
       </div>
 
       {isComplete && (
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <div className={`mt-6 p-4 border rounded-lg ${t.completeCard}`}>
           <div className="flex items-center gap-2">
             <span className="text-2xl">🎉</span>
             <div>
-              <p className="text-sm font-bold text-green-800">
+              <p className={`text-sm font-bold ${t.completeTitle}`}>
                 Evidence Mapping Complete!
               </p>
-              <p className="text-xs text-green-600">
+              <p className={`text-xs ${t.completeText}`}>
                 Knowledge tree is ready to explore
               </p>
             </div>
@@ -158,7 +205,7 @@ export default function ProgressTimeline({ events }: ProgressTimelineProps) {
       )}
 
       {events.length === 0 && (
-        <div className="text-center text-gray-500 text-sm py-8 bg-gray-50 rounded-lg">
+        <div className={`text-center text-sm py-8 rounded-lg ${t.empty}`}>
           <div className="animate-pulse">
             <p className="font-semibold mb-1">Initializing pipeline...</p>
             <p className="text-xs">Waiting for worker to start processing</p>

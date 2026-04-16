@@ -10,6 +10,7 @@ interface PageListProps {
   onPageCreate: (title: string) => void;
   onPageDelete: (pageId: string) => void;
   isLoading?: boolean;
+  theme?: "dark" | "light" | "vibrant";
 }
 
 export default function PageList({
@@ -19,6 +20,7 @@ export default function PageList({
   onPageCreate,
   onPageDelete,
   isLoading = false,
+  theme = "light",
 }: PageListProps) {
   const [newPageTitle, setNewPageTitle] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -53,14 +55,25 @@ export default function PageList({
     });
   };
 
+  const isDark = theme === "dark";
+  const isVibrant = theme === "vibrant";
+
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="p-4 border-b border-gray-200">
+    <div
+      className={`flex flex-col h-full ${isDark ? "bg-zinc-900" : isVibrant ? "bg-white/90" : "bg-white"}`}
+    >
+      <div
+        className={`p-4 border-b ${isDark ? "border-zinc-800" : "border-gray-200"}`}
+      >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-900">Notebook Pages</h3>
+          <h3
+            className={`font-semibold ${isDark ? "text-zinc-100" : "text-gray-900"}`}
+          >
+            Notebook Pages
+          </h3>
           <button
             onClick={() => setIsCreating(true)}
-            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            className={`p-2 text-blue-600 rounded-lg transition-colors ${isDark ? "hover:bg-zinc-800" : "hover:bg-blue-50"}`}
             title="New page"
           >
             <svg
@@ -86,7 +99,7 @@ export default function PageList({
               value={newPageTitle}
               onChange={(e) => setNewPageTitle(e.target.value)}
               placeholder="Page title..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-zinc-800 border-zinc-700 text-zinc-100" : "border-gray-300"}`}
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -110,7 +123,7 @@ export default function PageList({
                   setIsCreating(false);
                   setNewPageTitle("");
                 }}
-                className="flex-1 px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className={`flex-1 px-3 py-1 text-sm rounded-lg ${isDark ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
               >
                 Cancel
               </button>

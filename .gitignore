@@ -25,7 +25,6 @@ yarn-error.log*
 # local env files
 .env
 .env*.local
-.env.example
 
 # vercel
 .vercel
@@ -37,6 +36,3 @@ next-env.d.ts
 # prisma
 prisma/migrations
 
-# markdown files except README
-*.md
-!README.md

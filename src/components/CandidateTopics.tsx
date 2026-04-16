@@ -10,6 +10,7 @@ interface CandidateTopicsProps {
   onAddCandidate: (label: string) => void;
   onArchiveCandidate: (candidateId: string) => void;
   isLoading?: boolean;
+  theme?: "dark" | "light" | "vibrant";
 }
 
 export default function CandidateTopics({
@@ -19,6 +20,7 @@ export default function CandidateTopics({
   onAddCandidate,
   onArchiveCandidate,
   isLoading = false,
+  theme = "light",
 }: CandidateTopicsProps) {
   const [newCandidate, setNewCandidate] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -50,11 +52,22 @@ export default function CandidateTopics({
   const activeCandidates = candidates.filter((c) => c.status === "active");
   const selectedCount = selectedCandidates.length;
 
+  const isDark = theme === "dark";
+  const isVibrant = theme === "vibrant";
+
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="p-4 border-b border-gray-200">
+    <div
+      className={`flex flex-col h-full ${isDark ? "bg-zinc-900" : isVibrant ? "bg-white/90" : "bg-white"}`}
+    >
+      <div
+        className={`p-4 border-b ${isDark ? "border-zinc-800" : "border-gray-200"}`}
+      >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-900">Candidate Topics</h3>
+          <h3
+            className={`font-semibold ${isDark ? "text-zinc-100" : "text-gray-900"}`}
+          >
+            Candidate Topics
+          </h3>
           {selectedCount > 0 && (
             <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
               {selectedCount} selected
@@ -69,7 +82,7 @@ export default function CandidateTopics({
               value={newCandidate}
               onChange={(e) => setNewCandidate(e.target.value)}
               placeholder="Add topic..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${isDark ? "bg-zinc-800 border-zinc-700 text-zinc-100" : "border-gray-300"}`}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleAddCandidate();
@@ -204,7 +217,9 @@ export default function CandidateTopics({
       </div>
 
       {selectedCount > 0 && (
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
+        <div
+          className={`p-4 border-t ${isDark ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-gray-50"}`}
+        >
           <div className="text-xs text-gray-600 mb-2">
             {selectedCount} topic{selectedCount !== 1 ? "s" : ""} selected for
             convergence

@@ -9,6 +9,7 @@ interface SuggestedTopic {
 interface SuggestedTopicsProps {
   topics: SuggestedTopic[];
   onTopicClick: (label: string) => void;
+  theme?: "dark" | "light" | "vibrant";
 }
 
 const COLORS = [
@@ -25,11 +26,19 @@ const COLORS = [
 export default function SuggestedTopics({
   topics,
   onTopicClick,
+  theme = "light",
 }: SuggestedTopicsProps) {
   if (topics.length === 0) return null;
 
+  const shell =
+    theme === "dark"
+      ? "bg-zinc-900 border-zinc-800"
+      : theme === "vibrant"
+        ? "bg-white/80 border-rose-200"
+        : "bg-gradient-to-br from-blue-50 to-purple-50 border-gray-200";
+
   return (
-    <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-t border-gray-200">
+    <div className={`p-4 border-t ${shell}`}>
       <div className="mb-3">
         <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
           <svg

@@ -23,7 +23,32 @@ interface KnowledgeTreeProps {
   onNodeSelect: (nodeId: string) => void;
   events: ProgressEvent[];
   jobId: string;
+  theme?: "dark" | "light" | "vibrant";
 }
+
+const THEME_STYLES = {
+  dark: {
+    nodeIdle: "bg-zinc-900 text-zinc-200",
+    buildIdle: "bg-zinc-900 border-zinc-600",
+    buildLoading: "bg-zinc-800 text-zinc-500",
+    connector: "bg-zinc-700",
+    error: "bg-red-500/10 border border-red-500/30 text-red-300",
+  },
+  light: {
+    nodeIdle: "bg-white text-gray-700",
+    buildIdle: "bg-white",
+    buildLoading: "bg-gray-200 text-gray-500",
+    connector: "bg-gray-300",
+    error: "bg-red-50 border border-red-200 text-red-700",
+  },
+  vibrant: {
+    nodeIdle: "bg-white text-zinc-700",
+    buildIdle: "bg-white",
+    buildLoading: "bg-zinc-200 text-zinc-500",
+    connector: "bg-zinc-300",
+    error: "bg-rose-50 border border-rose-200 text-rose-700",
+  },
+} as const;
 
 export default function KnowledgeTree({
   rootNodeId,
@@ -31,7 +56,9 @@ export default function KnowledgeTree({
   onNodeSelect,
   events,
   jobId,
+  theme = "light",
 }: KnowledgeTreeProps) {
+  const t = THEME_STYLES[theme];
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [buildingChildren, setBuildingChildren] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -130,7 +157,7 @@ export default function KnowledgeTree({
             className={`rounded-lg transition-all ${sizeClasses} ${
               selectedNodeId === node.id
                 ? `${color.bg} text-white shadow-lg scale-105`
-                : `bg-white text-gray-700 border-2 ${color.border} ${color.hover} hover:shadow-md`
+                : `${t.nodeIdle} border-2 ${color.border} ${color.hover} hover:shadow-md`
             }`}
           >
             {node.label}
@@ -142,8 +169,8 @@ export default function KnowledgeTree({
               disabled={isBuilding}
               className={`text-xs px-3 py-1 rounded-full transition-all ${
                 isBuilding
-                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                  : `${color.text} bg-white border border-current hover:bg-opacity-10`
+                  ? `${t.buildLoading} cursor-not-allowed`
+                  : `${color.text} ${t.buildIdle} border border-current hover:bg-opacity-10`
               }`}
             >
               {isBuilding ? (
@@ -175,7 +202,7 @@ export default function KnowledgeTree({
 
         {hasChildren && (
           <>
-            <div className="w-0.5 h-8 bg-gray-300 my-3"></div>
+            <div className={`w-0.5 h-8 ${t.connector} my-3`}></div>
             <div
               className={`grid gap-6 w-full ${
                 level === 0
@@ -206,35 +233,15 @@ export default function KnowledgeTree({
   return (
     <div className="max-w-6xl mx-auto p-6">
       {errorMessage && (
-        <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-md animate-fade-in">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-red-500"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-red-800">{errorMessage}</p>
-            </div>
+        <div className={`mt-4 p-3 rounded text-sm ${t.error}`}>
+          <div className="flex items-center justify-between gap-3">
+            <p>{errorMessage}</p>
             <button
               onClick={() => setErrorMessage(null)}
-              className="ml-3 flex-shrink-0 text-red-500 hover:text-red-700"
+              className="text-current/70 hover:text-current"
+              aria-label="Dismiss error"
             >
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              ✕
             </button>
           </div>
         </div>
@@ -244,7 +251,9 @@ export default function KnowledgeTree({
         {renderNode(rootNode, 0)}
       </div>
 
-      <div className="mt-12 text-center text-sm text-gray-500">
+      <div
+        className={`mt-12 text-center text-sm ${theme === "dark" ? "text-zinc-400" : "text-gray-500"}`}
+      >
         <p>Click any node to view detailed analysis</p>
         <p className="text-xs mt-1">
           Click "Build Children" to explore subtopics (max 3 layers)

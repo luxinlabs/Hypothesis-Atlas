@@ -139,8 +139,12 @@ const THEME_STYLES = {
     cardActive: "bg-indigo-500/15 border-indigo-400 text-white",
     cardMuted: "text-zinc-400",
     cloud: "bg-zinc-900/70 border border-zinc-700",
+    futureButton:
+      "bg-zinc-800/70 border border-zinc-600 text-zinc-300 cursor-not-allowed",
+    headingPlate:
+      "inline-flex px-4 py-2 rounded-xl border border-zinc-600 bg-zinc-900/80 shadow-sm backdrop-blur-sm",
     heading:
-      "bg-gradient-to-r from-indigo-300 via-cyan-300 to-emerald-300 bg-clip-text text-transparent",
+      "bg-gradient-to-r from-indigo-200 via-cyan-200 to-emerald-200 bg-clip-text text-transparent drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]",
   },
   light: {
     mainBg: "bg-gradient-to-b from-white to-zinc-50",
@@ -154,8 +158,12 @@ const THEME_STYLES = {
     cardActive: "bg-blue-50 border-blue-500 text-zinc-900",
     cardMuted: "text-zinc-600",
     cloud: "bg-white/90 border border-gray-200/50",
+    futureButton:
+      "bg-white border border-slate-300 text-slate-700 cursor-not-allowed",
+    headingPlate:
+      "inline-flex px-4 py-2 rounded-xl border border-slate-300/90 bg-white/95 shadow-md",
     heading:
-      "bg-gradient-to-r from-blue-800 via-indigo-800 to-fuchsia-800 bg-clip-text text-transparent",
+      "bg-gradient-to-r from-slate-900 via-indigo-900 to-fuchsia-900 bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.55)]",
   },
   vibrant: {
     mainBg: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50",
@@ -169,8 +177,12 @@ const THEME_STYLES = {
     cardActive: "bg-fuchsia-50 border-fuchsia-500 text-zinc-900",
     cardMuted: "text-zinc-600",
     cloud: "bg-white/85 border border-zinc-200",
+    futureButton:
+      "bg-white/90 border border-rose-300 text-zinc-700 cursor-not-allowed",
+    headingPlate:
+      "inline-flex px-4 py-2 rounded-xl border border-rose-300/90 bg-white/92 shadow-md",
     heading:
-      "bg-gradient-to-r from-fuchsia-700 via-orange-700 to-cyan-700 bg-clip-text text-transparent",
+      "bg-gradient-to-r from-fuchsia-900 via-orange-900 to-cyan-900 bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.45)]",
   },
 } as const;
 
@@ -190,14 +202,6 @@ export default function ExplorePage() {
   const t = THEME_STYLES[theme];
 
   const handleWordClick = async (word: string) => {
-    const confirmed = window.confirm(
-      `Running this hosted analysis round is priced at $1.\n\nContinue with topic: "${word}"?`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setIsLoading(true);
     try {
       const response = await fetch("/api/jobs", {
@@ -225,9 +229,11 @@ export default function ExplorePage() {
       <div className="container mx-auto px-4 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className={`text-4xl font-bold ${t.heading}`}>
-              Hypothesis Atlas Explorer
-            </h1>
+            <div className={t.headingPlate}>
+              <h1 className={`text-4xl font-bold ${t.heading}`}>
+                Hypothesis Atlas Explorer
+              </h1>
+            </div>
             <p className={`${t.subText} mt-2`}>
               Click a topic to launch an evidence-mapping run.
             </p>
@@ -248,9 +254,15 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${t.banner}`}>
-          <strong>Pay-per-run mode:</strong> Hosted execution is priced at{" "}
-          <strong>$1 per round</strong>.
+        <div className="mb-6 flex justify-center">
+          <button
+            type="button"
+            disabled
+            className={`px-4 py-2 rounded-lg text-sm font-semibold shadow-sm ${t.futureButton}`}
+            title="Hosted $1 mode will be available in a future update"
+          >
+            $1 hosted mode — available in the future
+          </button>
         </div>
 
         <div

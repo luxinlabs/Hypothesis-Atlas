@@ -223,12 +223,14 @@ export default function PricingPage() {
               </div>
             </div>
 
-            <Link
-              href="/explore"
-              className="w-full py-3 rounded-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transition-all text-center block"
+            <button
+              type="button"
+              disabled
+              className="w-full py-3 rounded-lg font-semibold border border-purple-200 bg-purple-50 text-purple-700 cursor-not-allowed text-center"
+              title="Hosted $1 mode will be available in a future update"
             >
-              Try Hosted Version
-            </Link>
+              Hosted mode — available in the future
+            </button>
           </div>
         </div>
       </div>

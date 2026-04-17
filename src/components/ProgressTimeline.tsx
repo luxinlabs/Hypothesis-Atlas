@@ -21,6 +21,13 @@ const THEME_STYLES = {
     message: "text-zinc-300",
     timestamp: "text-zinc-500",
     count: "text-indigo-200 bg-indigo-500/20",
+    stageDone: "text-green-300",
+    stageActive: "text-indigo-300",
+    stagePending: "text-zinc-500",
+    stagePendingIcon: "bg-zinc-800 text-zinc-500",
+    connectorDone: "bg-green-400/70",
+    connectorPending: "bg-zinc-700",
+    activeDot: "bg-indigo-500 text-white shadow-md animate-pulse",
     completeCard: "bg-green-500/10 border-green-500/30",
     completeTitle: "text-green-300",
     completeText: "text-green-400",
@@ -33,6 +40,13 @@ const THEME_STYLES = {
     message: "text-gray-600",
     timestamp: "text-gray-400",
     count: "text-blue-600 bg-blue-100",
+    stageDone: "text-green-700",
+    stageActive: "text-blue-700",
+    stagePending: "text-gray-500",
+    stagePendingIcon: "bg-gray-200 text-gray-400",
+    connectorDone: "bg-green-300",
+    connectorPending: "bg-gray-200",
+    activeDot: "bg-blue-500 text-white shadow-md animate-pulse",
     completeCard: "bg-green-50 border-green-200",
     completeTitle: "text-green-800",
     completeText: "text-green-600",
@@ -45,6 +59,13 @@ const THEME_STYLES = {
     message: "text-zinc-600",
     timestamp: "text-zinc-400",
     count: "text-fuchsia-700 bg-fuchsia-100",
+    stageDone: "text-green-700",
+    stageActive: "text-fuchsia-700",
+    stagePending: "text-zinc-500",
+    stagePendingIcon: "bg-zinc-200 text-zinc-500",
+    connectorDone: "bg-green-300",
+    connectorPending: "bg-zinc-200",
+    activeDot: "bg-fuchsia-500 text-white shadow-md animate-pulse",
     completeCard: "bg-green-50/80 border-green-200",
     completeTitle: "text-green-800",
     completeText: "text-green-600",
@@ -120,12 +141,12 @@ export default function ProgressTimeline({
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
                     isCompleted
-                      ? "bg-green-500 text-white shadow-md"
+                      ? `${t.stageDone} bg-green-500 text-white shadow-md`
                       : isError
-                        ? "bg-red-500 text-white shadow-md"
+                        ? `${t.stageDone} bg-red-500 text-white shadow-md`
                         : isStarted
-                          ? "bg-blue-500 text-white shadow-md animate-pulse"
-                          : "bg-gray-200 text-gray-400"
+                          ? t.activeDot
+                          : t.stagePendingIcon
                   }`}
                 >
                   {isCompleted ? (
@@ -141,7 +162,7 @@ export default function ProgressTimeline({
                 {index < PIPELINE_STAGES.length - 1 && (
                   <div
                     className={`w-0.5 flex-1 mt-1 transition-colors ${
-                      isCompleted ? "bg-green-300" : "bg-gray-200"
+                      isCompleted ? t.connectorDone : t.connectorPending
                     }`}
                     style={{ minHeight: "20px" }}
                   />
@@ -153,10 +174,10 @@ export default function ProgressTimeline({
                   <span
                     className={`text-sm font-semibold ${
                       isCompleted
-                        ? "text-green-700"
+                        ? t.stageDone
                         : isStarted
-                          ? "text-blue-700"
-                          : "text-gray-500"
+                          ? t.stageActive
+                          : t.stagePending
                     }`}
                   >
                     {stage.label}

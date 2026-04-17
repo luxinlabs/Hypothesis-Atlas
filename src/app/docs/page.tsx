@@ -1,7 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+
+type Theme = "dark" | "light" | "vibrant";
+
+const THEME_STYLES = {
+  dark: {
+    mainBg: "bg-[#0a0a0f]",
+    header: "bg-zinc-900/90 border-zinc-800",
+    brand: "text-zinc-100 hover:text-zinc-300",
+    slash: "text-zinc-700",
+    sectionLabel: "text-zinc-400",
+    exploreLink: "text-zinc-300 hover:text-zinc-100",
+    homeButton: "bg-zinc-100 text-zinc-900 hover:bg-white",
+    sidebar: "border-zinc-800 bg-zinc-900/80",
+    navActive: "bg-indigo-500/20 text-indigo-200 font-semibold",
+    navIdle: "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+    contentShell: "bg-white",
+  },
+  light: {
+    mainBg: "bg-zinc-50",
+    header: "bg-white/80 border-zinc-200",
+    brand: "text-zinc-900 hover:text-zinc-700",
+    slash: "text-zinc-300",
+    sectionLabel: "text-zinc-500",
+    exploreLink: "text-zinc-600 hover:text-zinc-900",
+    homeButton: "bg-zinc-900 text-white hover:bg-zinc-800",
+    sidebar: "border-zinc-200 bg-white",
+    navActive: "bg-indigo-50 text-indigo-700 font-semibold",
+    navIdle: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+    contentShell: "bg-transparent",
+  },
+  vibrant: {
+    mainBg: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50",
+    header: "bg-white/85 border-rose-200",
+    brand: "text-zinc-900 hover:text-zinc-700",
+    slash: "text-zinc-300",
+    sectionLabel: "text-zinc-500",
+    exploreLink: "text-zinc-600 hover:text-zinc-900",
+    homeButton: "bg-zinc-900 text-white hover:bg-zinc-800",
+    sidebar: "border-rose-200 bg-white/90",
+    navActive: "bg-fuchsia-50 text-fuchsia-700 font-semibold",
+    navIdle: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+    contentShell: "bg-white/90",
+  },
+} as const;
 
 /* ── data ─────────────────────────────────────────────── */
 
@@ -190,6 +234,16 @@ const sections = [
 
 export default function DocsPage() {
   const [activeSection, setActiveSection] = useState("quickstart");
+  const [theme, setTheme] = useState<Theme>("light");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme") as Theme | null;
+    if (saved && ["dark", "light", "vibrant"].includes(saved)) {
+      setTheme(saved);
+    }
+  }, []);
+
+  const t = THEME_STYLES[theme];
 
   const scrollTo = (id: string) => {
     setActiveSection(id);
@@ -199,32 +253,31 @@ export default function DocsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50">
+    <main className={`min-h-screen ${t.mainBg} transition-all duration-500`}>
       {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-zinc-200">
+      <header
+        className={`sticky top-0 z-30 ${t.header} backdrop-blur border-b transition-colors duration-500`}
+      >
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="font-bold text-zinc-900 hover:text-zinc-700 transition-colors"
-            >
+            <Link href="/" className={`font-bold transition-colors ${t.brand}`}>
               Hypothesis Atlas
             </Link>
-            <span className="text-zinc-300">/</span>
-            <span className="text-zinc-500 text-sm font-medium">
+            <span className={t.slash}>/</span>
+            <span className={`text-sm font-medium ${t.sectionLabel}`}>
               Documentation
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/explore"
-              className="px-3 py-1.5 text-sm font-semibold text-zinc-600 hover:text-zinc-900 transition-colors"
+              className={`px-3 py-1.5 text-sm font-semibold transition-colors ${t.exploreLink}`}
             >
               Explorer
             </Link>
             <Link
               href="/"
-              className="px-3 py-1.5 text-sm font-semibold bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors"
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${t.homeButton}`}
             >
               Home
             </Link>
@@ -234,16 +287,16 @@ export default function DocsPage() {
 
       <div className="max-w-7xl mx-auto flex">
         {/* Sidebar */}
-        <aside className="hidden lg:block w-56 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto border-r border-zinc-200 bg-white py-6 px-4">
+        <aside
+          className={`hidden lg:block w-56 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto border-r py-6 px-4 transition-colors duration-500 ${t.sidebar}`}
+        >
           <nav className="space-y-1">
             {sections.map((s) => (
               <button
                 key={s.id}
                 onClick={() => scrollTo(s.id)}
                 className={`block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                  activeSection === s.id
-                    ? "bg-indigo-50 text-indigo-700 font-semibold"
-                    : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                  activeSection === s.id ? t.navActive : t.navIdle
                 }`}
               >
                 {s.label}
@@ -253,7 +306,9 @@ export default function DocsPage() {
         </aside>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 px-6 lg:px-12 py-10 space-y-12">
+        <div
+          className={`flex-1 min-w-0 px-6 lg:px-12 py-10 space-y-12 transition-colors duration-500 ${t.contentShell}`}
+        >
           {/* Quick Start */}
           <section id="quickstart">
             <h2 className="text-3xl font-bold text-zinc-900 mb-2">

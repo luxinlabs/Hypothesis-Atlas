@@ -29,6 +29,14 @@ const THEME_STYLES = {
     page: "bg-[#0a0a0f] text-white",
     pageSoft: "bg-zinc-900/90 border-zinc-800",
     pageMuted: "bg-zinc-900/80 border-zinc-800",
+    progressSidebar: "bg-zinc-900/85 border-zinc-800",
+    loadingCard: "bg-zinc-900/80 border border-zinc-700",
+    loadingTitle: "text-zinc-100",
+    loadingText: "text-zinc-400",
+    emptyNodeCard: "bg-zinc-900/70 border-zinc-700",
+    emptyNodeIcon: "text-zinc-500",
+    emptyNodeTitle: "text-zinc-300",
+    emptyNodeText: "text-zinc-500",
     tabBar: "bg-zinc-900 border-zinc-800",
     tabActive: "border-indigo-400 text-indigo-300",
     tabIdle: "text-zinc-400 hover:text-zinc-200 hover:border-zinc-600",
@@ -39,6 +47,14 @@ const THEME_STYLES = {
     page: "bg-gradient-to-b from-white to-zinc-50 text-zinc-900",
     pageSoft: "bg-white/90 border-gray-200",
     pageMuted: "bg-white/80 border-gray-200",
+    progressSidebar: "bg-white/80 border-gray-200",
+    loadingCard: "bg-white/80",
+    loadingTitle: "text-gray-800",
+    loadingText: "text-gray-600",
+    emptyNodeCard: "bg-gray-50 border-gray-300",
+    emptyNodeIcon: "text-gray-400",
+    emptyNodeTitle: "text-gray-600",
+    emptyNodeText: "text-gray-500",
     tabBar: "bg-white border-gray-200",
     tabActive: "border-blue-500 text-blue-600",
     tabIdle: "text-gray-500 hover:text-gray-700 hover:border-gray-300",
@@ -49,6 +65,14 @@ const THEME_STYLES = {
     page: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50 text-zinc-900",
     pageSoft: "bg-white/80 border-rose-200",
     pageMuted: "bg-white/85 border-zinc-200",
+    progressSidebar: "bg-white/85 border-rose-200",
+    loadingCard: "bg-white/85 border border-rose-200",
+    loadingTitle: "text-zinc-900",
+    loadingText: "text-zinc-600",
+    emptyNodeCard: "bg-white/80 border-rose-200",
+    emptyNodeIcon: "text-zinc-400",
+    emptyNodeTitle: "text-zinc-700",
+    emptyNodeText: "text-zinc-500",
     tabBar: "bg-white/80 border-rose-200",
     tabActive: "border-fuchsia-500 text-fuchsia-700",
     tabIdle: "text-zinc-500 hover:text-zinc-700 hover:border-zinc-300",
@@ -245,7 +269,9 @@ export default function JobPage() {
       <div className="flex h-[calc(100vh-89px-49px)]">
         {activeTab === "knowledge" ? (
           <>
-            <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200 overflow-y-auto shadow-sm">
+            <div
+              className={`w-80 ${t.progressSidebar} backdrop-blur-sm border-r overflow-y-auto shadow-sm`}
+            >
               <ProgressTimeline events={events} theme={theme} />
             </div>
 
@@ -261,15 +287,19 @@ export default function JobPage() {
                 />
               ) : (
                 <div className="flex items-center justify-center h-full">
-                  <div className="text-center bg-white/80 backdrop-blur-sm rounded-2xl p-12 shadow-lg">
+                  <div
+                    className={`text-center ${t.loadingCard} backdrop-blur-sm rounded-2xl p-12 shadow-lg`}
+                  >
                     <div className="relative mb-6">
                       <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 mx-auto"></div>
                       <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 mx-auto absolute top-0 left-1/2 -ml-8"></div>
                     </div>
-                    <p className="text-lg font-semibold text-gray-800 mb-2">
+                    <p
+                      className={`text-lg font-semibold mb-2 ${t.loadingTitle}`}
+                    >
                       Building Knowledge Tree
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className={`text-sm ${t.loadingText}`}>
                       Analyzing sources and creating nodes...
                     </p>
                   </div>
@@ -284,9 +314,11 @@ export default function JobPage() {
                 <NodeDetail nodeId={selectedNodeId} theme={theme} />
               ) : (
                 <div className="p-8 text-center">
-                  <div className="bg-gray-50 rounded-xl p-8 border-2 border-dashed border-gray-300">
+                  <div
+                    className={`rounded-xl p-8 border-2 border-dashed ${t.emptyNodeCard}`}
+                  >
                     <svg
-                      className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                      className={`w-16 h-16 mx-auto mb-4 ${t.emptyNodeIcon}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -298,10 +330,10 @@ export default function JobPage() {
                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <p className="text-gray-600 font-medium">
+                    <p className={`font-medium ${t.emptyNodeTitle}`}>
                       Select a node to view details
                     </p>
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className={`text-sm mt-2 ${t.emptyNodeText}`}>
                       Click any node in the knowledge tree
                     </p>
                   </div>

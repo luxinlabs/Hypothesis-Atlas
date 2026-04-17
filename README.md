@@ -1,6 +1,8 @@
 # Hypothesis Atlas
 
-A biotech research evidence mapping platform that automatically discovers, analyzes, and visualizes scientific knowledge from multiple sources including peer-reviewed papers, datasets, and social signals.
+HEPOPS Atlas (Hypothesis Atlas) is a multi-domain evidence mapping platform that automatically discovers, analyzes, and visualizes scientific and technical knowledge from multiple sources including peer-reviewed papers, datasets, and social signals.
+
+Current topic domains include biology, chemistry, technology, and finance. We will continue expanding domain coverage and add user-customizable topics in upcoming releases.
 
 ## Demo Video
 
@@ -40,7 +42,7 @@ Open http://localhost:3000
 
 ## Usage
 
-1. Visit `/explore` and click a term in the word cloud
+1. Visit `/explore`, choose a domain, and click a term in the word cloud
 2. Watch the real-time evidence gathering
 3. Explore the knowledge tree and detailed analysis
 4. Use the Notebook & Topic Copilot for research notes and AI assistance

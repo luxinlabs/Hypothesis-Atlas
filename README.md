@@ -4,7 +4,9 @@ A biotech research evidence mapping platform that automatically discovers, analy
 
 ## Demo Video
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/5io6ZrWCPIw" title="Hypothesis Atlas Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Watch the demo](https://img.youtube.com/vi/5io6ZrWCPIw/maxresdefault.jpg)](https://youtu.be/5io6ZrWCPIw)
+
+▶️ Click the image above to watch the demo.
 
 ## Quick Start
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import ProgressTimeline from "@/components/ProgressTimeline";
 import KnowledgeTree from "@/components/KnowledgeTree";
 import NodeDetail from "@/components/NodeDetail";
@@ -37,6 +38,8 @@ const THEME_STYLES = {
     emptyNodeIcon: "text-zinc-500",
     emptyNodeTitle: "text-zinc-300",
     emptyNodeText: "text-zinc-500",
+    backToExploreButton:
+      "bg-zinc-800 border border-zinc-700 text-zinc-200 hover:bg-zinc-700",
     tabBar: "bg-zinc-900 border-zinc-800",
     tabActive: "border-indigo-400 text-indigo-300",
     tabIdle: "text-zinc-400 hover:text-zinc-200 hover:border-zinc-600",
@@ -55,6 +58,8 @@ const THEME_STYLES = {
     emptyNodeIcon: "text-gray-400",
     emptyNodeTitle: "text-gray-600",
     emptyNodeText: "text-gray-500",
+    backToExploreButton:
+      "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
     tabBar: "bg-white border-gray-200",
     tabActive: "border-blue-500 text-blue-600",
     tabIdle: "text-gray-500 hover:text-gray-700 hover:border-gray-300",
@@ -73,6 +78,8 @@ const THEME_STYLES = {
     emptyNodeIcon: "text-zinc-400",
     emptyNodeTitle: "text-zinc-700",
     emptyNodeText: "text-zinc-500",
+    backToExploreButton:
+      "bg-white/90 border border-rose-300 text-zinc-700 hover:bg-white",
     tabBar: "bg-white/80 border-rose-200",
     tabActive: "border-fuchsia-500 text-fuchsia-700",
     tabIdle: "text-zinc-500 hover:text-zinc-700 hover:border-zinc-300",
@@ -188,6 +195,12 @@ export default function JobPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/explore"
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${t.backToExploreButton}`}
+            >
+              Back to Word Cloud
+            </Link>
             <span
               className={`px-4 py-2 rounded-lg text-sm font-semibold shadow-sm ${
                 job.status === "completed"

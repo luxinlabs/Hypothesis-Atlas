@@ -1,0 +1,765 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import ARSPlanChat from "@/components/ARSPlanChat";
+
+type Step = "context" | "outline" | "ars";
+
+interface ResearchIdea {
+  title: string;
+  problem_to_solve: string;
+  proposed_method: string[];
+  next_3_steps: string[];
+  field_context: string[];
+}
+
+interface OutlineSubsection {
+  heading: string;
+  keyPoints: string[];
+}
+
+interface OutlineSection {
+  name: string;
+  subsections: OutlineSubsection[];
+}
+
+interface Outline {
+  title: string;
+  abstract: string;
+  sections: OutlineSection[];
+  keyReferences: string[];
+}
+
+import { Suspense } from "react";
+
+function PaperPipelineInner() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const jobId = params.id as string;
+
+  const initialStep = (searchParams.get("step") as Step) ?? "context";
+  const [step, setStep] = useState<Step>(
+    ["context", "outline", "ars"].includes(initialStep) ? initialStep : "context"
+  );
+  const [topicQuery, setTopicQuery] = useState("");
+  const [ideas, setIdeas] = useState<ResearchIdea[]>([]);
+  const [ideasSource, setIdeasSource] = useState<"loading" | "converged" | "tree" | "topic">("loading");
+  const [selectedIdeaIndex, setSelectedIdeaIndex] = useState(0);
+  const [arsContext, setArsContext] = useState("");
+  const [outline, setOutline] = useState<Outline | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [referenceDoc, setReferenceDoc] = useState<{ name: string; content: string } | null>(null);
+  const [refDocExpanded, setRefDocExpanded] = useState(false);
+  const refFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Persist reference doc in localStorage per job
+  useEffect(() => {
+    const saved = localStorage.getItem(`ref-doc:${jobId}`);
+    if (saved) { try { setReferenceDoc(JSON.parse(saved)); } catch {} }
+  }, [jobId]);
+
+  const handleRefDocLoad = (name: string, content: string) => {
+    const doc = { name, content };
+    setReferenceDoc(doc);
+    setRefDocExpanded(true);
+    localStorage.setItem(`ref-doc:${jobId}`, JSON.stringify(doc));
+  };
+
+  const handleRefDocClear = () => {
+    setReferenceDoc(null);
+    setRefDocExpanded(false);
+    localStorage.removeItem(`ref-doc:${jobId}`);
+  };
+
+  const handleRefFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => handleRefDocLoad(file.name, ev.target?.result as string);
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      const [jobRes, convergeRes] = await Promise.all([
+        fetch(`/api/jobs/${jobId}`).then((r) => r.json()),
+        fetch(`/api/jobs/${jobId}/converge`).then((r) => r.json()).catch(() => ({ ideas: [] })),
+      ]);
+
+      setTopicQuery(jobRes.topicQuery ?? "");
+      const convergedIdeas: ResearchIdea[] = convergeRes.ideas ?? [];
+
+      if (convergedIdeas.length > 0) {
+        setIdeas(convergedIdeas);
+        setIdeasSource("converged");
+        return;
+      }
+
+      // Fall back to knowledge tree child nodes
+      if (jobRes.rootNodeId) {
+        try {
+          const nodeRes = await fetch(`/api/nodes/${jobRes.rootNodeId}`).then((r) => r.json());
+          if (nodeRes.children && nodeRes.children.length > 0) {
+            const treeIdeas: ResearchIdea[] = nodeRes.children.map((child: { label: string; summary?: string }) => ({
+              title: child.label,
+              problem_to_solve: child.summary || `Exploring ${child.label} in the context of ${jobRes.topicQuery}`,
+              proposed_method: ["Literature review", "Evidence synthesis", "Critical analysis"],
+              next_3_steps: [
+                "Define the core research question",
+                "Survey and synthesize the evidence",
+                "Structure the paper argument",
+              ],
+              field_context: [],
+            }));
+            setIdeas(treeIdeas);
+            setIdeasSource("tree");
+            return;
+          }
+        } catch {}
+      }
+
+      // Last resort: use the job topic itself
+      setIdeas([{
+        title: jobRes.topicQuery,
+        problem_to_solve: `A focused research paper examining the key questions and evidence around "${jobRes.topicQuery}".`,
+        proposed_method: ["Systematic literature review", "Evidence synthesis", "Critical analysis"],
+        next_3_steps: [
+          "Define the core research question",
+          "Survey the evidence base",
+          "Structure the paper argument",
+        ],
+        field_context: [],
+      }]);
+      setIdeasSource("topic");
+    };
+
+    load().catch(console.error);
+  }, [jobId]);
+
+  const generateContext = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/paper-pipeline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: "context" }),
+      });
+      const data = await res.json();
+      setArsContext(data.arsContext ?? "");
+      setStep("context");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateOutline = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/paper-pipeline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: "outline" }),
+      });
+      const data = await res.json();
+      setOutline(data.outline ?? null);
+      setStep("outline");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadFile = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const idea = ideas[selectedIdeaIndex];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-3">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #9333ea)" }}>
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <span className="font-semibold text-gray-800 text-sm">Paper Pipeline</span>
+            </div>
+            <span className="text-gray-200 mx-1">|</span>
+            {/* Quick navigation back to research tabs */}
+            <Link
+              href={`/job/${jobId}?tab=knowledge`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
+            >
+              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              Knowledge Tree
+            </Link>
+            <Link
+              href={`/job/${jobId}?tab=notebook`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
+            >
+              <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              Ideas & Notebook
+            </Link>
+          </div>
+          <p className="text-xs text-gray-400 truncate max-w-xs">{topicQuery}</p>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Step tabs */}
+        <div className="flex items-center gap-1 mb-8 bg-gray-100 rounded-xl p-1 w-fit">
+          {(["context", "outline", "ars"] as Step[]).map((s, i) => (
+            <button
+              key={s}
+              onClick={() => setStep(s)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+                step === s
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <span className="mr-2 text-xs opacity-60">{i + 1}.</span>
+              {s === "context" ? "Select Idea" : s === "outline" ? "Paper Outline" : "Write Paper"}
+            </button>
+          ))}
+        </div>
+
+        {/* ─── Step 1: Research Context ─── */}
+        {step === "context" && (
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2 space-y-5">
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Select Your Paper Topic</h2>
+                <p className="text-sm text-gray-500 mb-3">
+                  {ideasSource === "converged"
+                    ? "Choose one of your AI-generated research ideas. All context from this job will be imported automatically."
+                    : ideasSource === "tree"
+                    ? "Showing topics from your knowledge tree — pick one to focus your paper on."
+                    : ideasSource === "topic"
+                    ? "Using your research topic directly as the paper focus."
+                    : "Loading topics…"}
+                </p>
+
+                {/* Banner when not using converged ideas */}
+                {(ideasSource === "tree" || ideasSource === "topic") && (
+                  <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>
+                      For richer, AI-generated paper ideas, open the{" "}
+                      <Link href={`/job/${jobId}?tab=notebook`} className="font-semibold underline">
+                        Notebook tab
+                      </Link>{" "}
+                      and run <strong>Converge to Top 3</strong>. You can still write a great paper with any topic below.
+                    </span>
+                  </div>
+                )}
+
+                {ideasSource === "loading" ? (
+                  <div className="flex items-center gap-2 py-6 text-sm text-gray-400">
+                    <div className="animate-spin h-4 w-4 border-2 border-indigo-400 border-t-transparent rounded-full" />
+                    Loading topics…
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {ideas.map((idea, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedIdeaIndex(i)}
+                        className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                          selectedIdeaIndex === i
+                            ? "border-indigo-400 bg-indigo-50"
+                            : "border-gray-200 hover:border-gray-300 bg-white"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${
+                              selectedIdeaIndex === i
+                                ? "bg-indigo-600 text-white"
+                                : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {i + 1}
+                          </span>
+                          <div>
+                            <p className="font-medium text-gray-900 text-sm">{idea.title}</p>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{idea.problem_to_solve}</p>
+                            {idea.field_context.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {idea.field_context.map((f, fi) => (
+                                  <span key={fi} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                    {f}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {idea && (
+                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                  <h3 className="font-semibold text-gray-900 mb-3">Selected Idea Details</h3>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Problem</p>
+                      <p className="text-gray-700">{idea.problem_to_solve}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Methods</p>
+                      <ul className="space-y-0.5">
+                        {idea.proposed_method.map((m, mi) => (
+                          <li key={mi} className="flex gap-2 text-gray-700">
+                            <span className="text-indigo-400">•</span> {m}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
+                      <ol className="space-y-0.5 list-decimal list-inside text-gray-700">
+                        {idea.next_3_steps.map((s, si) => (
+                          <li key={si}>{s}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right column: actions */}
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-900 mb-2">Next Steps</h3>
+                {idea && (
+                  <div className="mb-3 px-3 py-2 bg-indigo-50 rounded-lg border border-indigo-100">
+                    <p className="text-xs text-indigo-500 font-medium">Selected idea</p>
+                    <p className="text-xs text-indigo-800 font-semibold mt-0.5 leading-tight">{idea.title}</p>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  <button
+                    onClick={generateOutline}
+                    disabled={loading || ideasSource === "loading" || ideas.length === 0}
+                    className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Generate Paper Outline
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setStep("ars")}
+                    disabled={ideasSource === "loading" || ideas.length === 0}
+                    className="w-full py-3 px-4 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(to right, #7c3aed, #9333ea)" }}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Write Paper with This Idea
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-purple-50 rounded-2xl border border-purple-200 p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-semibold text-purple-900 text-sm">ARS Pipeline</h3>
+                </div>
+                <p className="text-xs text-purple-700 leading-relaxed">
+                  12-agent Claude pipeline: plan → outline → draft → peer review → revise.
+                </p>
+                <ul className="mt-2 mb-3 space-y-1 text-xs text-purple-600">
+                  {["Socratic chapter-by-chapter planning", "Auto peer-review simulation", "Citation verification", "LaTeX / APA 7.0 output"].map((f) => (
+                    <li key={f} className="flex gap-1.5">
+                      <span>✓</span> {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => setStep("ars")}
+                  disabled={ideasSource === "loading" || ideas.length === 0}
+                  className="w-full py-2 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-all"
+                  style={{ background: "#7c3aed" }}
+                >
+                  Write Paper with This Idea →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Step 2: Outline ─── */}
+        {step === "outline" && (
+          <div>
+            {!outline ? (
+              <div className="text-center py-20">
+                {loading ? (
+                  <>
+                    <div className="animate-spin h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4" />
+                    <p className="text-gray-600">Generating paper outline...</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-gray-500 mb-4">No outline generated yet.</p>
+                    <button
+                      onClick={generateOutline}
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"
+                    >
+                      Generate Outline
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="max-w-3xl mx-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">{outline.title}</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const md = outlineToMarkdown(outline);
+                        downloadFile(md, "paper-outline.md");
+                      }}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download .md
+                    </button>
+                    <button
+                      onClick={() => setStep("ars")}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 flex items-center gap-2"
+                    >
+                      Run /ars-plan →
+                    </button>
+                  </div>
+                </div>
+
+                {/* Abstract */}
+                <div className="bg-slate-50 rounded-xl p-5 mb-5 border border-slate-200">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Abstract</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{outline.abstract}</p>
+                </div>
+
+                {/* Sections */}
+                <div className="space-y-4">
+                  {outline.sections?.map((section, si) => (
+                    <div key={si} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                      <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <span className="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-md flex items-center justify-center text-xs font-bold">
+                          {si + 1}
+                        </span>
+                        {section.name}
+                      </h3>
+                      <div className="space-y-3">
+                        {section.subsections?.map((sub, ssi) => (
+                          <div key={ssi} className="pl-4 border-l-2 border-gray-100">
+                            <p className="text-sm font-medium text-gray-700 mb-1">{sub.heading}</p>
+                            <ul className="space-y-0.5">
+                              {sub.keyPoints?.map((point, pi) => (
+                                <li key={pi} className="text-xs text-gray-500 flex gap-2">
+                                  <span className="text-indigo-300 mt-0.5">•</span>
+                                  {point}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Key references */}
+                {outline.keyReferences?.length > 0 && (
+                  <div className="mt-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                    <h3 className="font-semibold text-gray-900 mb-3">Key References</h3>
+                    <ul className="space-y-1">
+                      {outline.keyReferences.map((ref, i) => (
+                        <li key={i} className="text-xs text-gray-600 flex gap-2">
+                          <span className="text-gray-400">[{i + 1}]</span>
+                          {ref}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Step 3: /ars-plan embedded chat ─── */}
+        {step === "ars" && (
+          <div className="flex gap-6 h-[calc(100vh-220px)] min-h-[520px]">
+            {/* Chat panel */}
+            <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+              <ARSPlanChat key={selectedIdeaIndex} jobId={jobId} selectedIdea={idea} referenceDoc={referenceDoc ?? undefined} />
+            </div>
+
+            {/* Right sidebar: context export */}
+            <div className="w-72 flex-shrink-0 space-y-4">
+              <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #9333ea, #4338ca)", color: "#fff" }}>
+                <h3 className="font-bold mb-1 text-sm">/ars-plan · In-App</h3>
+                <p className="text-xs leading-relaxed" style={{ color: "#e9d5ff" }}>
+                  The Socratic planner on the left is powered by Claude — same workflow as
+                  running <code style={{ background: "rgba(255,255,255,0.2)", padding: "1px 4px", borderRadius: "3px" }}>/ars-plan</code> in Claude Code.
+                </p>
+              </div>
+
+              {/* Reference Document panel */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => setRefDocExpanded((v) => !v)}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-xs font-semibold text-gray-700">Reference Doc</span>
+                    {referenceDoc && (
+                      <span className="text-xs text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full truncate max-w-[100px]">
+                        {referenceDoc.name}
+                      </span>
+                    )}
+                  </div>
+                  <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0 ${refDocExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+
+                {refDocExpanded && (
+                  <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-2">
+                    {referenceDoc ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">
+                            {referenceDoc.content.split("\n").length} lines · {Math.round(referenceDoc.content.length / 5)} words
+                          </span>
+                          <button onClick={handleRefDocClear} className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                            Remove
+                          </button>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-2 max-h-32 overflow-y-auto">
+                          <pre className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed font-mono">
+                            {referenceDoc.content.slice(0, 600)}{referenceDoc.content.length > 600 ? "\n…" : ""}
+                          </pre>
+                        </div>
+                        <p className="text-xs text-violet-600 bg-violet-50 rounded-lg px-3 py-2 leading-relaxed">
+                          Claude can see this document. Ask about it in the chat — e.g. "Based on my reference doc, what should the introduction argue?"
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          Upload a previous draft, notes, or any <code className="font-mono bg-gray-100 px-1 rounded">.md</code> file to reference during planning.
+                        </p>
+                        <input
+                          ref={refFileInputRef}
+                          type="file"
+                          accept=".md,.txt"
+                          className="hidden"
+                          onChange={handleRefFileUpload}
+                        />
+                        <button
+                          onClick={() => refFileInputRef.current?.click()}
+                          className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-violet-400 hover:text-violet-600 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          Upload .md file
+                        </button>
+                        <textarea
+                          placeholder="…or paste content here"
+                          rows={3}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-violet-400 text-gray-700 placeholder-gray-400"
+                          onBlur={(e) => {
+                            if (e.target.value.trim()) handleRefDocLoad("pasted-notes.md", e.target.value.trim());
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-3">
+                <p className="text-sm font-semibold text-gray-800">Export context for Claude Code</p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Want the full 12-agent ARS pipeline (peer review, LaTeX output, citation verification)?
+                  Export your context and continue in Claude Code.
+                </p>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      if (!arsContext) generateContext();
+                      else copyToClipboard(arsContext);
+                    }}
+                    disabled={loading}
+                    className="w-full py-2 px-3 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {loading ? (
+                      <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                    {copied ? "Copied!" : arsContext ? "Copy Context" : "Generate & Copy"}
+                  </button>
+                  {arsContext && (
+                    <button
+                      onClick={() => downloadFile(arsContext, "ars-context.md")}
+                      className="w-full py-2 px-3 border border-gray-300 text-gray-700 rounded-lg text-xs hover:bg-gray-50"
+                    >
+                      Download .md
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick navigation back to research */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Return to research</p>
+                <div className="space-y-1.5">
+                  <Link
+                    href={`/job/${jobId}?tab=knowledge`}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-gray-700 border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    Knowledge Tree
+                  </Link>
+                  <Link
+                    href={`/job/${jobId}?tab=notebook`}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-gray-700 border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Ideas & Notebook
+                  </Link>
+                  <Link
+                    href={`/job/${jobId}?tab=papermap`}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-gray-700 border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    Paper Map
+                  </Link>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Claude Code commands</p>
+                <div className="space-y-1.5">
+                  {[
+                    { cmd: "/ars-plan", desc: "Socratic planning (this)" },
+                    { cmd: "/ars-outline", desc: "Quick outline + evidence map" },
+                    { cmd: "/ars-full", desc: "Full pipeline: write → review" },
+                  ].map(({ cmd, desc }) => (
+                    <div key={cmd} className="flex items-start gap-2">
+                      <code className="text-xs bg-gray-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono flex-shrink-0">
+                        {cmd}
+                      </code>
+                      <span className="text-xs text-gray-500">{desc}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-3 leading-relaxed">
+                  Install:{" "}
+                  <code className="font-mono text-gray-500 text-xs">
+                    /plugin marketplace add<br />Imbad0202/academic-research-skills
+                  </code>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function PaperPipelinePage() {
+  return (
+    <Suspense fallback={null}>
+      <PaperPipelineInner />
+    </Suspense>
+  );
+}
+
+function outlineToMarkdown(outline: Outline): string {
+  const lines: string[] = [
+    `# ${outline.title}`,
+    "",
+    "## Abstract",
+    outline.abstract,
+    "",
+  ];
+  for (const section of outline.sections ?? []) {
+    lines.push(`## ${section.name}`, "");
+    for (const sub of section.subsections ?? []) {
+      lines.push(`### ${sub.heading}`, "");
+      for (const point of sub.keyPoints ?? []) {
+        lines.push(`- ${point}`);
+      }
+      lines.push("");
+    }
+  }
+  if (outline.keyReferences?.length) {
+    lines.push("## References", "");
+    outline.keyReferences.forEach((r, i) => lines.push(`[${i + 1}] ${r}`));
+  }
+  return lines.join("\n");
+}

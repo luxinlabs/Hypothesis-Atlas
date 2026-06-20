@@ -191,6 +191,11 @@ export default function ExplorePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState<Domain>("bio");
   const [theme, setTheme] = useState<Theme>("light");
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLastJobId(localStorage.getItem("lastJobId"));
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") as Theme | null;
@@ -212,6 +217,7 @@ export default function ExplorePage() {
 
       const data = await response.json();
       if (data.jobId) {
+        localStorage.setItem("lastJobId", data.jobId);
         router.push(`/job/${data.jobId}`);
       } else {
         setIsLoading(false);
@@ -245,6 +251,24 @@ export default function ExplorePage() {
             >
               Home
             </Link>
+            <Link
+              href="/jobs"
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${t.navButton}`}
+            >
+              My Research
+            </Link>
+            {lastJobId && (
+              <Link
+                href={`/job/${lastJobId}/paper`}
+                className="px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2"
+                style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Write Paper
+              </Link>
+            )}
             <Link
               href="/docs"
               className={`px-4 py-2 rounded-lg font-semibold transition-colors ${t.docsButton}`}

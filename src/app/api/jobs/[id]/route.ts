@@ -35,3 +35,16 @@ export async function GET(
     )
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await prisma.job.delete({ where: { id: params.id } })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Error deleting job:', error)
+    return NextResponse.json({ error: 'Failed to delete job' }, { status: 500 })
+  }
+}

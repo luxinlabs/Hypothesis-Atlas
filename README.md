@@ -105,7 +105,7 @@ Open http://localhost:3000
 
 ## ARS Integration
 
-This app integrates with the [luxinlabs/academic-research-skills](https://github.com/luxinlabs/academic-research-skills) Claude Code plugin suite:
+This app integrates with the [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) Claude Code plugin suite (original by Cheng-I Wu; adapted at [luxinlabs/academic-research-skills](https://github.com/luxinlabs/academic-research-skills)):
 
 | In-app feature | ARS equivalent |
 |---|---|
@@ -184,7 +184,7 @@ MIT License — see `LICENSE` file.
 
 ### Academic Research Skills (ARS) Plugin
 
-The in-app ARS Plan feature integrates the [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) plugin by Cheng-I Wu, licensed under **CC-BY-NC 4.0**.
+The in-app ARS Plan feature integrates the [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) plugin originally created by **Cheng-I Wu**, licensed under **CC-BY-NC 4.0**.
 
 This work is licensed under [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
 
@@ -196,8 +196,9 @@ Under the following terms:
 - **Attribution** — You must give appropriate credit
 - **NonCommercial** — You may not use the material for commercial purposes
 
-Attribution format:
-> Based on Academic Research Skills by Cheng-I Wu
+**Attribution:**
+
+> Based on [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) by Cheng-I Wu
 > https://github.com/Imbad0202/academic-research-skills
 
 #### ARS Learning Resources

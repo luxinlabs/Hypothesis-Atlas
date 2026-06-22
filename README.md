@@ -4,11 +4,17 @@ HEPOPS Atlas (Hypothesis Atlas) is a multi-domain evidence mapping platform that
 
 It now includes a full **Academic Paper Pipeline** powered by the [ARS (Academic Research Skills)](https://github.com/luxinlabs/academic-research-skills) plugin — letting you go from a research topic all the way to a structured paper draft without leaving the app.
 
-## Demo Video
+## Demo Videos
 
-[![Watch the demo](https://img.youtube.com/vi/5io6ZrWCPIw/maxresdefault.jpg)](https://youtu.be/5io6ZrWCPIw)
+### V2 — Paper Pipeline + ARS Integration
+[![Watch the V2 demo](https://img.youtube.com/vi/V8uTbUVssmI/maxresdefault.jpg)](https://youtu.be/V8uTbUVssmI)
 
-▶️ Click the image above to watch the demo.
+▶️ Click the image above to watch the V2 demo.
+
+### V1 — Evidence Mapping & Knowledge Tree
+[![Watch the V1 demo](https://img.youtube.com/vi/5io6ZrWCPIw/maxresdefault.jpg)](https://youtu.be/5io6ZrWCPIw)
+
+▶️ Click the image above to watch the V1 demo.
 
 ---
 

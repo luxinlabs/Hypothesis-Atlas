@@ -146,6 +146,26 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 
 ---
 
+## Version History
+
+### V2 — Paper Pipeline + ARS Integration
+- In-app ARS Plan chat powered by Claude (`/ars-plan` Socratic planning mode)
+- Idea selection from converged ideas, knowledge tree nodes, or raw topic
+- Paper Outline generation via Groq (IMRaD structure)
+- Session caching: resume previous ARS sessions; restart clears the cache
+- Reference Document: attach `.md` drafts or notes for Claude to reference during planning
+- `/jobs` research management page: list, view, write, delete all past runs
+- Knowledge Tree, Notebook, and Paper Map accessible directly from the paper session
+- Export context to Claude Code for the full 12-agent ARS pipeline
+
+### V1 — Evidence Mapping & Knowledge Tree
+- Word cloud topic explorer across Biology, Chemistry, Technology, and Finance
+- Real-time knowledge tree built from peer-reviewed papers, datasets, and social signals
+- Reliability-tiered Paper Map (SVG network graph)
+- Notebook & Topic Copilot with AI-assisted brainstorm and Converge to Top 3
+
+---
+
 ## Contributing
 
 See `CONTRIBUTING.md`.
@@ -154,6 +174,36 @@ See `CONTRIBUTING.md`.
 
 See `SECURITY.md` for responsible disclosure.
 
+---
+
 ## License
 
+### Hypothesis Atlas
+
 MIT License — see `LICENSE` file.
+
+### Academic Research Skills (ARS) Plugin
+
+The in-app ARS Plan feature integrates the [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) plugin by Cheng-I Wu, licensed under **CC-BY-NC 4.0**.
+
+This work is licensed under [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
+
+You are free to:
+- **Share** — copy and redistribute the material
+- **Adapt** — remix, transform, and build upon the material
+
+Under the following terms:
+- **Attribution** — You must give appropriate credit
+- **NonCommercial** — You may not use the material for commercial purposes
+
+Attribution format:
+> Based on Academic Research Skills by Cheng-I Wu
+> https://github.com/Imbad0202/academic-research-skills
+
+#### ARS Learning Resources
+
+The ARS repository also includes structured learning materials covering the full academic research workflow — from Socratic research planning and systematic literature review to multi-agent peer review and publication-ready formatting. If you want to go deeper into the methodology behind the pipeline embedded in this app, visit:
+
+- **Plugin docs**: [`docs/ARCHITECTURE.md`](https://github.com/Imbad0202/academic-research-skills/blob/main/docs/ARCHITECTURE.md)
+- **Setup guide**: [`docs/SETUP.md`](https://github.com/Imbad0202/academic-research-skills/blob/main/docs/SETUP.md)
+- **Full repo**: https://github.com/Imbad0202/academic-research-skills

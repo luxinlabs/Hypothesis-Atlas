@@ -6,18 +6,24 @@ It now includes a full **Academic Paper Pipeline** powered by the [ARS (Academic
 
 ## Demo Video
 
-[![Watch the demo](https://img.youtube.com/vi/5io6ZrWCPIw/maxresdefault.jpg)](https://youtu.be/5io6ZrWCPIw)
+[![Watch the V1 demo](https://img.youtube.com/vi/5io6ZrWCPIw/maxresdefault.jpg)](https://youtu.be/5io6ZrWCPIw)
 
-▶️ Click the image above to watch the demo.
+▶️ V1 — Evidence Mapping & Knowledge Tree
+
+[![Watch the V2 demo](https://img.youtube.com/vi/V8uTbUVssmI/maxresdefault.jpg)](https://youtu.be/V8uTbUVssmI)
+
+▶️ V2 — Paper Pipeline + ARS Integration
 
 ---
 
 ## Features
 
 ### Evidence Mapping
-- Word cloud topic explorer across Biology, Chemistry, Technology, and Finance domains
+- Area/industry selector (General · Biology · Chemistry · Technology · Finance) with per-domain word clouds
+- Custom topic search: type 2–5 words → Groq generates a live keyword cloud centered on your topic
 - Real-time knowledge tree built from peer-reviewed papers, datasets, and social signals
-- Reliability-tiered source visualization (Paper Map — SVG network graph)
+- Hub-and-spoke Paper Map: Research hub at center, weighted lines to each paper, no visual clutter between peers
+- Paper Compare Mode: pick 2 papers → Claude generates methodology differences + research gap analysis
 - Node-level detail: methods, findings, disagreements, open problems
 
 ### Notebook & Topic Copilot
@@ -101,7 +107,7 @@ Open http://localhost:3000
 
 ## ARS Integration
 
-This app integrates with the [luxinlabs/academic-research-skills](https://github.com/luxinlabs/academic-research-skills) Claude Code plugin suite:
+This app integrates with the [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) Claude Code plugin suite (original by Cheng-I Wu; adapted at [luxinlabs/academic-research-skills](https://github.com/luxinlabs/academic-research-skills)):
 
 | In-app feature | ARS equivalent |
 |---|---|
@@ -142,6 +148,47 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 
 ---
 
+## Version History
+
+### V2.2 — Notes System, Find Papers & Knowledge Tree Paper Exploration
+
+- **Persistent notes system**: all notes stored in `localStorage` per job, synced across tabs via `atlas:notes-update` event; shared by NotesPanel, NotesTab, PaperMap compare, and Topic Copilot
+- **Floating NotesPanel**: slide-in drawer (bottom-right) with entry list, type badges (session / manual / comparison / insight), expand/collapse, delete, textarea + Add Note, Export .md
+- **Dedicated Notes tab**: 2-column layout — entry timeline left, detail viewer / composer right; session memory card shows topic + entry counts; quick-capture labels; inline edit & delete
+- **Paper compare → notes**: Save to Notes button in compare panel writes a structured markdown comparison directly into the session notes
+- **Topic Workspace redesign**: removed Pages sidebar; inline action toolbar (Write Paper · Export .md · Converge · Save to Notes) replaces floating bottom-right buttons; prominent "Type a topic and press Enter…" input at top of sidebar
+- **Write Paper — Find Papers tab**: editable description field (defaults to job topic), "Explore Papers" button searches OpenAlex + PubMed, results ranked by relevance + recency (65 / 35 blend)
+- **Knowledge Tree — Explore Papers**: new button in toolbar fetches related papers and displays them below the tree as a card grid; each card shows a **node-connection badge** (colour-matched to tree depth) indicating which tree node the paper connects to
+- **Relevance + recency ranking**: title match (×4) + abstract match (×1) + title-start bonus (×3), blended with a 10-year recency window; applies to all paper search endpoints
+- **Layout fixes**: NotebookTab and NotesTab now fill full viewport width; floating Write Paper / Export buttons moved to inline toolbar
+- Write Paper: floating Notes panel + ← Back button in header
+
+### V2.1 — Smart Explore, Hub-Spoke Paper Map & Paper Comparison
+- **Custom topic search**: type 2–5 words, click Search → Groq generates a live word cloud with your keyword pinned at center and 16 related terms around it
+- **Area / industry selector**: General (cross-domain, default), Biology, Chemistry, Technology, Finance — word cloud updates per domain; General triggers LLM keyword generation
+- **Hub-and-spoke Paper Map**: Research hub at center with weighted lines to every paper (line width & opacity = knowledge-node count); no peer-to-peer lines cluttering the graph
+- **Paper Compare Mode**: select any 2 papers → Claude returns a structured comparison of (1) methodology differences and (2) research gaps, with a combined-opportunity insight
+- **Richer paper detail panel**: full abstract, publication year, stats row, "Read Paper ↗" button, venue + year on related papers
+- Pricing: free & open-source; $100 / paper for hosted workflow with managed tokens
+
+### V2 — Paper Pipeline + ARS Integration
+- In-app ARS Plan chat powered by Claude (`/ars-plan` Socratic planning mode)
+- Idea selection from converged ideas, knowledge tree nodes, or raw topic
+- Paper Outline generation via Groq (IMRaD structure)
+- Session caching: resume previous ARS sessions; restart clears the cache
+- Reference Document: attach `.md` drafts or notes for Claude to reference during planning
+- `/jobs` research management page: list, view, write, delete all past runs
+- Knowledge Tree, Notebook, and Paper Map accessible directly from the paper session
+- Export context to Claude Code for the full 12-agent ARS pipeline
+
+### V1 — Evidence Mapping & Knowledge Tree
+- Word cloud topic explorer across Biology, Chemistry, Technology, and Finance
+- Real-time knowledge tree built from peer-reviewed papers, datasets, and social signals
+- Reliability-tiered Paper Map (SVG network graph)
+- Notebook & Topic Copilot with AI-assisted brainstorm and Converge to Top 3
+
+---
+
 ## Contributing
 
 See `CONTRIBUTING.md`.
@@ -150,6 +197,37 @@ See `CONTRIBUTING.md`.
 
 See `SECURITY.md` for responsible disclosure.
 
+---
+
 ## License
 
+### Hypothesis Atlas
+
 MIT License — see `LICENSE` file.
+
+### Academic Research Skills (ARS) Plugin
+
+The in-app ARS Plan feature integrates the [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) plugin originally created by **Cheng-I Wu**, licensed under **CC-BY-NC 4.0**.
+
+This work is licensed under [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
+
+You are free to:
+- **Share** — copy and redistribute the material
+- **Adapt** — remix, transform, and build upon the material
+
+Under the following terms:
+- **Attribution** — You must give appropriate credit
+- **NonCommercial** — You may not use the material for commercial purposes
+
+**Attribution:**
+
+> Based on [Academic Research Skills](https://github.com/Imbad0202/academic-research-skills) by Cheng-I Wu
+> https://github.com/Imbad0202/academic-research-skills
+
+#### ARS Learning Resources
+
+The ARS repository also includes structured learning materials covering the full academic research workflow — from Socratic research planning and systematic literature review to multi-agent peer review and publication-ready formatting. If you want to go deeper into the methodology behind the pipeline embedded in this app, visit:
+
+- **Plugin docs**: [`docs/ARCHITECTURE.md`](https://github.com/Imbad0202/academic-research-skills/blob/main/docs/ARCHITECTURE.md)
+- **Setup guide**: [`docs/SETUP.md`](https://github.com/Imbad0202/academic-research-skills/blob/main/docs/SETUP.md)
+- **Full repo**: https://github.com/Imbad0202/academic-research-skills

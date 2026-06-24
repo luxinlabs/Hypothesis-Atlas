@@ -94,6 +94,28 @@ const DOMAIN_TERMS = {
     { text: "digital payments", value: 87 },
     { text: "robo-advisors", value: 86 },
   ],
+  general: [
+    { text: "artificial intelligence", value: 100 },
+    { text: "climate change", value: 97 },
+    { text: "quantum computing", value: 95 },
+    { text: "gene therapy", value: 93 },
+    { text: "large language models", value: 92 },
+    { text: "renewable energy", value: 91 },
+    { text: "brain-computer interface", value: 90 },
+    { text: "CRISPR gene editing", value: 89 },
+    { text: "autonomous vehicles", value: 88 },
+    { text: "synthetic biology", value: 87 },
+    { text: "space exploration", value: 86 },
+    { text: "microbiome research", value: 85 },
+    { text: "nuclear fusion", value: 84 },
+    { text: "drug discovery AI", value: 83 },
+    { text: "social media algorithms", value: 82 },
+    { text: "materials science", value: 81 },
+    { text: "precision medicine", value: 80 },
+    { text: "robotics automation", value: 79 },
+    { text: "digital twins", value: 78 },
+    { text: "carbon capture", value: 77 },
+  ],
 };
 
 type Domain = keyof typeof DOMAIN_TERMS;
@@ -103,6 +125,11 @@ const DOMAIN_META: Record<
   Domain,
   { label: string; subtitle: string; emoji: string }
 > = {
+  general: {
+    label: "General",
+    subtitle: "Cross-domain exploration",
+    emoji: "🌐",
+  },
   bio: {
     label: "Biology",
     subtitle: "Genomics, biotech, and health research",
@@ -189,9 +216,14 @@ const THEME_STYLES = {
 export default function ExplorePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedDomain, setSelectedDomain] = useState<Domain>("bio");
+  const [selectedDomain, setSelectedDomain] = useState<Domain>("general");
   const [theme, setTheme] = useState<Theme>("light");
   const [lastJobId, setLastJobId] = useState<string | null>(null);
+  const [customTopic, setCustomTopic] = useState("");
+  const [topicError, setTopicError] = useState("");
+  const [dynamicWords, setDynamicWords] = useState<{ text: string; value: number }[] | null>(null);
+  const [loadingWords, setLoadingWords] = useState(false);
+  const [centerWord, setCenterWord] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     setLastJobId(localStorage.getItem("lastJobId"));
@@ -204,7 +236,37 @@ export default function ExplorePage() {
     }
   }, []);
 
+  // Reset dynamic cloud when domain changes
+  useEffect(() => {
+    setDynamicWords(null);
+    setCenterWord(undefined);
+  }, [selectedDomain]);
+
   const t = THEME_STYLES[theme];
+
+  const handleSearchTopic = async () => {
+    const words = customTopic.trim().split(/\s+/).filter(Boolean);
+    if (words.length < 2 || words.length > 5) {
+      setTopicError("Please enter between 2 and 5 words.");
+      return;
+    }
+    setTopicError("");
+    setLoadingWords(true);
+    setCenterWord(customTopic.trim());
+    try {
+      const res = await fetch("/api/explore/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: customTopic.trim(), domain: selectedDomain }),
+      });
+      const data = await res.json() as { words: { text: string; value: number }[] };
+      if (data.words?.length) setDynamicWords(data.words);
+    } catch {
+      // silently fall back to static list
+    } finally {
+      setLoadingWords(false);
+    }
+  };
 
   const handleWordClick = async (word: string) => {
     setIsLoading(true);
@@ -278,78 +340,100 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        <div className="mb-6 flex justify-center">
-          <button
-            type="button"
-            disabled
-            className={`px-4 py-2 rounded-lg text-sm font-semibold shadow-sm ${t.futureButton}`}
-            title="Hosted $1 mode will be available in a future update"
-          >
-            $1 hosted mode — available in the future
-          </button>
-        </div>
-
         <div
           className={`rounded-3xl p-8 backdrop-blur-sm shadow-xl ${t.panel}`}
         >
+          {/* Area / Industry pill selector */}
+          <div className="flex flex-wrap justify-center gap-2 mb-6">
+            {(["general", "bio", "chemistry", "tech", "finance"] as Domain[]).map((domain) => {
+              const meta = DOMAIN_META[domain];
+              const isActive = selectedDomain === domain;
+              return (
+                <button
+                  key={domain}
+                  type="button"
+                  onClick={() => setSelectedDomain(domain)}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                    isActive ? t.cardActive : t.card
+                  }`}
+                >
+                  <span>{meta.emoji}</span>
+                  <span>{meta.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Custom topic search */}
           <div className="mb-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] mb-2 text-center text-indigo-500">
-              Step 1
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-center">
-              Choose your domain
+            <h2 className="text-xl font-bold text-center mb-4">
+              Search your own topic
             </h2>
-            <p className={`mt-2 text-center ${t.subText}`}>
-              Pick an area you care about. We’ll generate a topic cloud tailored
-              to it.
-            </p>
-
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl mx-auto">
-              {(["bio", "chemistry", "tech", "finance"] as Domain[]).map(
-                (domain) => {
-                  const isActive = selectedDomain === domain;
-                  const meta = DOMAIN_META[domain];
-
-                  return (
-                    <button
-                      key={domain}
-                      onClick={() => setSelectedDomain(domain)}
-                      className={`w-full text-left rounded-2xl p-5 border transition-all hover:-translate-y-0.5 ${
-                        isActive ? t.cardActive : t.card
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl leading-none">
-                          {meta.emoji}
-                        </span>
-                        <div>
-                          <p className="text-lg font-semibold">{meta.label}</p>
-                          <p
-                            className={`mt-1 text-sm ${isActive ? "text-current/80" : t.cardMuted}`}
-                          >
-                            {meta.subtitle}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                },
-              )}
+            <div className="max-w-xl mx-auto flex gap-3">
+              <input
+                type="text"
+                placeholder="e.g. neural implant biocompatibility (2–5 words)"
+                value={customTopic}
+                onChange={(e) => {
+                  setCustomTopic(e.target.value);
+                  if (topicError) setTopicError("");
+                }}
+                className={`flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400 transition ${t.card} ${t.text}`}
+                style={{ minWidth: 0 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearchTopic();
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleSearchTopic}
+                disabled={loadingWords}
+                className="px-5 py-2.5 rounded-xl font-semibold text-sm flex-shrink-0 transition-opacity hover:opacity-90 disabled:opacity-60"
+                style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+              >
+                {loadingWords ? "…" : "Search"}
+              </button>
             </div>
+            {topicError && (
+              <p className="text-center text-xs mt-2" style={{ color: "#dc2626" }}>
+                {topicError}
+              </p>
+            )}
+            <p className={`text-center text-xs mt-2 ${t.subText}`}>
+              2–5 words for best results
+            </p>
+          </div>
+
+          <div className={`flex items-center gap-3 mb-8 ${t.subText}`}>
+            <div className={`flex-1 h-px ${t.subText} opacity-30 bg-current`} />
+            <span className="text-xs font-semibold uppercase tracking-widest opacity-60">or browse by domain</span>
+            <div className={`flex-1 h-px ${t.subText} opacity-30 bg-current`} />
           </div>
 
           <p
-            className={`text-sm font-semibold uppercase tracking-wider mb-4 text-center ${t.subText}`}
+            className={`text-sm font-semibold uppercase tracking-wider mb-2 text-center ${t.subText}`}
           >
-            Step 2 · Select a topic to begin
+            {dynamicWords
+              ? `Related topics · click any word to start research`
+              : `Or click a topic from the ${DOMAIN_META[selectedDomain].label} cloud`}
           </p>
 
-          <div className={`rounded-2xl p-4 ${t.cloud}`}>
+          <div className={`relative rounded-2xl p-4 ${t.cloud}`}>
+            {loadingWords && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/60 backdrop-blur-sm z-10">
+                <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-indigo-400 border-t-transparent" />
+                  Generating related topics…
+                </div>
+              </div>
+            )}
             <WordCloudComponent
-              words={DOMAIN_TERMS[selectedDomain]}
+              words={dynamicWords ?? DOMAIN_TERMS[selectedDomain]}
               onWordClick={handleWordClick}
+              centerWord={centerWord}
             />
           </div>
+
         </div>
 
         {isLoading && (

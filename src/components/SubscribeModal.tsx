@@ -20,6 +20,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
   const [frequency, setFreq]    = useState(10);
   const [loading, setLoading]   = useState(false);
   const [done, setDone]         = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [error, setError]       = useState("");
   const [mounted, setMounted]   = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +51,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Something went wrong."); return; }
+      setEmailSent(!!data.emailSent);
       setDone(true);
     } catch {
       setError("Network error — please try again.");
@@ -92,8 +94,13 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
             </div>
             <h3 className="text-lg font-bold mb-1">You're subscribed!</h3>
             <p className={`text-sm mb-3 ${sub}`}>
-              Check your inbox — we sent a confirmation to{" "}
-              <span className="font-semibold">{email}</span>.
+              {emailSent ? (
+                <>Check your inbox — we sent a confirmation to{" "}
+                <span className="font-semibold">{email}</span>.</>
+              ) : (
+                <>Subscribed successfully. Weekly digests for{" "}
+                <span className="font-semibold">{email}</span> start next Monday.</>
+              )}
             </p>
             <div className={`rounded-xl border px-4 py-3 mb-4 text-left space-y-1 ${
               isDark ? "bg-indigo-500/10 border-indigo-500/30" : "bg-indigo-50 border-indigo-200"

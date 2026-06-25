@@ -131,22 +131,36 @@ export async function POST(req: NextRequest) {
     }
 
     // Send confirmation email via Resend
-    if (process.env.RESEND_API_KEY) {
+    let emailSent = false;
+    let emailError: string | undefined;
+
+    const resendKey = process.env.RESEND_API_KEY;
+    if (!resendKey) {
+      emailError = "RESEND_API_KEY not configured";
+      console.warn("[subscriptions] Skipping email — RESEND_API_KEY is not set");
+    } else {
       try {
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        await resend.emails.send({
+        const resend = new Resend(resendKey);
+        const result = await resend.emails.send({
           from: "Hypothesis Atlas <onboarding@resend.dev>",
           to: normalizedEmail,
           subject: `Subscribed: ${freq} papers/week on "${topic}"`,
           html: confirmationHtml(normalizedEmail, topic, freq),
         });
+        if (result.error) {
+          emailError = result.error.message;
+          console.error("[subscriptions] Resend error:", result.error);
+        } else {
+          emailSent = true;
+          console.log("[subscriptions] Confirmation email sent:", result.data?.id);
+        }
       } catch (emailErr) {
-        // Don't fail the subscription if email sending fails
-        console.error("Email send error:", emailErr);
+        emailError = String(emailErr);
+        console.error("[subscriptions] Email send exception:", emailErr);
       }
     }
 
-    return NextResponse.json({ subscription, updated: !!existing });
+    return NextResponse.json({ subscription, updated: !!existing, emailSent, emailError });
   } catch (err) {
     console.error("subscription error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

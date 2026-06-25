@@ -12,9 +12,8 @@ export interface FetchedPaper {
   source: "openalex" | "pubmed";
 }
 
-const CURRENT_YEAR = new Date().getFullYear();
-
 function rankScore(paper: FetchedPaper, query: string): number {
+  const currentYear = new Date().getFullYear();
   const stopWords = new Set(["with", "from", "that", "this", "for", "and", "the", "are", "its", "into", "using"]);
   const tokens = query.toLowerCase().split(/\W+/).filter((w) => w.length > 3 && !stopWords.has(w));
   const titleLower = paper.title.toLowerCase();
@@ -26,8 +25,9 @@ function rankScore(paper: FetchedPaper, query: string): number {
   }
   if (tokens.some((t) => titleLower.startsWith(t))) relevance += 3;
   const relScore = Math.min(relevance, 20) / 20;
-  const year = parseInt(paper.year) || (CURRENT_YEAR - 5);
-  const recScore = Math.max(0, Math.min(1, (year - (CURRENT_YEAR - 10)) / 10));
+  // 2-year window: current year = 1.0, two years ago = 0.0
+  const year = parseInt(paper.year) || (currentYear - 2);
+  const recScore = Math.max(0, Math.min(1, (year - (currentYear - 2)) / 2));
   return relScore * 0.65 + recScore * 0.35;
 }
 

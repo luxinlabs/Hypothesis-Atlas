@@ -55,11 +55,15 @@ function paperCard(paper: FetchedPaper, index: number): string {
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://hypothesis-atlas.vercel.app";
 
-function digestHtml(email: string, topic: string, frequency: number, deliveryTime: string, papers: FetchedPaper[], isFirst: boolean, unsubToken: string): string {
+function digestHtml(email: string, topic: string, frequency: number, deliveryTime: string, papers: FetchedPaper[], isFirst: boolean, unsubToken: string, subscribedAt: Date): string {
   const nextDate = nextMonday(deliveryTime);
   const timeLabel = formatTime(deliveryTime);
   const title = isFirst ? "Your First Paper Digest" : `Weekly Digest: ${topic}`;
   const unsubUrl = `${APP_URL}/api/subscriptions/unsubscribe?token=${unsubToken}`;
+  const subscribedLabel = subscribedAt.toLocaleString("en-US", {
+    month: "long", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
 
   return `
 <!DOCTYPE html>
@@ -85,8 +89,11 @@ function digestHtml(email: string, topic: string, frequency: number, deliveryTim
           <!-- Schedule banner -->
           <tr>
             <td style="background:#f5f3ff;padding:12px 40px;border-bottom:1px solid #e0d9ff;">
-              <p style="margin:0;color:#4f46e5;font-size:12px;">
-                📅 You'll receive ${frequency} papers every <strong>Monday at ${timeLabel}</strong>. Next digest: <strong>${nextDate}</strong>
+              <p style="margin:0 0 4px;color:#4f46e5;font-size:12px;">
+                📅 You'll receive <strong>${frequency} papers</strong> every <strong>Monday at ${timeLabel}</strong>. Next digest: <strong>${nextDate}</strong>
+              </p>
+              <p style="margin:0;color:#7c6fcd;font-size:11px;">
+                Subscribed on ${subscribedLabel} · Papers from ${new Date().getFullYear() - 1}–${new Date().getFullYear()}
               </p>
             </td>
           </tr>
@@ -180,7 +187,7 @@ export async function POST(req: NextRequest) {
           from: "Hypothesis Atlas <onboarding@resend.dev>",
           to: normalizedEmail,
           subject: `Your first ${freq} papers on "${topic}" — Hypothesis Atlas`,
-          html: digestHtml(normalizedEmail, topic, freq, time, papers, true, subscription.unsubToken),
+          html: digestHtml(normalizedEmail, topic, freq, time, papers, true, subscription.unsubToken, subscription.createdAt),
         });
 
         if (result.error) {

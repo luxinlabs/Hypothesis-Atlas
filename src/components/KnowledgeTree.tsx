@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SubscribeModal from "./SubscribeModal";
 
 interface Node {
   id: string;
@@ -87,6 +88,15 @@ function collectLabels(node: Node): string[] {
   return [node.label, ...node.children.flatMap(collectLabels)];
 }
 
+function findNodeById(node: Node, id: string): Node | null {
+  if (node.id === id) return node;
+  for (const child of node.children) {
+    const found = findNodeById(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
 function findConnection(paper: FetchedPaper, labels: string[]): string | null {
   const text = (paper.title + " " + (paper.abstract ?? "")).toLowerCase();
   for (const label of labels) {
@@ -120,6 +130,7 @@ export default function KnowledgeTree({
   const [exploringPapers, setExploringPapers] = useState(false);
   const [papers, setPapers] = useState<FetchedPaper[]>([]);
   const [showPapers, setShowPapers] = useState(false);
+  const [showSubscribe, setShowSubscribe] = useState(false);
 
   const fetchNodeTree = () => {
     fetch(`/api/nodes/${rootNodeId}`)
@@ -163,8 +174,11 @@ export default function KnowledgeTree({
     }
   };
 
+  const selectedNode = selectedNodeId && rootNode ? findNodeById(rootNode, selectedNodeId) : null;
+  const activeTopic = selectedNode?.label || topic || rootNode?.label || "";
+
   const handleExplorePapers = async () => {
-    const query = topic || rootNode?.label || "";
+    const query = activeTopic;
     if (!query) return;
     setExploringPapers(true);
     setShowPapers(true);
@@ -263,37 +277,71 @@ export default function KnowledgeTree({
     <div className="max-w-6xl mx-auto">
 
       {/* ── Toolbar ── */}
-      <div className={`flex items-center justify-between mb-6 px-2 py-2 rounded-xl border ${t.toolbar}`}>
-        <div className={`text-xs ${t.sectionLabel}`}>
-          Click a node to view details · "Build Children" to expand (max 3 layers)
-        </div>
-        <button
-          onClick={showPapers ? () => setShowPapers(false) : handleExplorePapers}
-          disabled={exploringPapers}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60 transition-all"
-          style={{ background: "linear-gradient(to right, #0ea5e9, #6366f1)" }}
-        >
-          {exploringPapers ? (
-            <>
-              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-              Fetching papers…
-            </>
-          ) : showPapers ? (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      <div className={`flex items-center justify-between mb-6 px-3 py-2.5 rounded-xl border ${t.toolbar}`}>
+        {/* Left: hint + selected node chip */}
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={`text-xs hidden sm:block ${t.sectionLabel}`}>
+            Click a node · "Build Children" to expand
+          </span>
+          {selectedNode && (
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
+              theme === "dark" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                               : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+            }`}>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
               </svg>
-              Hide Papers
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              Explore Papers
-            </>
+              <span className="truncate max-w-[180px]">{selectedNode.label}</span>
+            </div>
           )}
-        </button>
+        </div>
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Subscribe button */}
+          <button
+            onClick={() => setShowSubscribe(true)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+              theme === "dark"
+                ? "border-zinc-600 text-zinc-300 hover:bg-zinc-700"
+                : "border-gray-200 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Subscribe
+          </button>
+
+          {/* Explore Papers button */}
+          <button
+            onClick={showPapers ? () => setShowPapers(false) : handleExplorePapers}
+            disabled={exploringPapers}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-60 transition-all"
+            style={{ background: "linear-gradient(to right, #0ea5e9, #6366f1)" }}
+          >
+            {exploringPapers ? (
+              <>
+                <div className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                Fetching…
+              </>
+            ) : showPapers ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+                Hide Papers
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                {selectedNode ? `Explore for "${selectedNode.label.slice(0, 20)}${selectedNode.label.length > 20 ? "…" : ""}"` : "Explore Papers"}
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {errorMessage && (
@@ -320,10 +368,10 @@ export default function KnowledgeTree({
               </h3>
               <p className={`text-xs mt-0.5 ${t.paperMeta}`}>
                 {exploringPapers
-                  ? "Searching OpenAlex and PubMed…"
+                  ? `Searching OpenAlex and PubMed for "${activeTopic}"…`
                   : papers.length > 0
-                  ? `${papers.length} papers found — connected to nodes in your tree`
-                  : "No papers found. Try rebuilding the tree with more nodes."}
+                  ? `${papers.length} papers for "${activeTopic}" — connected to nodes in your tree`
+                  : "No papers found. Try selecting a different node or rebuilding the tree."}
               </p>
             </div>
             {!exploringPapers && papers.length > 0 && (
@@ -420,6 +468,15 @@ export default function KnowledgeTree({
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Subscribe modal ── */}
+      {showSubscribe && (
+        <SubscribeModal
+          topic={activeTopic}
+          onClose={() => setShowSubscribe(false)}
+          theme={theme}
+        />
       )}
     </div>
   );

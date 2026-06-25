@@ -163,11 +163,12 @@ model Top3Ideas {
 }
 
 model PaperSubscription {
-  id        String   @id @default(cuid())
-  email     String
-  topic     String
-  frequency Int      @default(10)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String
+  topic        String
+  frequency    Int      @default(10)
+  deliveryTime String   @default("09:00")
+  createdAt    DateTime @default(now())
 
   @@index([email])
   @@index([topic])

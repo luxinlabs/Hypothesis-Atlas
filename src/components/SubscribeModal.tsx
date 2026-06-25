@@ -10,26 +10,32 @@ interface SubscribeModalProps {
 }
 
 const FREQUENCY_OPTIONS = [
-  { value: 5,  label: "5 papers",  desc: "Focused digest" },
-  { value: 10, label: "10 papers", desc: "Balanced coverage" },
+  { value: 5,  label: "5 papers",  desc: "Focused" },
+  { value: 10, label: "10 papers", desc: "Balanced" },
   { value: 20, label: "20 papers", desc: "Deep dive" },
 ];
 
+const TIME_OPTIONS = [
+  { value: "08:00", label: "8:00 AM" },
+  { value: "12:00", label: "12:00 PM" },
+  { value: "18:00", label: "6:00 PM" },
+  { value: "21:00", label: "9:00 PM" },
+];
+
 export default function SubscribeModal({ topic, onClose, theme = "light" }: SubscribeModalProps) {
-  const [email, setEmail]       = useState("");
-  const [frequency, setFreq]    = useState(10);
-  const [loading, setLoading]   = useState(false);
-  const [done, setDone]         = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-  const [error, setError]       = useState("");
-  const [mounted, setMounted]   = useState(false);
+  const [email, setEmail]             = useState("");
+  const [frequency, setFreq]          = useState(10);
+  const [deliveryTime, setTime]       = useState("09:00");
+  const [loading, setLoading]         = useState(false);
+  const [done, setDone]               = useState(false);
+  const [emailSent, setEmailSent]     = useState(false);
+  const [error, setError]             = useState("");
+  const [mounted, setMounted]         = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Ensure we only portal on the client
   useEffect(() => {
     setMounted(true);
     setTimeout(() => inputRef.current?.focus(), 50);
-    // Close on Escape
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -47,7 +53,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
       const res = await fetch("/api/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, topic, frequency }),
+        body: JSON.stringify({ email, topic, frequency, deliveryTime }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Something went wrong."); return; }
@@ -63,15 +69,17 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
   if (!mounted) return null;
 
   const isDark = theme === "dark";
-
   const panel   = isDark ? "bg-zinc-900 border-zinc-700 text-zinc-100" : "bg-white border-gray-200 text-gray-900";
   const sub     = isDark ? "text-zinc-400" : "text-gray-500";
-  const input   = isDark
+  const inputCls = isDark
     ? "bg-zinc-800 border-zinc-600 text-zinc-100 placeholder-zinc-500 focus:ring-indigo-400"
     : "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-indigo-400";
   const optBase = isDark ? "border-zinc-700 hover:border-indigo-500 hover:bg-indigo-500/10"
                          : "border-gray-200 hover:border-indigo-400 hover:bg-indigo-50";
   const optOn   = isDark ? "border-indigo-400 bg-indigo-500/20" : "border-indigo-500 bg-indigo-50";
+
+  // Friendly label for chosen time
+  const timeLabel = TIME_OPTIONS.find(t => t.value === deliveryTime)?.label ?? deliveryTime;
 
   const modal = (
     <div
@@ -93,21 +101,17 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
               </svg>
             </div>
             <h3 className="text-lg font-bold mb-1">You're subscribed!</h3>
-            <p className={`text-sm mb-3 ${sub}`}>
-              {emailSent ? (
-                <>Check your inbox — we sent a confirmation to{" "}
-                <span className="font-semibold">{email}</span>.</>
-              ) : (
-                <>Subscribed successfully. Weekly digests for{" "}
-                <span className="font-semibold">{email}</span> start next Monday.</>
-              )}
+            <p className={`text-sm mb-4 ${sub}`}>
+              {emailSent
+                ? <>Your first digest is on its way to <span className="font-semibold">{email}</span>. Check your inbox!</>
+                : <>Subscribed! Your weekly digest for <span className="font-semibold">{email}</span> starts next Monday.</>}
             </p>
-            <div className={`rounded-xl border px-4 py-3 mb-4 text-left space-y-1 ${
+            <div className={`rounded-xl border px-4 py-3 mb-4 text-left space-y-2 ${
               isDark ? "bg-indigo-500/10 border-indigo-500/30" : "bg-indigo-50 border-indigo-200"
             }`}>
-              <p className="text-xs text-indigo-500 font-semibold uppercase tracking-wide">Your digest</p>
+              <p className="text-xs text-indigo-500 font-semibold uppercase tracking-wide">Your weekly digest</p>
               <p className={`text-sm font-semibold ${isDark ? "text-zinc-100" : "text-gray-900"}`}>{topic}</p>
-              <p className={`text-xs ${sub}`}>{frequency} papers · every Monday</p>
+              <p className={`text-xs ${sub}`}>{frequency} papers · every Monday at {timeLabel}</p>
             </div>
             <button
               onClick={onClose}
@@ -124,7 +128,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
             <div className="flex items-start justify-between mb-5">
               <div>
                 <h3 className="text-base font-bold">Subscribe to Weekly Papers</h3>
-                <p className={`text-xs mt-0.5 ${sub}`}>Get the latest research in your inbox every Monday</p>
+                <p className={`text-xs mt-0.5 ${sub}`}>Get the latest research delivered to your inbox</p>
               </div>
               <button type="button" onClick={onClose}
                 className={`p-1.5 rounded-lg transition-colors ${isDark ? "hover:bg-zinc-700 text-zinc-400" : "hover:bg-gray-100 text-gray-400"}`}>
@@ -159,21 +163,36 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 transition ${input}`}
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 transition ${inputCls}`}
               />
             </div>
 
             {/* Frequency */}
-            <div className="mb-5">
+            <div className="mb-4">
               <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${sub}`}>
                 Papers per week
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {FREQUENCY_OPTIONS.map((opt) => (
                   <button key={opt.value} type="button" onClick={() => setFreq(opt.value)}
-                    className={`rounded-xl border p-3 text-left transition-all ${frequency === opt.value ? optOn : optBase}`}>
+                    className={`rounded-xl border p-2.5 text-left transition-all ${frequency === opt.value ? optOn : optBase}`}>
                     <p className={`text-sm font-bold ${frequency === opt.value ? "text-indigo-600" : ""}`}>{opt.label}</p>
                     <p className={`text-xs mt-0.5 ${sub}`}>{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Delivery time */}
+            <div className="mb-5">
+              <label className={`block text-xs font-semibold uppercase tracking-wide mb-2 ${sub}`}>
+                Delivery time (every Monday)
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {TIME_OPTIONS.map((opt) => (
+                  <button key={opt.value} type="button" onClick={() => setTime(opt.value)}
+                    className={`rounded-xl border py-2 text-center transition-all ${deliveryTime === opt.value ? optOn : optBase}`}>
+                    <p className={`text-xs font-semibold ${deliveryTime === opt.value ? "text-indigo-600" : ""}`}>{opt.label}</p>
                   </button>
                 ))}
               </div>
@@ -189,7 +208,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
               ) : (
                 <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg> Subscribe</>
+                </svg> Subscribe &amp; send first digest</>
               )}
             </button>
           </form>

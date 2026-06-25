@@ -8,6 +8,8 @@ import KnowledgeTree from "@/components/KnowledgeTree";
 import NodeDetail from "@/components/NodeDetail";
 import NotebookTab from "@/components/NotebookTab";
 import PaperMap from "@/components/PaperMap";
+import NotesPanel from "@/components/NotesPanel";
+import NotesTab from "@/components/NotesTab";
 
 interface Job {
   id: string;
@@ -96,7 +98,7 @@ export default function JobPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [events, setEvents] = useState<ProgressEvent[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"knowledge" | "notebook" | "papermap">(
+  const [activeTab, setActiveTab] = useState<"knowledge" | "notebook" | "papermap" | "notes">(
     "knowledge",
   );
   const [theme, setTheme] = useState<Theme>("light");
@@ -104,8 +106,8 @@ export default function JobPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    if (tabParam && ["knowledge", "notebook", "papermap"].includes(tabParam)) {
-      setActiveTab(tabParam as "knowledge" | "notebook" | "papermap");
+    if (tabParam && ["knowledge", "notebook", "papermap", "notes"].includes(tabParam)) {
+      setActiveTab(tabParam as "knowledge" | "notebook" | "papermap" | "notes");
     }
   }, []);
 
@@ -287,7 +289,7 @@ export default function JobPage() {
                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                   />
                 </svg>
-                Notebook & Topic Copilot
+                Topic Workspace
               </div>
             </button>
             <button
@@ -299,20 +301,26 @@ export default function JobPage() {
               }`}
             >
               <div className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Paper Map
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("notes")}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "notes"
+                  ? t.tabActive
+                  : `border-transparent ${t.tabIdle}`
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Notes
               </div>
             </button>
 
@@ -347,6 +355,7 @@ export default function JobPage() {
                   onNodeSelect={setSelectedNodeId}
                   events={events}
                   jobId={jobId}
+                  topic={job.topicQuery}
                   theme={theme}
                 />
               ) : (
@@ -406,11 +415,16 @@ export default function JobPage() {
             </div>
           </>
         ) : activeTab === "notebook" ? (
-          <NotebookTab jobId={jobId} theme={theme} />
+          <NotebookTab jobId={jobId} topic={job.topicQuery} theme={theme} />
+        ) : activeTab === "notes" ? (
+          <NotesTab jobId={jobId} topic={job.topicQuery} theme={theme} />
         ) : (
           <PaperMap jobId={jobId} theme={theme} />
         )}
       </div>
+
+      {/* Floating notes button — hidden on the Notes tab since it's fully visible there */}
+      <NotesPanel jobId={jobId} topic={job.topicQuery} theme={theme} hidden={activeTab === "notes"} />
     </div>
   );
 }

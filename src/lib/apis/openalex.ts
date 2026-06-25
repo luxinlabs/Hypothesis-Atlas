@@ -18,7 +18,9 @@ export interface OpenAlexWork {
 
 export async function searchOpenAlex(query: string, limit: number = 30): Promise<OpenAlexWork[]> {
   try {
-    const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}&sort=publication_date:desc&filter=publication_year:2018-2024`
+    const currentYear = new Date().getFullYear();
+    const fromYear = currentYear - 2;
+    const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}&sort=publication_date:desc&filter=publication_year:${fromYear}-${currentYear}`
     
     const response = await fetch(url, {
       headers: {

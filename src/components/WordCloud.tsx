@@ -10,6 +10,7 @@ interface Word {
 interface WordCloudProps {
   words: Word[];
   onWordClick: (word: string) => void;
+  centerWord?: string;
 }
 
 interface PlacedWord {
@@ -22,8 +23,11 @@ interface PlacedWord {
 export default function WordCloudComponent({
   words,
   onWordClick,
+  centerWord,
 }: WordCloudProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const onWordClickRef = useRef(onWordClick);
+  useEffect(() => { onWordClickRef.current = onWordClick; }, [onWordClick]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -96,6 +100,54 @@ export default function WordCloudComponent({
 
       return null;
     };
+
+    // Place center word first, pinned to exact center
+    if (centerWord) {
+      const span = document.createElement("span");
+      span.textContent = centerWord;
+      span.style.fontSize = "42px";
+      span.style.color = "#4f46e5";
+      span.style.cursor = "pointer";
+      span.style.position = "absolute";
+      span.style.fontWeight = "800";
+      span.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+      span.style.padding = "8px 18px";
+      span.style.borderRadius = "12px";
+      span.style.background = "rgba(79, 70, 229, 0.08)";
+      span.style.border = "2px solid rgba(79, 70, 229, 0.25)";
+      span.style.whiteSpace = "nowrap";
+      span.style.userSelect = "none";
+      span.style.opacity = "0";
+      span.style.zIndex = "20";
+
+      container.appendChild(span);
+      const rect = span.getBoundingClientRect();
+      const cw = rect.width;
+      const ch = rect.height;
+      const cx = width / 2 - cw / 2;
+      const cy = height / 2 - ch / 2;
+
+      span.style.left = `${cx}px`;
+      span.style.top = `${cy}px`;
+      setTimeout(() => { span.style.opacity = "1"; }, 0);
+
+      placedWords.push({ x: cx, y: cy, width: cw, height: ch });
+
+      span.addEventListener("mouseenter", () => {
+        span.style.transform = "scale(1.08)";
+        span.style.background = "rgba(79, 70, 229, 0.14)";
+        span.style.boxShadow = "0 4px 20px rgba(79, 70, 229, 0.25)";
+      });
+      span.addEventListener("mouseleave", () => {
+        span.style.transform = "scale(1)";
+        span.style.background = "rgba(79, 70, 229, 0.08)";
+        span.style.boxShadow = "none";
+      });
+      span.addEventListener("click", () => {
+        span.style.transform = "scale(0.95)";
+        setTimeout(() => { onWordClickRef.current(centerWord); }, 100);
+      });
+    }
 
     const sortedWords = [...words].sort((a, b) => b.value - a.value);
 
@@ -170,14 +222,14 @@ export default function WordCloudComponent({
         span.addEventListener("click", () => {
           span.style.transform = "scale(0.95)";
           setTimeout(() => {
-            onWordClick(word.text);
+            onWordClickRef.current(word.text);
           }, 100);
         });
       } else {
         container.removeChild(span);
       }
     });
-  }, [words, onWordClick]);
+  }, [words, centerWord]);
 
   return (
     <div

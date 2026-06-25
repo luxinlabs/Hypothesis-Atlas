@@ -156,8 +156,21 @@ model Top3Ideas {
   generatedAt DateTime @default(now())
   ideasJson   String   @db.Text
   traceJson   String?  @db.Text
-  
+
   job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  
+
   @@index([jobId])
+}
+
+model PaperSubscription {
+  id           String   @id @default(cuid())
+  email        String
+  topic        String
+  frequency    Int      @default(10)
+  deliveryTime String   @default("09:00")
+  unsubToken   String   @unique @default(cuid())
+  createdAt    DateTime @default(now())
+
+  @@index([email])
+  @@index([topic])
 }

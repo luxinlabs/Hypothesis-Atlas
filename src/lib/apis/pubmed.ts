@@ -10,7 +10,10 @@ export interface PubMedArticle {
 
 export async function searchPubMed(query: string, limit: number = 20): Promise<PubMedArticle[]> {
   try {
-    const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json&sort=relevance`
+    const currentYear = new Date().getFullYear();
+    const fromYear = currentYear - 2;
+    const dateFilter = `&datetype=pdat&mindate=${fromYear}/01/01&maxdate=${currentYear}/12/31`;
+    const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json&sort=pub+date${dateFilter}`
     
     const searchResponse = await fetch(searchUrl, {
       signal: AbortSignal.timeout(10000)

@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ARSPlanChat from "@/components/ARSPlanChat";
+import NotesPanel from "@/components/NotesPanel";
 
-type Step = "context" | "outline" | "ars";
+type Step = "context" | "outline" | "papers" | "ars";
 
 interface ResearchIdea {
   title: string;
@@ -41,7 +42,7 @@ function PaperPipelineInner() {
 
   const initialStep = (searchParams.get("step") as Step) ?? "context";
   const [step, setStep] = useState<Step>(
-    ["context", "outline", "ars"].includes(initialStep) ? initialStep : "context"
+    ["context", "outline", "papers", "ars"].includes(initialStep) ? initialStep : "context"
   );
   const [topicQuery, setTopicQuery] = useState("");
   const [ideas, setIdeas] = useState<ResearchIdea[]>([]);
@@ -54,6 +55,16 @@ function PaperPipelineInner() {
   const [referenceDoc, setReferenceDoc] = useState<{ name: string; content: string } | null>(null);
   const [refDocExpanded, setRefDocExpanded] = useState(false);
   const refFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch latest papers section
+  interface FetchedPaper {
+    id: string; title: string; authors: string[]; venue: string;
+    year: string; abstract: string; url: string; source: "openalex" | "pubmed";
+  }
+  const [paperSearchDesc, setPaperSearchDesc] = useState("");
+  const [paperResults, setPaperResults] = useState<FetchedPaper[]>([]);
+  const [loadingPapers, setLoadingPapers] = useState(false);
+  const [paperSearchDone, setPaperSearchDone] = useState(false);
 
   // Persist reference doc in localStorage per job
   useEffect(() => {
@@ -74,6 +85,28 @@ function PaperPipelineInner() {
     localStorage.removeItem(`ref-doc:${jobId}`);
   };
 
+  const handleFetchPapers = async () => {
+    const desc = paperSearchDesc.trim();
+    if (!desc) return;
+    setLoadingPapers(true);
+    setPaperSearchDone(false);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/search-papers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: desc }),
+      });
+      const data = await res.json();
+      setPaperResults(data.papers ?? []);
+      setPaperSearchDone(true);
+    } catch {
+      setPaperResults([]);
+      setPaperSearchDone(true);
+    } finally {
+      setLoadingPapers(false);
+    }
+  };
+
   const handleRefFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -91,6 +124,7 @@ function PaperPipelineInner() {
       ]);
 
       setTopicQuery(jobRes.topicQuery ?? "");
+      setPaperSearchDesc((prev) => prev || jobRes.topicQuery || "");
       const convergedIdeas: ResearchIdea[] = convergeRes.ideas ?? [];
 
       if (convergedIdeas.length > 0) {
@@ -199,7 +233,17 @@ function PaperPipelineInner() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/job/${jobId}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </Link>
+            <span className="text-gray-200">|</span>
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #9333ea)" }}>
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,8 +252,7 @@ function PaperPipelineInner() {
               </div>
               <span className="font-semibold text-gray-800 text-sm">Paper Pipeline</span>
             </div>
-            <span className="text-gray-200 mx-1">|</span>
-            {/* Quick navigation back to research tabs */}
+            <span className="text-gray-200">|</span>
             <Link
               href={`/job/${jobId}?tab=knowledge`}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
@@ -236,7 +279,7 @@ function PaperPipelineInner() {
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Step tabs */}
         <div className="flex items-center gap-1 mb-8 bg-gray-100 rounded-xl p-1 w-fit">
-          {(["context", "outline", "ars"] as Step[]).map((s, i) => (
+          {(["context", "papers", "outline", "ars"] as Step[]).map((s, i) => (
             <button
               key={s}
               onClick={() => setStep(s)}
@@ -247,7 +290,7 @@ function PaperPipelineInner() {
               }`}
             >
               <span className="mr-2 text-xs opacity-60">{i + 1}.</span>
-              {s === "context" ? "Select Idea" : s === "outline" ? "Paper Outline" : "Write Paper"}
+              {s === "context" ? "Select Idea" : s === "papers" ? "Find Papers" : s === "outline" ? "Paper Outline" : "Write Paper"}
             </button>
           ))}
         </div>
@@ -433,7 +476,134 @@ function PaperPipelineInner() {
           </div>
         )}
 
-        {/* ─── Step 2: Outline ─── */}
+        {/* ─── Step 2: Find Papers ─── */}
+        {step === "papers" && (
+          <div className="max-w-3xl mx-auto">
+            {/* Header */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Find Latest Papers</h2>
+              <p className="text-sm text-gray-500">
+                Describe what you want to find — we'll search OpenAlex and PubMed and return recent related papers.
+              </p>
+            </div>
+
+            {/* Search box */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm mb-6">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Search description
+              </label>
+              <textarea
+                value={paperSearchDesc}
+                onChange={(e) => setPaperSearchDesc(e.target.value)}
+                rows={3}
+                placeholder="e.g. Recent advances in CRISPR gene editing for therapeutic applications in human disease"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm resize-none outline-none focus:ring-2 focus:ring-sky-300 text-gray-800 placeholder-gray-400 leading-relaxed"
+              />
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs text-gray-400">Edit to 1–3 sentences for best results</p>
+                <button
+                  onClick={handleFetchPapers}
+                  disabled={loadingPapers || !paperSearchDesc.trim()}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-all"
+                  style={{ background: "linear-gradient(to right, #0ea5e9, #6366f1)" }}
+                >
+                  {loadingPapers ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                      Searching…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      Explore Papers
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Results */}
+            {paperSearchDone && paperResults.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <svg className="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm font-medium">No papers found</p>
+                <p className="text-xs mt-1">Try rephrasing your description with different keywords</p>
+              </div>
+            )}
+
+            {paperResults.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    {paperResults.length} papers found
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> OpenAlex
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> PubMed
+                    </span>
+                  </div>
+                </div>
+                {paperResults.map((paper) => (
+                  <div key={paper.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:border-indigo-300 hover:shadow-sm transition-all">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${paper.source === "openalex" ? "bg-blue-400" : "bg-emerald-400"}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={paper.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-semibold text-gray-900 hover:text-indigo-700 transition-colors leading-snug"
+                        >
+                          {paper.title}
+                        </a>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                          {paper.year && (
+                            <span className="text-xs font-medium text-gray-500">{paper.year}</span>
+                          )}
+                          {paper.venue && (
+                            <span className="text-xs text-gray-400 italic truncate max-w-xs">{paper.venue}</span>
+                          )}
+                          {paper.authors.length > 0 && (
+                            <span className="text-xs text-gray-400">
+                              {paper.authors.slice(0, 3).join(", ")}{paper.authors.length > 3 ? " et al." : ""}
+                            </span>
+                          )}
+                        </div>
+                        {paper.abstract && (
+                          <p className="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">
+                            {paper.abstract}
+                          </p>
+                        )}
+                      </div>
+                      <a
+                        href={paper.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 p-1.5 rounded-lg hover:bg-indigo-50 text-gray-300 hover:text-indigo-500 transition-colors"
+                        title="Open paper"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Step 3: Outline ─── */}
         {step === "outline" && (
           <div>
             {!outline ? (
@@ -727,6 +897,8 @@ function PaperPipelineInner() {
           </div>
         )}
       </div>
+
+      <NotesPanel jobId={jobId} topic={topicQuery} />
     </div>
   );
 }

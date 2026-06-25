@@ -53,10 +53,13 @@ function paperCard(paper: FetchedPaper, index: number): string {
 </table>`;
 }
 
-function digestHtml(email: string, topic: string, frequency: number, deliveryTime: string, papers: FetchedPaper[], isFirst: boolean): string {
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://hypothesis-atlas.vercel.app";
+
+function digestHtml(email: string, topic: string, frequency: number, deliveryTime: string, papers: FetchedPaper[], isFirst: boolean, unsubToken: string): string {
   const nextDate = nextMonday(deliveryTime);
   const timeLabel = formatTime(deliveryTime);
   const title = isFirst ? "Your First Paper Digest" : `Weekly Digest: ${topic}`;
+  const unsubUrl = `${APP_URL}/api/subscriptions/unsubscribe?token=${unsubToken}`;
 
   return `
 <!DOCTYPE html>
@@ -104,8 +107,13 @@ function digestHtml(email: string, topic: string, frequency: number, deliveryTim
               <p style="margin:0 0 8px;color:#9ca3af;font-size:12px;text-align:center;">
                 You subscribed to weekly research digests on Hypothesis Atlas with ${email}.
               </p>
-              <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">
-                <a href="https://hypothesis-atlas.vercel.app" style="color:#4f46e5;text-decoration:none;">Open Hypothesis Atlas</a>
+              <p style="margin:0 0 8px;color:#9ca3af;font-size:12px;text-align:center;">
+                <a href="${APP_URL}" style="color:#4f46e5;text-decoration:none;">Open Hypothesis Atlas</a>
+                &nbsp;·&nbsp;
+                <a href="${unsubUrl}" style="color:#9ca3af;text-decoration:underline;">Unsubscribe</a>
+              </p>
+              <p style="margin:0;color:#d1d5db;font-size:11px;text-align:center;">
+                Clicking unsubscribe will immediately remove you from this digest.
               </p>
             </td>
           </tr>
@@ -172,7 +180,7 @@ export async function POST(req: NextRequest) {
           from: "Hypothesis Atlas <onboarding@resend.dev>",
           to: normalizedEmail,
           subject: `Your first ${freq} papers on "${topic}" — Hypothesis Atlas`,
-          html: digestHtml(normalizedEmail, topic, freq, time, papers, true),
+          html: digestHtml(normalizedEmail, topic, freq, time, papers, true, subscription.unsubToken),
         });
 
         if (result.error) {

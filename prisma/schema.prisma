@@ -168,6 +168,7 @@ model PaperSubscription {
   topic        String
   frequency    Int      @default(10)
   deliveryTime String   @default("09:00")
+  unsubToken   String   @unique @default(cuid())
   createdAt    DateTime @default(now())
 
   @@index([email])

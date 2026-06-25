@@ -198,8 +198,6 @@ export default function ExplorePage() {
   const [lastJobId, setLastJobId]         = useState<string | null>(null);
   const [customTopic, setCustomTopic]     = useState("");
   const [topicError, setTopicError]       = useState("");
-  const [dynamicWords, setDynamicWords]   = useState<{ text: string; value: number }[] | null>(null);
-  const [loadingWords, setLoadingWords]   = useState(false);
   const [centerWord, setCenterWord]       = useState<string | undefined>(undefined);
 
   // Explore mode
@@ -217,7 +215,6 @@ export default function ExplorePage() {
   }, []);
 
   useEffect(() => {
-    setDynamicWords(null);
     setCenterWord(undefined);
   }, [selectedDomain]);
 
@@ -228,33 +225,16 @@ export default function ExplorePage() {
 
   const t = THEME_STYLES[theme];
 
-  const handleSearchTopic = async () => {
+  const handleSearchTopic = () => {
     const words = customTopic.trim().split(/\s+/).filter(Boolean);
     if (words.length < 2 || words.length > 5) {
       setTopicError("Please enter between 2 and 5 words.");
       return;
     }
     setTopicError("");
-    setLoadingWords(true);
     setCenterWord(customTopic.trim());
-
     if (exploreMode) {
-      // In explore mode: set as the explore topic so the cloud click will subscribe
       setExploreTopic(customTopic.trim());
-    }
-
-    try {
-      const res = await fetch("/api/explore/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: customTopic.trim(), domain: selectedDomain }),
-      });
-      const data = await res.json() as { words: { text: string; value: number }[] };
-      if (data.words?.length) setDynamicWords(data.words);
-    } catch {
-      // silently fall back to static list
-    } finally {
-      setLoadingWords(false);
     }
   };
 
@@ -383,11 +363,10 @@ export default function ExplorePage() {
               <button
                 type="button"
                 onClick={handleSearchTopic}
-                disabled={loadingWords}
-                className="px-5 py-2.5 rounded-xl font-semibold text-sm flex-shrink-0 transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="px-5 py-2.5 rounded-xl font-semibold text-sm flex-shrink-0 transition-opacity hover:opacity-90"
                 style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
               >
-                {loadingWords ? "…" : "Search"}
+                Search
               </button>
             </div>
             {topicError && <p className="text-center text-xs mt-2" style={{ color: "#dc2626" }}>{topicError}</p>}
@@ -403,9 +382,7 @@ export default function ExplorePage() {
           <p className={`text-sm font-semibold uppercase tracking-wider mb-2 text-center ${t.subText}`}>
             {exploreMode
               ? "Explore mode — click any word to subscribe to weekly papers"
-              : dynamicWords
-                ? "Related topics · click any word to start research"
-                : `Or click a topic from the ${DOMAIN_META[selectedDomain].label} cloud`}
+              : `Or click a topic from the ${DOMAIN_META[selectedDomain].label} cloud`}
           </p>
 
           {/* Subscribe prompt — shown when a topic is selected in explore mode */}
@@ -455,16 +432,8 @@ export default function ExplorePage() {
                 </span>
               </div>
             )}
-            {loadingWords && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/60 backdrop-blur-sm z-10">
-                <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-indigo-400 border-t-transparent" />
-                  Generating related topics…
-                </div>
-              </div>
-            )}
             <WordCloudComponent
-              words={dynamicWords ?? DOMAIN_TERMS[selectedDomain]}
+              words={DOMAIN_TERMS[selectedDomain]}
               onWordClick={handleWordClick}
               centerWord={centerWord}
             />

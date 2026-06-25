@@ -21,18 +21,28 @@ It now includes a full **Academic Paper Pipeline** powered by the [ARS (Academic
 ### Evidence Mapping
 - Area/industry selector (General · Biology · Chemistry · Technology · Finance) with per-domain word clouds
 - Custom topic search: type 2–5 words → Groq generates a live keyword cloud centered on your topic
+- **Explore toggle**: switch the word cloud to subscription mode — clicking a word subscribes to weekly papers instead of launching a research run
 - Real-time knowledge tree built from peer-reviewed papers, datasets, and social signals
+- **Node-aware Explore Papers**: click any tree node to scope paper fetching to that node's topic; results show node-connection badges
 - Hub-and-spoke Paper Map: Research hub at center, weighted lines to each paper, no visual clutter between peers
 - Paper Compare Mode: pick 2 papers → Claude generates methodology differences + research gap analysis
 - Node-level detail: methods, findings, disagreements, open problems
+
+### Weekly Paper Subscription
+- Subscribe to any topic (from the word cloud or Knowledge Tree) for a weekly digest of the latest papers
+- Choose delivery time (8 AM / 12 PM / 6 PM / 9 PM) and number of papers (5 / 10 / 20) per week
+- First digest sent immediately on subscribe; subsequent digests delivered every Monday via Vercel Cron
+- Papers sourced from OpenAlex + PubMed, filtered to the last 2 years, ranked by relevance + recency
+- One-click unsubscribe link in every email; branded confirmation page
 
 ### Notebook & Topic Copilot
 - AI-assisted brainstorm with streaming responses
 - Converge to Top 3 research ideas from your exploration
 - Export brainstorm as Markdown
 
-### Paper Pipeline (new)
+### Paper Pipeline
 - **Idea selection** — picks from your converged ideas, knowledge tree nodes, or raw topic
+- **Find Papers** — dedicated tab to search OpenAlex + PubMed with editable query; relevance + recency ranked
 - **Paper Outline** — Groq-powered IMRaD outline generation
 - **ARS Plan Mode** — in-app Socratic planning chat powered by Claude (`/ars-plan` workflow)
   - Session caching: resume previous sessions automatically; restart clears the cache
@@ -72,7 +82,9 @@ Open http://localhost:3000
    DATABASE_URL="postgresql://postgres:postgres@localhost:5433/hypothesis_atlas?schema=public"
    REDIS_URL="redis://localhost:6379"
    GROQ_API_KEY="your_groq_api_key_here"
-   ANTHROPIC_API_KEY="sk-ant-..."   # required for ARS Plan Mode
+   ANTHROPIC_API_KEY="sk-ant-..."        # required for ARS Plan Mode
+   RESEND_API_KEY="re_..."               # required for weekly digest emails
+   NEXT_PUBLIC_APP_URL="http://localhost:3000"  # used in email unsubscribe links
    ```
 3. Start infrastructure: `make infra-up`
 4. Push schema: `make db-push`
@@ -149,6 +161,30 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 ---
 
 ## Version History
+
+### V2.3 — Node-Aware Explore Papers & Weekly Paper Subscription
+
+- **Node-aware Explore Papers** (Knowledge Tree): clicking a tree node sets it as the active search topic (shown as an indigo chip in the toolbar); "Explore Papers" fetches papers ranked specifically for that node's label rather than the job root topic
+- **Explore toggle** (word cloud page): a pill toggle (default OFF) switches the word cloud from "launch research" mode to "subscribe" mode — clicking a word in Explore mode shows a subscribe card instead of navigating to a job
+- **Weekly paper subscription**: Subscribe button in the Knowledge Tree toolbar and the Explore page opens a popup with:
+  - Topic chip (auto-filled from selected node or searched term)
+  - Email input
+  - Papers per week selector: 5 / 10 / 20
+  - Delivery time picker: 8 AM / 12 PM / 6 PM / 9 PM (every Monday)
+- **Immediate first digest**: on subscribe, the API fetches the top N ranked papers for the topic right now and emails them instantly via Resend — same styled HTML digest as the weekly version
+- **Weekly digest cron**: `vercel.json` registers a Vercel Cron (`0 * * * 1` — every hour on Mondays) that calls `GET /api/cron/weekly-digest`; the route matches subscriptions by delivery time (UTC hour), fetches fresh papers, and sends the weekly digest email
+- **One-click unsubscribe**: every digest email contains a tokenised unsubscribe link (`/api/subscriptions/unsubscribe?token=...`) that deletes the subscription and redirects to a branded `/unsubscribed` confirmation page (handles success, already-used, and error states)
+- **Latest papers only**: OpenAlex and PubMed queries are now filtered to the last 2 years (`currentYear-2` to `currentYear`) with `sort=publication_date:desc`; recency scoring window tightened from 10 years to 2 years so 2026 papers rank first
+- **Email shows exact subscribe time**: the digest banner includes the timestamp when the user clicked Subscribe and the paper year range (e.g. "2025–2026")
+- **`PaperSubscription` model**: stores `email`, `topic`, `frequency`, `deliveryTime`, `unsubToken` (unique cuid for unsubscribe links), `createdAt`
+- **Shared `fetchTopicPapers()` utility** (`src/lib/fetchTopicPapers.ts`): extracted from the search-papers route so both in-app Explore Papers and email digests use the same ranking logic
+
+#### Required environment variables (new in V2.3)
+
+| Variable | Purpose |
+|---|---|
+| `RESEND_API_KEY` | Resend API key for sending digest and confirmation emails |
+| `NEXT_PUBLIC_APP_URL` | App base URL used in email links (e.g. `http://localhost:3000` for dev, your Vercel URL for prod) |
 
 ### V2.2 — Notes System, Find Papers & Knowledge Tree Paper Exploration
 

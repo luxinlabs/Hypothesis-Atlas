@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import QuizPanel from "./QuizPanel";
 
 interface Source {
   id: string;
@@ -72,6 +73,7 @@ export default function NodeDetail({
 }: NodeDetailProps) {
   const t = THEME_STYLES[theme];
   const [node, setNode] = useState<NodeData | null>(null);
+  const [showQuiz, setShowQuiz] = useState(false);
 
   useEffect(() => {
     fetch(`/api/nodes/${nodeId}`)
@@ -168,6 +170,16 @@ export default function NodeDetail({
           </ul>
         </div>
       )}
+
+      <div className={`border-t pt-4 ${t.border}`}>
+        <button
+          onClick={() => setShowQuiz((v) => !v)}
+          className="w-full text-xs py-2 px-3 rounded-md border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors font-medium mb-4"
+        >
+          {showQuiz ? "Hide Quiz" : "Test Your Understanding"}
+        </button>
+        {showQuiz && <QuizPanel nodeId={nodeId} theme={theme} />}
+      </div>
 
       <div className={`border-t pt-4 ${t.border}`}>
         <h3 className={`text-sm font-semibold mb-3 ${t.subheading}`}>

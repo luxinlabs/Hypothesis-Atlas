@@ -9,6 +9,12 @@ export async function GET(
   try {
     const node = await prisma.node.findUnique({
       where: { id: params.nodeId },
+      include: {
+        nodeSources: {
+          include: { source: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     })
 
     if (!node) {
@@ -20,19 +26,30 @@ export async function GET(
     const disagreements = node.disagreementsJson ? JSON.parse(node.disagreementsJson) : []
     const openProblems = node.openProblemsJson ? JSON.parse(node.openProblemsJson) : []
 
-    const prompt = `You are a scientific educator. Based on the following research node content, generate exactly 4 multiple-choice comprehension questions to help readers verify their understanding. Each question should test a different aspect of the content (summary, methods, findings, or open problems).
+    // Pull top peer-reviewed sources with snippets/abstracts for grounding
+    const peerSources = node.nodeSources
+      .filter((ns: any) => ns.source.reliabilityTier === 'peer_reviewed' && ns.source.snippet)
+      .slice(0, 5)
+      .map((ns: any) => `- "${ns.source.title}"${ns.source.venue ? ` (${ns.source.venue})` : ''}: ${ns.source.snippet}`)
+
+    const sourcesBlock = peerSources.length > 0
+      ? `\nActual papers linked to this node:\n${peerSources.join('\n')}`
+      : ''
+
+    const prompt = `You are a scientific educator. Based ONLY on the specific research content below, generate exactly 4 multiple-choice comprehension questions. The questions must be directly answerable from the provided content — do not ask about general research concepts.
 
 Node Topic: ${node.label}
 
 Summary: ${node.summary}
 
-Methods: ${methods.join('; ')}
+Methods used in this research: ${methods.join('; ')}
 
-Key Findings: ${findings.join('; ')}
+Key findings from this research: ${findings.join('; ')}
 
-Disagreements: ${disagreements.join('; ')}
+Current disagreements in the field: ${disagreements.join('; ')}
 
-Open Problems: ${openProblems.join('; ')}
+Open problems identified: ${openProblems.join('; ')}
+${sourcesBlock}
 
 Return a JSON object with this exact structure:
 {
@@ -42,17 +59,18 @@ Return a JSON object with this exact structure:
       "question": "Question text here?",
       "options": ["A) Option one", "B) Option two", "C) Option three", "D) Option four"],
       "correctIndex": 0,
-      "explanation": "Brief explanation of why the correct answer is right."
+      "explanation": "Brief explanation citing the specific finding/method/paper above."
     }
   ]
 }
 
 Rules:
+- Every question must be answerable from the content above — not from general knowledge
+- Reference specific findings, methods, or paper titles in the questions where possible
 - correctIndex is 0-based (0=A, 1=B, 2=C, 3=D)
-- Make one option clearly correct based on the content above
-- Make distractors plausible but wrong
-- Explanation should reference the content above
-- Questions should progress from basic (summary) to nuanced (open problems)`
+- Distractors should be plausible alternatives within this specific topic area
+- Explanation must cite the specific part of the content that supports the answer
+- Questions should progress: key finding → specific method → a disagreement/debate → an open problem`
 
     const result = await generateWithGroq(prompt)
 

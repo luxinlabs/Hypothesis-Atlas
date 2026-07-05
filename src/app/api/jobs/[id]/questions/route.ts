@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 import { generateWithGroq } from '@/lib/groq'
 
 interface IdeaContent {
@@ -21,17 +22,69 @@ export async function POST(
       return NextResponse.json({ error: 'No idea content provided' }, { status: 400 })
     }
 
-    const prompt = `You are a scientific educator. Based on the following research paper idea, generate exactly 4 multiple-choice comprehension questions to help the researcher verify their understanding of the idea before writing. Cover different aspects: the core problem, the method, the next steps, and broader context.
+    // Fetch the job's root node + child nodes for real synthesized content
+    const job = await prisma.job.findUnique({
+      where: { id: params.id },
+      select: { rootNodeId: true, topicQuery: true },
+    })
 
-Paper Title: ${idea.title}
+    let nodesBlock = ''
+    let sourcesBlock = ''
 
-Problem to Solve: ${idea.problem_to_solve}
+    if (job?.rootNodeId) {
+      const rootNode = await prisma.node.findUnique({
+        where: { id: job.rootNodeId },
+        include: {
+          children: true,
+          nodeSources: {
+            include: { source: true },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      })
 
-Proposed Methods: ${idea.proposed_method.join('; ')}
+      if (rootNode) {
+        const rootFindings = rootNode.findingsJson ? JSON.parse(rootNode.findingsJson) : []
+        const rootMethods = rootNode.methodsJson ? JSON.parse(rootNode.methodsJson) : []
+        const rootDisagreements = rootNode.disagreementsJson ? JSON.parse(rootNode.disagreementsJson) : []
+        const rootOpenProblems = rootNode.openProblemsJson ? JSON.parse(rootNode.openProblemsJson) : []
 
-Next 3 Steps: ${idea.next_3_steps.join('; ')}
+        nodesBlock = `
+Synthesized research overview for "${job.topicQuery}":
+Summary: ${rootNode.summary}
+Key findings: ${rootFindings.join('; ')}
+Methods: ${rootMethods.join('; ')}
+Disagreements: ${rootDisagreements.join('; ')}
+Open problems: ${rootOpenProblems.join('; ')}`
 
-Field Context: ${idea.field_context.join('; ') || 'General research'}
+        // Add child node subtopics
+        if (rootNode.children.length > 0) {
+          const subtopics = rootNode.children.map((child: any) => {
+            const childFindings = child.findingsJson ? JSON.parse(child.findingsJson) : []
+            return `  - ${child.label}: ${child.summary}${childFindings.length > 0 ? ` Findings: ${childFindings.slice(0, 2).join('; ')}` : ''}`
+          })
+          nodesBlock += `\n\nSubtopics from the knowledge tree:\n${subtopics.join('\n')}`
+        }
+
+        // Top peer-reviewed source snippets
+        const peerSources = rootNode.nodeSources
+          .filter((ns: any) => ns.source.reliabilityTier === 'peer_reviewed' && ns.source.snippet)
+          .slice(0, 5)
+          .map((ns: any) => `- "${ns.source.title}"${ns.source.venue ? ` (${ns.source.venue})` : ''}: ${ns.source.snippet}`)
+
+        if (peerSources.length > 0) {
+          sourcesBlock = `\nActual papers found during evidence mapping:\n${peerSources.join('\n')}`
+        }
+      }
+    }
+
+    const prompt = `You are a scientific educator. Generate exactly 4 multiple-choice comprehension questions about the specific research topic and evidence below. Questions must be answerable from the provided content — not from general knowledge.
+
+Selected paper idea: ${idea.title}
+Problem: ${idea.problem_to_solve}
+Proposed methods: ${idea.proposed_method.join('; ')}
+${nodesBlock}
+${sourcesBlock}
 
 Return a JSON object with this exact structure:
 {
@@ -41,17 +94,18 @@ Return a JSON object with this exact structure:
       "question": "Question text here?",
       "options": ["A) Option one", "B) Option two", "C) Option three", "D) Option four"],
       "correctIndex": 0,
-      "explanation": "Brief explanation of why the correct answer is right."
+      "explanation": "Brief explanation citing the specific finding, paper, or subtopic above."
     }
   ]
 }
 
 Rules:
+- Questions must reference specific findings, paper titles, subtopics, or methods from the content above
+- Do NOT ask about generic research concepts — every question must be specific to this topic
 - correctIndex is 0-based (0=A, 1=B, 2=C, 3=D)
-- Make one option clearly correct based on the content above
-- Make distractors plausible but wrong
-- Explanation should reference the content above
-- Questions should progress: core problem → method → next steps → strategic context`
+- Distractors should be plausible alternatives within this specific domain
+- Explanation must cite which specific piece of evidence supports the answer
+- Question progression: a key finding → a specific method or subtopic → a disagreement or gap → what the selected paper idea addresses`
 
     const result = await generateWithGroq(prompt)
 

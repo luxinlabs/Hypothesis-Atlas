@@ -8,7 +8,7 @@ if (GROQ_API_KEY) {
   groq = new Groq({ apiKey: GROQ_API_KEY })
 }
 
-export async function generateWithGroq(prompt: string, schema?: any): Promise<any> {
+export async function generateWithGroq(prompt: string, schema?: any, systemPrompt?: string): Promise<any> {
   if (!groq) {
     return generateFallback(prompt, schema)
   }
@@ -18,7 +18,7 @@ export async function generateWithGroq(prompt: string, schema?: any): Promise<an
       messages: [
         {
           role: 'system',
-          content: 'You are a scientific research assistant. Provide structured, accurate responses based on the given context.',
+          content: systemPrompt ?? 'You are a scientific research assistant. Provide structured, accurate responses based on the given context.',
         },
         {
           role: 'user',

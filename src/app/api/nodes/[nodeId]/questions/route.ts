@@ -21,58 +21,54 @@ export async function GET(
       return NextResponse.json({ error: 'Node not found' }, { status: 404 })
     }
 
-    const methods = node.methodsJson ? JSON.parse(node.methodsJson) : []
-    const findings = node.findingsJson ? JSON.parse(node.findingsJson) : []
-    const disagreements = node.disagreementsJson ? JSON.parse(node.disagreementsJson) : []
-    const openProblems = node.openProblemsJson ? JSON.parse(node.openProblemsJson) : []
+    const methods: string[] = node.methodsJson ? JSON.parse(node.methodsJson) : []
+    const findings: string[] = node.findingsJson ? JSON.parse(node.findingsJson) : []
+    const disagreements: string[] = node.disagreementsJson ? JSON.parse(node.disagreementsJson) : []
+    const openProblems: string[] = node.openProblemsJson ? JSON.parse(node.openProblemsJson) : []
 
-    // Pull top peer-reviewed sources with snippets/abstracts for grounding
     const peerSources = node.nodeSources
       .filter((ns: any) => ns.source.reliabilityTier === 'peer_reviewed' && ns.source.snippet)
-      .slice(0, 5)
-      .map((ns: any) => `- "${ns.source.title}"${ns.source.venue ? ` (${ns.source.venue})` : ''}: ${ns.source.snippet}`)
+      .slice(0, 6)
+      .map((ns: any, i: number) =>
+        `[P${i + 1}] "${ns.source.title}"${ns.source.venue ? ` — ${ns.source.venue}` : ''}\n    Abstract: ${ns.source.snippet}`
+      )
 
-    const sourcesBlock = peerSources.length > 0
-      ? `\nActual papers linked to this node:\n${peerSources.join('\n')}`
-      : ''
+    const contentBlock = [
+      `TOPIC: ${node.label}`,
+      ``,
+      `SUMMARY: ${node.summary}`,
+      ``,
+      findings.length > 0 ? `KEY FINDINGS:\n${findings.map((f, i) => `  F${i + 1}. ${f}`).join('\n')}` : null,
+      methods.length > 0 ? `METHODS:\n${methods.map((m, i) => `  M${i + 1}. ${m}`).join('\n')}` : null,
+      disagreements.length > 0 ? `DISAGREEMENTS:\n${disagreements.map((d, i) => `  D${i + 1}. ${d}`).join('\n')}` : null,
+      openProblems.length > 0 ? `OPEN PROBLEMS:\n${openProblems.map((p, i) => `  O${i + 1}. ${p}`).join('\n')}` : null,
+      peerSources.length > 0 ? `PAPERS:\n${peerSources.join('\n')}` : null,
+    ].filter(Boolean).join('\n')
 
-    const prompt = `You are a scientific educator. Based ONLY on the specific research content below, generate exactly 4 multiple-choice comprehension questions. The questions must be directly answerable from the provided content — do not ask about general research concepts.
+    const systemPrompt = `You are a quiz generator. Your ONLY job is to write multiple-choice questions whose correct answers can be found verbatim or paraphrased from the CONTENT block the user provides. You must NEVER introduce facts, concepts, or terminology that are not present in the CONTENT block. If a concept is not in the CONTENT block, do not ask about it. Every question must name a specific finding, method, paper, or problem from the CONTENT block.`
 
-Node Topic: ${node.label}
+    const prompt = `Generate exactly 4 multiple-choice questions using ONLY the content below. Every question must reference a specific item labelled F#, M#, D#, O#, or P# from the CONTENT block. Do not use general knowledge.
 
-Summary: ${node.summary}
+===CONTENT START===
+${contentBlock}
+===CONTENT END===
 
-Methods used in this research: ${methods.join('; ')}
-
-Key findings from this research: ${findings.join('; ')}
-
-Current disagreements in the field: ${disagreements.join('; ')}
-
-Open problems identified: ${openProblems.join('; ')}
-${sourcesBlock}
-
-Return a JSON object with this exact structure:
+Return JSON only:
 {
   "questions": [
     {
       "id": 1,
-      "question": "Question text here?",
-      "options": ["A) Option one", "B) Option two", "C) Option three", "D) Option four"],
+      "question": "string — must name a specific finding/method/paper/problem from the CONTENT",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
       "correctIndex": 0,
-      "explanation": "Brief explanation citing the specific finding/method/paper above."
+      "explanation": "string — quote or cite the exact item (F#/M#/D#/O#/P#) that supports the answer"
     }
   ]
 }
 
-Rules:
-- Every question must be answerable from the content above — not from general knowledge
-- Reference specific findings, methods, or paper titles in the questions where possible
-- correctIndex is 0-based (0=A, 1=B, 2=C, 3=D)
-- Distractors should be plausible alternatives within this specific topic area
-- Explanation must cite the specific part of the content that supports the answer
-- Questions should progress: key finding → specific method → a disagreement/debate → an open problem`
+Question order: one about a key finding → one about a method → one about a disagreement or open problem → one about a specific paper or its finding. All four must be uniquely answerable from the CONTENT block above.`
 
-    const result = await generateWithGroq(prompt)
+    const result = await generateWithGroq(prompt, undefined, systemPrompt)
 
     if (!result.questions || !Array.isArray(result.questions)) {
       return NextResponse.json({ error: 'Failed to generate questions' }, { status: 500 })

@@ -166,7 +166,7 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 
 - **"Test Your Understanding" quiz** on every knowledge tree node: click the button in NodeDetail to generate 4 multiple-choice questions grounded in the actual papers and findings discovered for that node — powered by Groq; includes per-question feedback and a score summary screen
 - **Paper Quiz** in the Paper Pipeline: a "Quiz" button in the step tabs bar generates 4 comprehension questions drawn from the job's real evidence — root node synthesis, child subtopic findings, and linked peer-reviewed paper abstracts; slide-in panel with the same question flow and scoring
-- Questions are specific to the actual research content (paper titles, snippets, subtopic findings) — not generic research concepts
+- Questions are strictly grounded in the actual evidence: a dedicated system prompt instructs Groq never to introduce concepts outside the provided content block; each finding, method, paper, and subtopic is labelled (F#/M#/P#/S#) and every question must cite a specific label — eliminating hallucinated generic questions
 - **Subscribe button** on the Explore page replaced with a compact bell icon (same action; saves space in the selected-topic card)
 - **"Explore Papers" button** in the Knowledge Tree simplified to "Explore"
 - **Prisma P2024 fix**: `prisma.ts` now appends `connection_limit=5&pool_timeout=30` to `DATABASE_URL` at startup (if not already set), preventing connection pool exhaustion under dev hot-reloads and concurrent requests

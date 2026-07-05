@@ -22,14 +22,20 @@ export async function POST(
       return NextResponse.json({ error: 'No idea content provided' }, { status: 400 })
     }
 
-    // Fetch the job's root node + child nodes for real synthesized content
     const job = await prisma.job.findUnique({
       where: { id: params.id },
       select: { rootNodeId: true, topicQuery: true },
     })
 
-    let nodesBlock = ''
-    let sourcesBlock = ''
+    const contentParts: string[] = [
+      `TOPIC: ${job?.topicQuery ?? idea.title}`,
+      ``,
+      `SELECTED IDEA: ${idea.title}`,
+      `PROBLEM: ${idea.problem_to_solve}`,
+      idea.proposed_method.length > 0
+        ? `PROPOSED METHODS:\n${idea.proposed_method.map((m, i) => `  M${i + 1}. ${m}`).join('\n')}`
+        : null,
+    ].filter(Boolean) as string[]
 
     if (job?.rootNodeId) {
       const rootNode = await prisma.node.findUnique({
@@ -44,70 +50,74 @@ export async function POST(
       })
 
       if (rootNode) {
-        const rootFindings = rootNode.findingsJson ? JSON.parse(rootNode.findingsJson) : []
-        const rootMethods = rootNode.methodsJson ? JSON.parse(rootNode.methodsJson) : []
-        const rootDisagreements = rootNode.disagreementsJson ? JSON.parse(rootNode.disagreementsJson) : []
-        const rootOpenProblems = rootNode.openProblemsJson ? JSON.parse(rootNode.openProblemsJson) : []
+        const rootFindings: string[] = rootNode.findingsJson ? JSON.parse(rootNode.findingsJson) : []
+        const rootMethods: string[] = rootNode.methodsJson ? JSON.parse(rootNode.methodsJson) : []
+        const rootDisagreements: string[] = rootNode.disagreementsJson ? JSON.parse(rootNode.disagreementsJson) : []
+        const rootOpenProblems: string[] = rootNode.openProblemsJson ? JSON.parse(rootNode.openProblemsJson) : []
 
-        nodesBlock = `
-Synthesized research overview for "${job.topicQuery}":
-Summary: ${rootNode.summary}
-Key findings: ${rootFindings.join('; ')}
-Methods: ${rootMethods.join('; ')}
-Disagreements: ${rootDisagreements.join('; ')}
-Open problems: ${rootOpenProblems.join('; ')}`
+        contentParts.push(``)
+        contentParts.push(`RESEARCH OVERVIEW SUMMARY: ${rootNode.summary}`)
 
-        // Add child node subtopics
-        if (rootNode.children.length > 0) {
-          const subtopics = rootNode.children.map((child: any) => {
-            const childFindings = child.findingsJson ? JSON.parse(child.findingsJson) : []
-            return `  - ${child.label}: ${child.summary}${childFindings.length > 0 ? ` Findings: ${childFindings.slice(0, 2).join('; ')}` : ''}`
-          })
-          nodesBlock += `\n\nSubtopics from the knowledge tree:\n${subtopics.join('\n')}`
+        if (rootFindings.length > 0) {
+          contentParts.push(`KEY FINDINGS:\n${rootFindings.map((f, i) => `  F${i + 1}. ${f}`).join('\n')}`)
+        }
+        if (rootMethods.length > 0) {
+          contentParts.push(`METHODS IN USE:\n${rootMethods.map((m, i) => `  RM${i + 1}. ${m}`).join('\n')}`)
+        }
+        if (rootDisagreements.length > 0) {
+          contentParts.push(`CURRENT DISAGREEMENTS:\n${rootDisagreements.map((d, i) => `  D${i + 1}. ${d}`).join('\n')}`)
+        }
+        if (rootOpenProblems.length > 0) {
+          contentParts.push(`OPEN PROBLEMS:\n${rootOpenProblems.map((p, i) => `  O${i + 1}. ${p}`).join('\n')}`)
         }
 
-        // Top peer-reviewed source snippets
+        if (rootNode.children.length > 0) {
+          const subtopics = rootNode.children.map((child: any, i: number) => {
+            const childFindings: string[] = child.findingsJson ? JSON.parse(child.findingsJson) : []
+            return `  S${i + 1}. ${child.label}: ${child.summary}${childFindings.length > 0 ? ` — Findings: ${childFindings.slice(0, 2).join('; ')}` : ''}`
+          })
+          contentParts.push(`SUBTOPICS FROM KNOWLEDGE TREE:\n${subtopics.join('\n')}`)
+        }
+
         const peerSources = rootNode.nodeSources
           .filter((ns: any) => ns.source.reliabilityTier === 'peer_reviewed' && ns.source.snippet)
           .slice(0, 5)
-          .map((ns: any) => `- "${ns.source.title}"${ns.source.venue ? ` (${ns.source.venue})` : ''}: ${ns.source.snippet}`)
+          .map((ns: any, i: number) =>
+            `  [P${i + 1}] "${ns.source.title}"${ns.source.venue ? ` — ${ns.source.venue}` : ''}: ${ns.source.snippet}`
+          )
 
         if (peerSources.length > 0) {
-          sourcesBlock = `\nActual papers found during evidence mapping:\n${peerSources.join('\n')}`
+          contentParts.push(`PAPERS FROM EVIDENCE MAPPING:\n${peerSources.join('\n')}`)
         }
       }
     }
 
-    const prompt = `You are a scientific educator. Generate exactly 4 multiple-choice comprehension questions about the specific research topic and evidence below. Questions must be answerable from the provided content — not from general knowledge.
+    const contentBlock = contentParts.join('\n')
 
-Selected paper idea: ${idea.title}
-Problem: ${idea.problem_to_solve}
-Proposed methods: ${idea.proposed_method.join('; ')}
-${nodesBlock}
-${sourcesBlock}
+    const systemPrompt = `You are a quiz generator. Your ONLY job is to write multiple-choice questions whose correct answers can be found verbatim or paraphrased from the CONTENT block the user provides. You must NEVER introduce facts, concepts, or terminology that are not present in the CONTENT block. If a concept is not in the CONTENT block, do not ask about it. Every question must name a specific finding, method, subtopic, paper, or problem from the CONTENT block.`
 
-Return a JSON object with this exact structure:
+    const prompt = `Generate exactly 4 multiple-choice questions using ONLY the content below. Every question must reference a specific item labelled F#, M#, D#, O#, S#, or P# from the CONTENT block. Do not use general knowledge.
+
+===CONTENT START===
+${contentBlock}
+===CONTENT END===
+
+Return JSON only:
 {
   "questions": [
     {
       "id": 1,
-      "question": "Question text here?",
-      "options": ["A) Option one", "B) Option two", "C) Option three", "D) Option four"],
+      "question": "string — must name a specific finding/method/subtopic/paper/problem from the CONTENT",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
       "correctIndex": 0,
-      "explanation": "Brief explanation citing the specific finding, paper, or subtopic above."
+      "explanation": "string — quote or cite the exact item (F#/M#/D#/O#/S#/P#) that supports the answer"
     }
   ]
 }
 
-Rules:
-- Questions must reference specific findings, paper titles, subtopics, or methods from the content above
-- Do NOT ask about generic research concepts — every question must be specific to this topic
-- correctIndex is 0-based (0=A, 1=B, 2=C, 3=D)
-- Distractors should be plausible alternatives within this specific domain
-- Explanation must cite which specific piece of evidence supports the answer
-- Question progression: a key finding → a specific method or subtopic → a disagreement or gap → what the selected paper idea addresses`
+Question order: one about a key finding from the evidence → one about a method or subtopic → one about a disagreement or open problem → one about what the selected idea specifically addresses. All four must be uniquely answerable from the CONTENT block above.`
 
-    const result = await generateWithGroq(prompt)
+    const result = await generateWithGroq(prompt, undefined, systemPrompt)
 
     if (!result.questions || !Array.isArray(result.questions)) {
       return NextResponse.json({ error: 'Failed to generate questions' }, { status: 500 })

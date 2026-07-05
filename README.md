@@ -162,6 +162,21 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 
 ## Version History
 
+### V2.4 — Comprehension Quiz, UI Polish & Prisma Pool Fix
+
+- **"Test Your Understanding" quiz** on every knowledge tree node: click the button in NodeDetail to generate 4 multiple-choice questions from that node's summary, methods, findings, and open problems — powered by Groq; includes per-question feedback and a score summary screen
+- **Paper Quiz** in the Paper Pipeline: a "Quiz" button in the step tabs bar generates 4 comprehension questions from the currently selected research idea (problem, methods, next steps, field context); slide-in panel with the same question flow and scoring
+- **Subscribe button** on the Explore page replaced with a compact bell icon (same action; saves space in the selected-topic card)
+- **"Explore Papers" button** in the Knowledge Tree simplified to "Explore"
+- **Prisma P2024 fix**: `prisma.ts` now appends `connection_limit=5&pool_timeout=30` to `DATABASE_URL` at startup (if not already set), preventing connection pool exhaustion under dev hot-reloads and concurrent requests
+
+#### New API routes (V2.4)
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/nodes/[nodeId]/questions` | GET | Generate 4 MCQs from node content |
+| `/api/jobs/[id]/questions` | POST | Generate 4 MCQs from a selected paper idea |
+
 ### V2.3 — Node-Aware Explore Papers & Weekly Paper Subscription
 
 - **Node-aware Explore Papers** (Knowledge Tree): clicking a tree node sets it as the active search topic (shown as an indigo chip in the toolbar); "Explore Papers" fetches papers ranked specifically for that node's label rather than the job root topic

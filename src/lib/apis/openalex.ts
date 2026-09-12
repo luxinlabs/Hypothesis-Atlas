@@ -1,6 +1,7 @@
 export interface OpenAlexWork {
   id: string
   title: string
+  type: string
   publication_date: string
   authorships: Array<{
     author: {
@@ -10,10 +11,13 @@ export interface OpenAlexWork {
   primary_location?: {
     source?: {
       display_name: string
+      type?: string
     }
   }
   abstract_inverted_index?: Record<string, number[]>
   doi?: string
+  cited_by_count?: number
+  referenced_works?: string[]
 }
 
 export async function searchOpenAlex(query: string, limit: number = 30): Promise<OpenAlexWork[]> {

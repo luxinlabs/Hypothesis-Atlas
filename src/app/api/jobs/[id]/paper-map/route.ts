@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getNeo4jPaperGraph } from '@/lib/neo4j-paper-graph'
 
 export async function GET(
   _request: NextRequest,
@@ -39,7 +40,7 @@ export async function GET(
       })),
     }))
 
-    // Build links: two papers are linked when they share a knowledge-tree node
+    // Build links from shared knowledge nodes (always available)
     const nodeToSources: Record<string, string[]> = {}
     for (const s of sources) {
       for (const ns of s.nodeSources) {
@@ -49,20 +50,56 @@ export async function GET(
     }
 
     const linkSet = new Set<string>()
-    const links: { source: string; target: string; sharedNode: string }[] = []
+    const links: Record<string, any> = {}
     for (const [nodeId, sourceIds] of Object.entries(nodeToSources)) {
       for (let i = 0; i < sourceIds.length; i++) {
         for (let j = i + 1; j < sourceIds.length; j++) {
           const key = [sourceIds[i], sourceIds[j]].sort().join('|')
           if (!linkSet.has(key)) {
             linkSet.add(key)
-            links.push({ source: sourceIds[i], target: sourceIds[j], sharedNode: nodeId })
+            links[key] = {
+              source: sourceIds[i],
+              target: sourceIds[j],
+              sharedNode: nodeId,
+              relationships: [],
+            }
           }
         }
       }
     }
 
-    return NextResponse.json({ nodes, links })
+    // Merge Neo4j typed relationships into links
+    try {
+      const neo4jGraph = await getNeo4jPaperGraph(params.id)
+      if (neo4jGraph) {
+        for (const rel of neo4jGraph.links) {
+          const key = [rel.source, rel.target].sort().join('|')
+          if (links[key]) {
+            links[key].relationships.push({
+              type: rel.type,
+              sharedAuthors: rel.sharedAuthors || [],
+              count: rel.count || 0,
+            })
+          } else {
+            // Neo4j-only link (e.g. SHARES_AUTHOR without shared knowledge node)
+            links[key] = {
+              source: rel.source,
+              target: rel.target,
+              sharedNode: null,
+              relationships: [{
+                type: rel.type,
+                sharedAuthors: rel.sharedAuthors || [],
+                count: rel.count || 0,
+              }],
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Neo4j query failed, returning links without relationship types:', err)
+    }
+
+    return NextResponse.json({ nodes, links: Object.values(links) })
   } catch (error) {
     console.error('Error fetching paper map:', error)
     return NextResponse.json({ error: 'Failed to fetch paper map' }, { status: 500 })

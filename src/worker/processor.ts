@@ -5,6 +5,7 @@ import { searchPubMed } from '../lib/apis/pubmed'
 import { searchGEO } from '../lib/apis/geo'
 import { searchSocialSignals } from '../lib/apis/social'
 import { generateWithGroq } from '../lib/groq'
+import { populateNeo4jGraph } from '../lib/neo4j-paper-graph'
 
 export async function processEvidenceMapping(data: { jobId: string; topicQuery: string }) {
   const { jobId, topicQuery } = data
@@ -28,6 +29,7 @@ export async function processEvidenceMapping(data: { jobId: string; topicQuery: 
     const rankedSources = await rankAndDedupe(jobId, allSources)
     const rootNode = await buildRootNode(jobId, topicQuery, rankedSources)
     await buildChildNodes(jobId, topicQuery, rootNode.id, rankedSources)
+    await populateNeo4jGraph(jobId)
 
     await prisma.job.update({
       where: { id: jobId },
@@ -100,7 +102,7 @@ async function fetchAllSources(jobId: string, query: string, keywords: string[])
   for (const work of openAlexWorks) {
     const authors = work.authorships?.map(a => a.author.display_name).slice(0, 5) || []
     const abstract = reconstructAbstract(work.abstract_inverted_index)
-    
+
     const source = await prisma.source.create({
       data: {
         jobId,
@@ -112,7 +114,7 @@ async function fetchAllSources(jobId: string, query: string, keywords: string[])
         venue: work.primary_location?.source?.display_name || '',
         snippet: abstract,
         externalId: work.id,
-        reliabilityTier: 'peer_reviewed',
+        reliabilityTier: mapOpenAlexType(work.type),
       },
     })
     allSources.push(source)
@@ -131,7 +133,7 @@ async function fetchAllSources(jobId: string, query: string, keywords: string[])
         venue: article.journal,
         snippet: article.abstract,
         externalId: article.pmid,
-        reliabilityTier: 'peer_reviewed',
+        reliabilityTier: mapPubMedType(article.pubType),
       },
     })
     allSources.push(source)
@@ -232,7 +234,12 @@ async function rankAndDedupe(jobId: string, sources: any[]) {
 
   const tierScores: Record<string, number> = {
     peer_reviewed: 100,
-    preprint: 70,
+    review: 95,
+    conference: 80,
+    preprint: 60,
+    book: 70,
+    dissertation: 50,
+    report: 55,
     dataset: 80,
     social_signal: 30,
   }
@@ -509,5 +516,47 @@ Provide at least 2 items for each array.`)
       message: `Failed to build children: ${error instanceof Error ? error.message : 'Unknown error'}`,
       timestamp: Date.now(),
     })
+  }
+}
+
+function mapPubMedType(pubType: string): string {
+  const t = pubType?.toLowerCase() || ''
+  if (t.includes('review') || t.includes('systematic review') || t.includes('meta-analysis')) return 'review'
+  if (t.includes('congress') || t.includes('conference')) return 'conference'
+  if (t.includes('preprint')) return 'preprint'
+  if (t.includes('book') || t.includes('chapter')) return 'book'
+  return 'peer_reviewed'
+}
+
+function mapOpenAlexType(type: string): string {
+  switch (type?.toLowerCase()) {
+    case 'article':
+      return 'peer_reviewed'
+    case 'review':
+      return 'review'
+    case 'conference-paper':
+    case 'proceedings-article':
+      return 'conference'
+    case 'preprint':
+      return 'preprint'
+    case 'book':
+    case 'book-chapter':
+    case 'edited-book':
+    case 'monograph':
+      return 'book'
+    case 'dissertation':
+      return 'dissertation'
+    case 'dataset':
+      return 'dataset'
+    case 'report':
+    case 'policy-document':
+      return 'report'
+    case 'editorial':
+    case 'letter':
+    case 'paratext':
+    case 'other':
+      return 'other'
+    default:
+      return 'peer_reviewed'
   }
 }

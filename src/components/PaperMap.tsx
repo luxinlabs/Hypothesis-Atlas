@@ -23,10 +23,17 @@ interface PaperNode {
   knowledgeNodes: KnowledgeNodeRef[];
 }
 
+interface Relationship {
+  type: string;
+  sharedAuthors: string[];
+  count: number;
+}
+
 interface PaperLink {
   source: string;
   target: string;
-  sharedNode: string;
+  sharedNode: string | null;
+  relationships: Relationship[];
 }
 
 interface SimNode extends PaperNode {
@@ -57,11 +64,28 @@ interface PaperMapProps {
 
 const TIER_COLOR: Record<string, { fill: string; stroke: string; label: string }> = {
   peer_reviewed: { fill: "#3b82f6", stroke: "#1d4ed8", label: "Peer-reviewed" },
-  dataset: { fill: "#10b981", stroke: "#047857", label: "Dataset" },
+  review:        { fill: "#14b8a6", stroke: "#0d9488", label: "Review" },
+  conference:    { fill: "#f97316", stroke: "#ea580c", label: "Conference" },
+  preprint:      { fill: "#facc15", stroke: "#ca8a04", label: "Preprint" },
+  book:          { fill: "#94a3b8", stroke: "#64748b", label: "Book" },
+  dissertation:  { fill: "#ec4899", stroke: "#db2777", label: "Dissertation" },
+  report:        { fill: "#8b5cf6", stroke: "#7c3aed", label: "Report" },
+  dataset:       { fill: "#10b981", stroke: "#047857", label: "Dataset" },
   social_signal: { fill: "#f59e0b", stroke: "#b45309", label: "Social / Preprint" },
 };
 
 const fallbackColor = { fill: "#8b5cf6", stroke: "#6d28d9", label: "Other" };
+
+const REL_COLOR: Record<string, { color: string; dash: string; label: string }> = {
+  CITES:        { color: "#6366f1", dash: "6,3",  label: "Cites" },
+  SUPPORTS:     { color: "#22c55e", dash: "",      label: "Supports" },
+  CONTRADICTS:  { color: "#ef4444", dash: "3,3",  label: "Contradicts" },
+  EXTENDS:      { color: "#f59e0b", dash: "8,4",  label: "Extends" },
+  SHARES_AUTHOR:{ color: "#06b6d4", dash: "2,4",  label: "Shared Author" },
+  BELONGS_TO:   { color: "#8b5cf6", dash: "",      label: "Belongs To" },
+};
+
+const REL_FALLBACK = { color: "#9ca3af", dash: "5,4", label: "Related" };
 
 const W = 900;
 const H = 600;
@@ -71,35 +95,40 @@ const CY = H / 2;
 function layoutNodes(nodes: PaperNode[]): SimNode[] {
   if (nodes.length === 0) return [];
 
-  const groups: Record<string, PaperNode[]> = {
-    peer_reviewed: [],
-    dataset: [],
-    social_signal: [],
-    other: [],
+  const tierOrder = [
+    "peer_reviewed", "review", "conference", "preprint",
+    "book", "dissertation", "report", "dataset", "social_signal",
+  ];
+  const tierRadii: Record<string, number> = {
+    peer_reviewed: 150,
+    review: 180,
+    conference: 210,
+    preprint: 240,
+    book: 270,
+    dissertation: 270,
+    report: 270,
+    dataset: 300,
+    social_signal: 320,
   };
+
+  const groups: Record<string, PaperNode[]> = {};
+  for (const t of tierOrder) groups[t] = [];
+  groups["other"] = [];
 
   for (const n of nodes) {
     const key = n.reliabilityTier in groups ? n.reliabilityTier : "other";
     groups[key].push(n);
   }
 
-  // Sort each group by weight (knowledgeNodes.length) descending
   for (const key of Object.keys(groups)) {
     groups[key].sort((a, b) => b.knowledgeNodes.length - a.knowledgeNodes.length);
   }
-
-  const radii: Record<string, number> = {
-    peer_reviewed: 160,
-    dataset: 240,
-    social_signal: 310,
-    other: 310,
-  };
 
   const placed: SimNode[] = [];
 
   for (const [tier, group] of Object.entries(groups)) {
     if (group.length === 0) continue;
-    const r = radii[tier] ?? 280;
+    const r = tierRadii[tier] ?? 280;
     group.forEach((node, i) => {
       const angle = (2 * Math.PI * i) / group.length - Math.PI / 2;
       placed.push({
@@ -141,6 +170,82 @@ function layoutNodes(nodes: PaperNode[]): SimNode[] {
   return placed;
 }
 
+function neo4jLayout(nodes: PaperNode[], links: PaperLink[]): SimNode[] {
+  if (nodes.length === 0) return [];
+
+  const placed: SimNode[] = nodes.map((node, i) => ({
+    ...node,
+    x: CX + (Math.random() - 0.5) * W * 0.6,
+    y: CY + (Math.random() - 0.5) * H * 0.6,
+    vx: 0,
+    vy: 0,
+  }));
+
+  const idxMap = new Map(placed.map((n, i) => [n.id, i]));
+  const linkPairs = links.map(l => ({
+    i: idxMap.get(l.source) ?? -1,
+    j: idxMap.get(l.target) ?? -1,
+    weight: Math.max(1, l.relationships.length),
+  })).filter(l => l.i >= 0 && l.j >= 0);
+
+  for (let iter = 0; iter < 200; iter++) {
+    // Repulsion between all pairs
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        const dx = placed[j].x - placed[i].x;
+        const dy = placed[j].y - placed[i].y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const force = 8000 / (dist * dist);
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        placed[i].vx -= fx;
+        placed[i].vy -= fy;
+        placed[j].vx += fx;
+        placed[j].vy += fy;
+      }
+    }
+
+    // Attraction along edges
+    for (const { i, j, weight } of linkPairs) {
+      const dx = placed[j].x - placed[i].x;
+      const dy = placed[j].y - placed[i].y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const idealDist = 120 / weight;
+      const force = (dist - idealDist) * 0.01;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      placed[i].vx += fx;
+      placed[i].vy += fy;
+      placed[j].vx -= fx;
+      placed[j].vy -= fy;
+    }
+
+    // Center gravity
+    for (const n of placed) {
+      n.vx += (CX - n.x) * 0.002;
+      n.vy += (CY - n.y) * 0.002;
+    }
+
+    // Apply velocity with damping
+    const damping = 0.85;
+    for (const n of placed) {
+      n.vx *= damping;
+      n.vy *= damping;
+      n.x += n.vx;
+      n.y += n.vy;
+    }
+  }
+
+  // Clamp
+  const PAD = 60;
+  for (const n of placed) {
+    n.x = Math.max(PAD, Math.min(W - PAD, n.x));
+    n.y = Math.max(PAD, Math.min(H - PAD, n.y));
+  }
+
+  return placed;
+}
+
 export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
   const [nodes, setNodes] = useState<SimNode[]>([]);
   const [links, setLinks] = useState<PaperLink[]>([]);
@@ -154,6 +259,9 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
   const [compareSet, setCompareSet] = useState<string[]>([]);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [comparing, setComparing] = useState(false);
+
+  // Neo4j graph mode
+  const [graphMode, setGraphMode] = useState<"hub" | "neo4j">("hub");
 
   const isDark = theme === "dark";
 
@@ -189,6 +297,24 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
   const maxWeight = Math.max(1, ...nodes.map((n) => n.knowledgeNodes.length));
+
+  // Neo4j graph layout (only for links with typed relationships)
+  const neo4jLinks = links.filter(l => l.relationships.length > 0);
+  const hasNeo4j = neo4jLinks.length > 0;
+  const neo4jCacheRef = useRef<SimNode[] | null>(null);
+
+  // Reset cache when data changes
+  useEffect(() => { neo4jCacheRef.current = null; }, [jobId]);
+
+  const getNeo4jNodes = (): SimNode[] => {
+    if (!hasNeo4j) return nodes;
+    if (!neo4jCacheRef.current) {
+      neo4jCacheRef.current = neo4jLayout(nodes, neo4jLinks);
+    }
+    return neo4jCacheRef.current;
+  };
+
+  const graphNodes = graphMode === "neo4j" ? getNeo4jNodes() : nodes;
 
   // Hub-and-spoke link model
   // Build connected-paper IDs for selected paper
@@ -263,6 +389,18 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
               <span className={isDark ? "text-zinc-300" : "text-gray-600"}>{label}</span>
             </div>
           ))}
+          <div className={`pt-1 mt-1 border-t ${isDark ? "border-zinc-700" : "border-gray-200"}`}>
+            <p className={`font-semibold mb-1 ${isDark ? "text-zinc-400" : "text-gray-500"}`}>Relationships</p>
+            {Object.entries(REL_COLOR).map(([type, { color, label }]) => (
+              <div key={type} className="flex items-center gap-2">
+                <span
+                  className="inline-block w-4 h-0.5"
+                  style={{ background: color }}
+                />
+                <span className={isDark ? "text-zinc-300" : "text-gray-600"}>{label}</span>
+              </div>
+            ))}
+          </div>
           <div className={`pt-1 mt-1 border-t text-[10px] leading-snug ${isDark ? "text-zinc-500 border-zinc-700" : "text-gray-400 border-gray-200"}`}>
             Lines = knowledge node connections to Research hub<br />
             thickness = connection weight
@@ -270,27 +408,47 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
         </div>
 
         {/* Compare mode toggle */}
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            type="button"
-            onClick={() => {
-              if (compareMode) {
-                handleExitCompare();
-              } else {
-                setCompareMode(true);
-                setSelected(null);
-              }
-            }}
-            className="px-4 py-2 rounded-xl text-sm font-semibold shadow transition-opacity hover:opacity-90"
-            style={{
-              background: compareMode
-                ? "#f59e0b"
-                : "linear-gradient(to right, #4f46e5, #9333ea)",
-              color: "#fff",
-            }}
-          >
-            {compareMode ? "Exit Compare" : "Compare Papers"}
-          </button>
+        <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end">
+          <div className="flex gap-2">
+            {hasNeo4j && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGraphMode(prev => prev === "hub" ? "neo4j" : "hub");
+                  setSelected(null);
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-semibold shadow transition-opacity hover:opacity-90"
+                style={{
+                  background: graphMode === "neo4j"
+                    ? "linear-gradient(to right, #06b6d4, #3b82f6)"
+                    : isDark ? "#27272a" : "#f4f4f5",
+                  color: graphMode === "neo4j" ? "#fff" : isDark ? "#d4d4d8" : "#52525b",
+                }}
+              >
+                {graphMode === "neo4j" ? "Hub View" : "Neo4j Graph"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (compareMode) {
+                  handleExitCompare();
+                } else {
+                  setCompareMode(true);
+                  setSelected(null);
+                }
+              }}
+              className="px-4 py-2 rounded-xl text-sm font-semibold shadow transition-opacity hover:opacity-90"
+              style={{
+                background: compareMode
+                  ? "#f59e0b"
+                  : "linear-gradient(to right, #4f46e5, #9333ea)",
+                color: "#fff",
+              }}
+            >
+              {compareMode ? "Exit Compare" : "Compare Papers"}
+            </button>
+          </div>
           {compareMode && (
             <p className={`text-xs text-center mt-1 ${isDark ? "text-zinc-400" : "text-gray-500"}`}>
               {compareSet.length === 0
@@ -311,15 +469,14 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
             if (!compareMode) setSelected(null);
           }}
         >
-          {/* Hub-and-spoke: center to every node lines */}
-          {nodes.map((node) => {
+          {/* Hub-and-spoke: center to every node lines (hub mode only) */}
+          {graphMode === "hub" && nodes.map((node) => {
             const weight = node.knowledgeNodes.length;
             const ratio = weight / maxWeight;
             const lineWidth = 1 + ratio * 4;
             const baseOpacity = 0.25 + ratio * 0.55;
             const color = TIER_COLOR[node.reliabilityTier] ?? fallbackColor;
 
-            // Dim hub lines when a paper is selected (except selected paper's hub line)
             const isSelectedNode = selected?.id === node.id;
             const opacity = selected
               ? isSelectedNode
@@ -341,6 +498,59 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
             );
           })}
 
+          {/* Neo4j relationship edges (neo4j mode only) */}
+          {graphMode === "neo4j" && (
+            <>
+              {neo4jLinks.flatMap((link, linkIdx) => {
+                const sourceNode = graphNodes.find(n => n.id === link.source);
+                const targetNode = graphNodes.find(n => n.id === link.target);
+                if (!sourceNode || !targetNode) return [];
+
+                const isHighlighted = selected &&
+                  (link.source === selected.id || link.target === selected.id);
+
+                return link.relationships.map((rel, relIdx) => {
+                  const relStyle = REL_COLOR[rel.type] || REL_FALLBACK;
+                  const offset = (relIdx - (link.relationships.length - 1) / 2) * 3;
+                  const dx = targetNode.x - sourceNode.x;
+                  const dy = targetNode.y - sourceNode.y;
+                  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                  const nx = -dy / len;
+                  const ny = dx / len;
+
+                  return (
+                    <g key={`neo4j-edge-${linkIdx}-${relIdx}`}>
+                      <line
+                        x1={sourceNode.x + nx * offset}
+                        y1={sourceNode.y + ny * offset}
+                        x2={targetNode.x + nx * offset}
+                        y2={targetNode.y + ny * offset}
+                        stroke={relStyle.color}
+                        strokeWidth={isHighlighted ? 2.5 : 1.5}
+                        strokeOpacity={selected ? (isHighlighted ? 0.9 : 0.15) : 0.6}
+                        strokeDasharray={relStyle.dash || "none"}
+                      />
+                      {(isHighlighted || !selected) && (
+                        <text
+                          x={(sourceNode.x + targetNode.x) / 2 + nx * (offset + 6)}
+                          y={(sourceNode.y + targetNode.y) / 2 + ny * (offset + 6)}
+                          textAnchor="middle"
+                          fontSize={6}
+                          fill={relStyle.color}
+                          fontWeight="600"
+                          opacity={selected ? (isHighlighted ? 1 : 0.2) : 0.8}
+                          style={{ pointerEvents: "none" }}
+                        >
+                          {relStyle.label}
+                        </text>
+                      )}
+                    </g>
+                  );
+                });
+              })}
+            </>
+          )}
+
           {/* Dashed spoke lines to connected papers when a paper is selected */}
           {selected &&
             links
@@ -348,43 +558,74 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
                 (l) =>
                   l.source === selected.id || l.target === selected.id
               )
-              .map((link, i) => {
+              .flatMap((link, linkIdx) => {
                 const targetId =
                   link.source === selected.id ? link.target : link.source;
-                const targetNode = nodeMap.get(targetId);
-                if (!targetNode) return null;
-                const color = TIER_COLOR[targetNode.reliabilityTier] ?? fallbackColor;
-                return (
-                  <line
-                    key={`dash-${i}`}
-                    x1={selected.x}
-                    y1={selected.y}
-                    x2={targetNode.x}
-                    y2={targetNode.y}
-                    stroke={color.stroke}
-                    strokeWidth={1.5}
-                    strokeOpacity={0.7}
-                    strokeDasharray="5,4"
-                  />
-                );
+                const targetNode = graphNodes.find(n => n.id === targetId);
+                const selectedNode = graphNodes.find(n => n.id === selected.id);
+                if (!targetNode || !selectedNode) return [];
+
+                const rels = link.relationships.length > 0
+                  ? link.relationships
+                  : [{ type: 'RELATED', sharedAuthors: [] as string[], count: 0 }];
+
+                return rels.map((rel, relIdx) => {
+                  const relStyle = REL_COLOR[rel.type] || REL_FALLBACK;
+                  const offset = (relIdx - (rels.length - 1) / 2) * 4;
+                  const dx = targetNode.x - selectedNode.x;
+                  const dy = targetNode.y - selectedNode.y;
+                  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                  const nx = -dy / len;
+                  const ny = dx / len;
+
+                  return (
+                    <g key={`dash-${linkIdx}-${relIdx}`}>
+                      <line
+                        x1={selectedNode.x + nx * offset}
+                        y1={selectedNode.y + ny * offset}
+                        x2={targetNode.x + nx * offset}
+                        y2={targetNode.y + ny * offset}
+                        stroke={relStyle.color}
+                        strokeWidth={2}
+                        strokeOpacity={0.8}
+                        strokeDasharray={relStyle.dash || "none"}
+                      />
+                      <text
+                        x={(selectedNode.x + targetNode.x) / 2 + nx * (offset + 8)}
+                        y={(selectedNode.y + targetNode.y) / 2 + ny * (offset + 8)}
+                        textAnchor="middle"
+                        fontSize={7}
+                        fill={relStyle.color}
+                        fontWeight="600"
+                        style={{ pointerEvents: "none" }}
+                      >
+                        {relStyle.label}
+                      </text>
+                    </g>
+                  );
+                });
               })}
 
-          {/* Center hub circle */}
-          <circle cx={CX} cy={CY} r={28} fill={isDark ? "#1e1b4b" : "#ede9fe"} />
-          <text
-            x={CX}
-            y={CY}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize={10}
-            fill={isDark ? "#a5b4fc" : "#6d28d9"}
-            fontWeight="600"
-          >
-            Research
-          </text>
+          {/* Center hub circle (hub mode only) */}
+          {graphMode === "hub" && (
+            <>
+              <circle cx={CX} cy={CY} r={28} fill={isDark ? "#1e1b4b" : "#ede9fe"} />
+              <text
+                x={CX}
+                y={CY}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={10}
+                fill={isDark ? "#a5b4fc" : "#6d28d9"}
+                fontWeight="600"
+              >
+                Research
+              </text>
+            </>
+          )}
 
           {/* Nodes */}
-          {nodes.map((node) => {
+          {graphNodes.map((node) => {
             const color = TIER_COLOR[node.reliabilityTier] ?? fallbackColor;
             const isSelected = selected?.id === node.id;
             const isHovered = hovered === node.id;
@@ -454,7 +695,10 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
                     fill={isDark ? "#a5b4fc" : "#6d28d9"}
                     style={{ pointerEvents: "none" }}
                   >
-                    {node.knowledgeNodes.length} shared node{node.knowledgeNodes.length !== 1 ? "s" : ""}
+                    {graphMode === "neo4j"
+                      ? `${node.knowledgeNodes.length} nodes · ${neo4jLinks.filter(l => l.source === node.id || l.target === node.id).length} rels`
+                      : `${node.knowledgeNodes.length} shared node${node.knowledgeNodes.length !== 1 ? "s" : ""}`
+                    }
                   </text>
                 )}
               </g>
@@ -487,10 +731,13 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
             node={selected}
             related={links
               .filter((l) => l.source === selected.id || l.target === selected.id)
-              .map((l) =>
-                nodeMap.get(l.source === selected.id ? l.target : l.source)
-              )
-              .filter(Boolean) as SimNode[]}
+              .map((l) => {
+                const otherId = l.source === selected.id ? l.target : l.source;
+                const otherNode = nodeMap.get(otherId);
+                if (!otherNode) return null;
+                return { ...otherNode, relationships: l.relationships };
+              })
+              .filter(Boolean) as (SimNode & { relationships: Relationship[] })[]}
             onSelectRelated={(n) => setSelected(n)}
             isDark={isDark}
           />
@@ -709,7 +956,7 @@ function PaperDetail({
   isDark,
 }: {
   node: SimNode;
-  related: SimNode[];
+  related: (SimNode & { relationships: Relationship[] })[];
   onSelectRelated: (n: SimNode) => void;
   isDark: boolean;
 }) {
@@ -829,6 +1076,7 @@ function PaperDetail({
             {related.map((r) => {
               const rc = TIER_COLOR[r.reliabilityTier] ?? fallbackColor;
               const ry = r.publishedAt ? new Date(r.publishedAt).getFullYear() : null;
+              const relTypes = r.relationships.map(rel => rel.type);
               return (
                 <button
                   key={r.id}
@@ -848,6 +1096,22 @@ function PaperDetail({
                         <p className={`text-xs mt-0.5 ${sub}`}>
                           {[r.venue, ry].filter(Boolean).join(" · ")}
                         </p>
+                      )}
+                      {relTypes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {relTypes.map((type) => {
+                            const rs = REL_COLOR[type] || REL_FALLBACK;
+                            return (
+                              <span
+                                key={type}
+                                className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                                style={{ background: rs.color + "22", color: rs.color }}
+                              >
+                                {rs.label}
+                              </span>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>

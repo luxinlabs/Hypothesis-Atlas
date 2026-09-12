@@ -6,6 +6,7 @@ export interface PubMedArticle {
   journal: string
   pubDate: string
   pmid: string
+  pubType: string
 }
 
 export async function searchPubMed(query: string, limit: number = 20): Promise<PubMedArticle[]> {
@@ -49,6 +50,7 @@ function parsePubMedXML(xml: string): PubMedArticle[] {
     const abstractMatch = articleXml.match(/<AbstractText.*?>(.*?)<\/AbstractText>/)
     const journalMatch = articleXml.match(/<Title>(.*?)<\/Title>/)
     const yearMatch = articleXml.match(/<PubDate>.*?<Year>(.*?)<\/Year>/)
+    const pubTypeMatch = articleXml.match(/<PublicationType[^>]*>(.*?)<\/PublicationType>/)
     
     const authorMatches = [...articleXml.matchAll(/<LastName>(.*?)<\/LastName>/g)]
     const authors = authorMatches.map(m => m[1]).slice(0, 5)
@@ -62,6 +64,7 @@ function parsePubMedXML(xml: string): PubMedArticle[] {
         authors,
         journal: journalMatch ? journalMatch[1] : '',
         pubDate: yearMatch ? yearMatch[1] : '',
+        pubType: pubTypeMatch ? pubTypeMatch[1] : 'Journal Article',
       })
     }
   }

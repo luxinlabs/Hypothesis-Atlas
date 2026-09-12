@@ -27,7 +27,7 @@ export async function processEvidenceMapping(data: { jobId: string; topicQuery: 
     const allSources = await fetchAllSources(jobId, topicQuery, expandedKeywords)
     const rankedSources = await rankAndDedupe(jobId, allSources)
     const rootNode = await buildRootNode(jobId, topicQuery, rankedSources)
-    await buildChildNodes(jobId, rootNode.id, rankedSources)
+    await buildChildNodes(jobId, topicQuery, rootNode.id, rankedSources)
 
     await prisma.job.update({
       where: { id: jobId },
@@ -68,7 +68,7 @@ async function expandQuery(jobId: string, query: string): Promise<string[]> {
     timestamp: Date.now(),
   })
 
-  const prompt = `Given the biotech research topic "${query}", generate 8-12 related keywords, synonyms, and specific subtopics that would help find relevant scientific papers. Return as JSON: {"keywords": ["keyword1", "keyword2", ...]}`
+  const prompt = `Given the research topic "${query}", generate 8-12 related keywords, synonyms, and specific subtopics that would help find relevant scientific papers. Return as JSON: {"keywords": ["keyword1", "keyword2", ...]}`
 
   const result = await generateWithGroq(prompt)
   const keywords = result.keywords || [query]
@@ -285,7 +285,7 @@ async function buildRootNode(jobId: string, query: string, sources: any[]) {
     tier: s.reliabilityTier,
   }))
 
-  const prompt = `Analyze this biotech research topic: "${query}"
+  const prompt = `Analyze this research topic: "${query}"
 
 Based on these sources:
 ${JSON.stringify(sourceSummaries, null, 2)}
@@ -342,7 +342,7 @@ Provide at least 3 items for methods, findings, and openProblems. Include disagr
   return node
 }
 
-async function buildChildNodes(jobId: string, parentId: string, sources: any[]) {
+async function buildChildNodes(jobId: string, query: string, parentId: string, sources: any[]) {
   await emitProgressEvent({
     jobId,
     stage: 'build_children',
@@ -353,28 +353,23 @@ async function buildChildNodes(jobId: string, parentId: string, sources: any[]) 
 
   const sourceSummaries = sources.slice(0, 20).map(s => s.title)
 
-  const prompt = `Based on these research papers about the topic:
+  const prompt = `Based on these research papers about "${query}":
 ${sourceSummaries.join('\n')}
 
-Identify 4-6 distinct subtopics or research directions. Return as JSON:
+Identify 4-6 distinct subtopics that are directly and closely related to "${query}". Each subtopic should be a well-recognized area within this field — not a generic or loosely connected category. Return as JSON:
 {
   "subtopics": [
-    {"label": "Subtopic 1", "description": "Brief description"},
-    {"label": "Subtopic 2", "description": "Brief description"},
+    {"label": "Subtopic 1", "description": "Brief description of how it relates to ${query}"},
+    {"label": "Subtopic 2", "description": "Brief description of how it relates to ${query}"},
     ...
   ]
 }`
 
   const result = await generateWithGroq(prompt)
-  const subtopics = result.subtopics || [
-    { label: 'Material Science', description: 'Materials and coatings' },
-    { label: 'Biological Response', description: 'Immune and cellular responses' },
-    { label: 'Engineering Approaches', description: 'Design and fabrication' },
-    { label: 'Clinical Translation', description: 'Human trials and applications' },
-  ]
+  const subtopics = result.subtopics || []
 
   for (const subtopic of subtopics.slice(0, 6)) {
-    const childAnalysis = await generateWithGroq(`Analyze the subtopic "${subtopic.label}" (${subtopic.description}) in the context of biotech research.
+    const childAnalysis = await generateWithGroq(`Analyze the subtopic "${subtopic.label}" (${subtopic.description}) in the context of "${query}" research.
 
 You MUST respond with ONLY valid JSON in this exact format (no markdown, no code blocks):
 {
@@ -457,11 +452,11 @@ export async function buildChildrenForNode(
     const prompt = `Based on the research topic "${parentLabel}" and these papers:
 ${sourceTitles.join('\n')}
 
-Identify 3-5 distinct subtopics or research directions within this area. Return as JSON:
+Identify 3-5 distinct subtopics that are directly and closely related to "${parentLabel}". Each subtopic should be a well-recognized area within this field — not a generic or loosely connected category. Return as JSON:
 {
   "subtopics": [
-    {"label": "Subtopic 1", "description": "Brief description"},
-    {"label": "Subtopic 2", "description": "Brief description"},
+    {"label": "Subtopic 1", "description": "Brief description of how it relates to ${parentLabel}"},
+    {"label": "Subtopic 2", "description": "Brief description of how it relates to ${parentLabel}"},
     ...
   ]
 }`

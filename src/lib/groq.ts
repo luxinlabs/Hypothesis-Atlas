@@ -25,7 +25,7 @@ export async function generateWithGroq(prompt: string, schema?: any, systemPromp
           content: prompt,
         },
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       temperature: 0.3,
       max_tokens: 2000,
     })
@@ -51,28 +51,15 @@ export async function generateWithGroq(prompt: string, schema?: any, systemPromp
 }
 
 function generateFallback(prompt: string, schema?: any): any {
-  if (prompt.includes('expand query') || prompt.includes('keywords')) {
-    return {
-      keywords: ['neural interface', 'brain-computer interface', 'neuroprosthetics', 'electrode stability', 'chronic implants']
-    }
-  }
-  
-  if (prompt.includes('cluster') || prompt.includes('hypotheses')) {
-    return {
-      clusters: [
-        { label: 'Material Science', description: 'Biocompatible materials and coatings' },
-        { label: 'Biological Response', description: 'Immune response and gliosis' },
-        { label: 'Mechanical Factors', description: 'Micromotion and tissue damage' }
-      ]
-    }
-  }
-  
+  console.warn('Using generic fallback for prompt — Groq may be unavailable')
   return {
-    summary: 'Analysis of the topic based on available sources.',
-    methods: ['Literature review', 'Data analysis'],
-    findings: ['Multiple approaches being explored', 'Ongoing research challenges'],
-    disagreements: ['Debate on optimal materials', 'Conflicting results on long-term stability'],
-    openProblems: ['Long-term biocompatibility', 'Signal quality degradation', 'Scalability']
+    summary: 'Analysis unavailable — LLM service temporarily unreachable.',
+    methods: [],
+    findings: [],
+    disagreements: [],
+    openProblems: [],
+    keywords: [],
+    subtopics: [],
   }
 }
 

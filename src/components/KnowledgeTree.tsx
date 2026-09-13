@@ -85,12 +85,12 @@ const THEME_STYLES = {
 } as const;
 
 function collectLabels(node: Node): string[] {
-  return [node.label, ...node.children.flatMap(collectLabels)];
+  return [node.label, ...(node.children ?? []).flatMap(collectLabels)];
 }
 
 function findNodeById(node: Node, id: string): Node | null {
   if (node.id === id) return node;
-  for (const child of node.children) {
+  for (const child of node.children ?? []) {
     const found = findNodeById(child, id);
     if (found) return found;
   }

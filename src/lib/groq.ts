@@ -50,6 +50,48 @@ export async function generateWithGroq(prompt: string, schema?: any, systemPromp
   }
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export async function streamGroqChat(
+  messages: ChatMessage[],
+  systemPrompt: string
+): Promise<ReadableStream<Uint8Array> | null> {
+  if (!groq || messages.length === 0) return null
+
+  const client = groq
+  const encoder = new TextEncoder()
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        const completion = await client.chat.completions.create({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...messages,
+          ],
+          model: 'openai/gpt-oss-120b',
+          temperature: 0.4,
+          max_tokens: 3000,
+          stream: true,
+        })
+
+        for await (const chunk of completion) {
+          const delta = chunk.choices[0]?.delta?.content
+          if (delta) controller.enqueue(encoder.encode(delta))
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Stream error'
+        controller.enqueue(encoder.encode(`\n\n[Error: ${msg}]`))
+      } finally {
+        controller.close()
+      }
+    },
+  })
+}
+
 function generateFallback(prompt: string, schema?: any): any {
   console.warn('Using generic fallback for prompt — Groq may be unavailable')
   return {

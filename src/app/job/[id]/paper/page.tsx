@@ -4,10 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ARSPlanChat from "@/components/ARSPlanChat";
+import AssistantChat from "@/components/AssistantChat";
+import ExperimentsPanel from "@/components/ExperimentsPanel";
 import NotesPanel from "@/components/NotesPanel";
+import PaperMapPicker from "@/components/PaperMapPicker";
 import PaperQuizPanel from "@/components/PaperQuizPanel";
+import { REL_COLOR, REL_FALLBACK, TIER_COLOR } from "@/components/PaperMap";
 
-type Step = "context" | "outline" | "papers" | "ars";
+type Step = "context" | "outline" | "papers" | "ars" | "experiments";
 
 interface ResearchIdea {
   title: string;
@@ -41,10 +45,29 @@ function PaperPipelineInner() {
   const searchParams = useSearchParams();
   const jobId = params.id as string;
 
-  const initialStep = (searchParams.get("step") as Step) ?? "context";
+  const VALID_STEPS: Step[] = ["context", "papers", "outline", "ars", "experiments"];
+  const urlStep = searchParams.get("step") as Step | null;
+  // Server and first client render must match — always start from the URL (or "context").
+  // The cached step is applied after mount in the effect below to avoid SSR hydration mismatch.
   const [step, setStep] = useState<Step>(
-    ["context", "outline", "papers", "ars"].includes(initialStep) ? initialStep : "context"
+    urlStep && VALID_STEPS.includes(urlStep) ? urlStep : "context"
   );
+
+  // Restore last visited step from cache after mount (avoids SSR hydration mismatch)
+  useEffect(() => {
+    if (urlStep) return;
+    try {
+      const s = localStorage.getItem(`paper-step:${jobId}`);
+      if (s && VALID_STEPS.includes(s as Step)) setStep(s as Step);
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
+  // Persist step only on page unload (refresh/close) — writing during mount races
+  // with the restore effect under React StrictMode's double effect invocation.
+  const stepRef = useRef(step);
+  useEffect(() => { stepRef.current = step; }, [step]);
+  const [experimentMessages, setExperimentMessages] = useState<{ role: string; content: string }[]>([]);
   const [topicQuery, setTopicQuery] = useState("");
   const [ideas, setIdeas] = useState<ResearchIdea[]>([]);
   const [ideasSource, setIdeasSource] = useState<"loading" | "converged" | "tree" | "topic">("loading");
@@ -60,17 +83,82 @@ function PaperPipelineInner() {
   // Fetch latest papers section
   interface FetchedPaper {
     id: string; title: string; authors: string[]; venue: string;
-    year: string; abstract: string; url: string; source: "openalex" | "pubmed";
+    year: string; abstract: string; url: string; source: "openalex" | "pubmed" | "map";
+    mapTier?: string;
   }
   const [paperSearchDesc, setPaperSearchDesc] = useState("");
   const [paperResults, setPaperResults] = useState<FetchedPaper[]>([]);
   const [loadingPapers, setLoadingPapers] = useState(false);
   const [paperSearchDone, setPaperSearchDone] = useState(false);
 
+  // Paper map import
+  interface MapNode {
+    id: string; title: string; url: string | null; venue: string | null;
+    authors: string[]; snippet: string | null; publishedAt: string | null;
+    reliabilityTier: string;
+  }
+  interface MapLink {
+    source: string; target: string;
+    relationships: { type: string; sharedAuthors: string[]; count: number }[];
+  }
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [mapNodes, setMapNodes] = useState<MapNode[]>([]);
+  const [mapLinks, setMapLinks] = useState<MapLink[]>([]);
+
+  // Load paper map data (nodes + typed relationships) while on the papers step
+  useEffect(() => {
+    if (step !== "papers") return;
+    fetch(`/api/jobs/${jobId}/paper-map`)
+      .then((r) => r.json())
+      .then((d) => {
+        setMapNodes(Array.isArray(d.nodes) ? d.nodes : []);
+        setMapLinks(Array.isArray(d.links) ? d.links : []);
+      })
+      .catch(() => {});
+  }, [step, jobId]);
+
+  // Persist the session paper list on unload, alongside the step (see stepRef above)
+  const paperResultsRef = useRef(paperResults);
+  useEffect(() => { paperResultsRef.current = paperResults; }, [paperResults]);
+  useEffect(() => {
+    const save = () => {
+      try {
+        if (paperResultsRef.current.length > 0) {
+          localStorage.setItem(`paper-results:${jobId}`, JSON.stringify(paperResultsRef.current));
+        }
+      } catch {}
+    };
+    window.addEventListener("pagehide", save);
+    return () => window.removeEventListener("pagehide", save);
+  }, [jobId]);
+
   // Persist reference doc in localStorage per job
   useEffect(() => {
     const saved = localStorage.getItem(`ref-doc:${jobId}`);
     if (saved) { try { setReferenceDoc(JSON.parse(saved)); } catch {} }
+  }, [jobId]);
+
+  // Restore generated paper artifacts + idea selection from cache on refresh
+  useEffect(() => {
+    try {
+      const cachedContext = localStorage.getItem(`paper-context:${jobId}`);
+      if (cachedContext) setArsContext(cachedContext);
+      const cachedOutline = localStorage.getItem(`paper-outline:${jobId}`);
+      if (cachedOutline) {
+        const parsed = JSON.parse(cachedOutline);
+        if (Array.isArray(parsed?.sections) && parsed.sections.length > 0) setOutline(parsed);
+      }
+      const cachedIndex = localStorage.getItem(`paper-selected-idea:${jobId}`);
+      if (cachedIndex !== null) setSelectedIdeaIndex(Number(cachedIndex));
+      const cachedPapers = localStorage.getItem(`paper-results:${jobId}`);
+      if (cachedPapers) {
+        const parsed = JSON.parse(cachedPapers);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPaperResults(parsed);
+          setPaperSearchDone(true);
+        }
+      }
+    } catch {}
   }, [jobId]);
 
   const handleRefDocLoad = (name: string, content: string) => {
@@ -106,6 +194,47 @@ function PaperPipelineInner() {
     } finally {
       setLoadingPapers(false);
     }
+  };
+
+  const handleImportFromMap = (ids: string[]) => {
+    const existingIds = new Set(paperResults.map((p) => p.id));
+    const existingTitles = new Set(paperResults.map((p) => p.title.trim().toLowerCase()));
+    const imported: FetchedPaper[] = [];
+    for (const id of ids) {
+      const node = mapNodes.find((n) => n.id === id);
+      if (!node) continue;
+      const titleKey = node.title.trim().toLowerCase();
+      if (existingIds.has(id) || existingTitles.has(titleKey)) continue;
+      imported.push({
+        id: node.id,
+        title: node.title,
+        authors: node.authors ?? [],
+        venue: node.venue ?? "",
+        year: node.publishedAt ? String(new Date(node.publishedAt).getFullYear()) : "",
+        abstract: node.snippet ?? "",
+        url: node.url ?? "",
+        source: "map",
+        mapTier: node.reliabilityTier,
+      });
+    }
+    if (imported.length > 0) {
+      setPaperResults((prev) => [...prev, ...imported]);
+      setPaperSearchDone(true);
+    }
+    setPickerOpen(false);
+  };
+
+  // Typed paper-map relationships between a paper and other papers in this session's list
+  const relationshipsFor = (paper: FetchedPaper) => {
+    const out: { type: string; other: FetchedPaper }[] = [];
+    for (const l of mapLinks) {
+      const otherId = l.source === paper.id ? l.target : l.target === paper.id ? l.source : null;
+      if (!otherId) continue;
+      const other = paperResults.find((p) => p.id === otherId);
+      if (!other) continue;
+      for (const r of l.relationships) out.push({ type: r.type, other });
+    }
+    return out;
   };
 
   const handleRefFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,6 +314,7 @@ function PaperPipelineInner() {
       });
       const data = await res.json();
       setArsContext(data.arsContext ?? "");
+      try { if (data.arsContext) localStorage.setItem(`paper-context:${jobId}`, data.arsContext); } catch {}
       setStep("context");
     } catch (e) {
       console.error(e);
@@ -203,6 +333,11 @@ function PaperPipelineInner() {
       });
       const data = await res.json();
       setOutline(data.outline ?? null);
+      try {
+        if (data.outline && Array.isArray(data.outline.sections) && data.outline.sections.length > 0) {
+          localStorage.setItem(`paper-outline:${jobId}`, JSON.stringify(data.outline));
+        }
+      } catch {}
       setStep("outline");
     } catch (e) {
       console.error(e);
@@ -281,7 +416,7 @@ function PaperPipelineInner() {
         {/* Step tabs + Quiz button */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-            {(["context", "papers", "outline", "ars"] as Step[]).map((s, i) => (
+            {(["context", "papers", "outline", "ars", "experiments"] as Step[]).map((s, i) => (
               <button
                 key={s}
                 onClick={() => setStep(s)}
@@ -292,7 +427,7 @@ function PaperPipelineInner() {
                 }`}
               >
                 <span className="mr-2 text-xs opacity-60">{i + 1}.</span>
-                {s === "context" ? "Select Idea" : s === "papers" ? "Find Papers" : s === "outline" ? "Paper Outline" : "Write Paper"}
+                {s === "context" ? "Select Idea" : s === "papers" ? "Find Papers" : s === "outline" ? "Paper Outline" : s === "ars" ? "Write Paper" : "Experiments"}
               </button>
             ))}
           </div>
@@ -341,7 +476,10 @@ function PaperPipelineInner() {
                     {ideas.map((idea, i) => (
                       <button
                         key={i}
-                        onClick={() => setSelectedIdeaIndex(i)}
+                        onClick={() => {
+                          setSelectedIdeaIndex(i);
+                          try { localStorage.setItem(`paper-selected-idea:${jobId}`, String(i)); } catch {}
+                        }}
                         className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                           selectedIdeaIndex === i
                             ? "border-indigo-400 bg-indigo-50"
@@ -484,11 +622,23 @@ function PaperPipelineInner() {
         {step === "papers" && (
           <div className="max-w-3xl mx-auto">
             {/* Header */}
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Find Latest Papers</h2>
-              <p className="text-sm text-gray-500">
-                Describe what you want to find — we'll search OpenAlex and PubMed and return recent related papers.
-              </p>
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Find Latest Papers</h2>
+                <p className="text-sm text-gray-500">
+                  Describe what you want to find — we'll search OpenAlex and PubMed and return recent related papers.
+                </p>
+              </div>
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 border-violet-200 text-violet-700 hover:bg-violet-50 transition-colors"
+                title="Pick papers from your paper map — they keep their map relationships"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                Import from Paper Map
+              </button>
             </div>
 
             {/* Search box */}
@@ -552,13 +702,18 @@ function PaperPipelineInner() {
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> PubMed
                     </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-violet-500 inline-block" /> Paper Map
+                    </span>
                   </div>
                 </div>
                 {paperResults.map((paper) => (
                   <div key={paper.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:border-indigo-300 hover:shadow-sm transition-all">
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0 mt-0.5">
-                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${paper.source === "openalex" ? "bg-blue-400" : "bg-emerald-400"}`} />
+                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+                          paper.source === "openalex" ? "bg-blue-400" : paper.source === "pubmed" ? "bg-emerald-400" : "bg-violet-500"
+                        }`} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <a
@@ -573,6 +728,17 @@ function PaperPipelineInner() {
                           {paper.year && (
                             <span className="text-xs font-medium text-gray-500">{paper.year}</span>
                           )}
+                          {paper.mapTier && (TIER_COLOR[paper.mapTier] ?? { label: null }).label && (
+                            <span
+                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                              style={{
+                                background: (TIER_COLOR[paper.mapTier]?.fill ?? "#8b5cf6") + "22",
+                                color: TIER_COLOR[paper.mapTier]?.fill ?? "#8b5cf6",
+                              }}
+                            >
+                              {(TIER_COLOR[paper.mapTier] ?? { label: paper.mapTier }).label}
+                            </span>
+                          )}
                           {paper.venue && (
                             <span className="text-xs text-gray-400 italic truncate max-w-xs">{paper.venue}</span>
                           )}
@@ -586,6 +752,23 @@ function PaperPipelineInner() {
                           <p className="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">
                             {paper.abstract}
                           </p>
+                        )}
+                        {relationshipsFor(paper).length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {relationshipsFor(paper).map((rel, i) => {
+                              const style = REL_COLOR[rel.type] ?? REL_FALLBACK;
+                              return (
+                                <span
+                                  key={i}
+                                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                                  style={{ background: style.color + "1f", color: style.color }}
+                                  title={rel.other.title}
+                                >
+                                  {style.label} · {rel.other.title.slice(0, 30)}{rel.other.title.length > 30 ? "…" : ""}
+                                </span>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                       <a
@@ -709,21 +892,27 @@ function PaperPipelineInner() {
           </div>
         )}
 
-        {/* ─── Step 3: /ars-plan embedded chat ─── */}
+        {/* ─── Step 3: /ars-plan embedded chat + Atlas Assistant ─── */}
         {step === "ars" && (
-          <div className="flex gap-6 h-[calc(100vh-220px)] min-h-[520px]">
-            {/* Chat panel */}
-            <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-220px)] min-h-[520px]">
+            {/* ARS Plan chat (Claude) */}
+            <div className="flex-1 min-w-0 min-h-[420px] xl:min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
               <ARSPlanChat key={selectedIdeaIndex} jobId={jobId} selectedIdea={idea} referenceDoc={referenceDoc ?? undefined} />
             </div>
 
+            {/* Atlas Assistant chat (Groq, note-taking) */}
+            <div className="flex-1 min-w-0 min-h-[420px] xl:min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+              <AssistantChat jobId={jobId} selectedIdea={idea ?? undefined} />
+            </div>
+
             {/* Right sidebar: context export */}
-            <div className="w-72 flex-shrink-0 space-y-4">
+            <div className="w-full xl:w-72 flex-shrink-0 space-y-4">
               <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #9333ea, #4338ca)", color: "#fff" }}>
-                <h3 className="font-bold mb-1 text-sm">/ars-plan · In-App</h3>
+                <h3 className="font-bold mb-1 text-sm">Two agents, one paper</h3>
                 <p className="text-xs leading-relaxed" style={{ color: "#e9d5ff" }}>
-                  The Socratic planner on the left is powered by Claude — same workflow as
-                  running <code style={{ background: "rgba(255,255,255,0.2)", padding: "1px 4px", borderRadius: "3px" }}>/ars-plan</code> in Claude Code.
+                  <strong>ARS Plan</strong> (left) is the Socratic planner powered by Claude.{" "}
+                  <strong>Atlas Assistant</strong> (middle) is grounded in your session evidence,
+                  answers questions, and saves key replies to your notes.
                 </p>
               </div>
 
@@ -900,9 +1089,46 @@ function PaperPipelineInner() {
             </div>
           </div>
         )}
+
+        {/* ─── Step 5: Experiments — plan chat + claims verification ─── */}
+        {step === "experiments" && (
+          <div className="flex flex-col xl:flex-row gap-6 h-[calc(100vh-220px)] min-h-[520px]">
+            <div className="flex-1 min-w-0 min-h-[420px] xl:min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+              <AssistantChat
+                key={selectedIdeaIndex}
+                jobId={jobId}
+                selectedIdea={idea ?? undefined}
+                persona="experiment"
+                storageKey={`experiment-chat:${jobId}`}
+                welcome={{
+                  role: "assistant",
+                  content:
+                    "I'm your experiment designer. Tell me which idea we're testing (or use the selected one above), and I'll turn it into a concrete plan: hypothesis, variables, baselines from the mapped papers, metrics with equations, and expected results with numbers you can verify.\n\nMath renders in LaTeX — try asking for a metric like $F_1 = 2\\frac{pr}{p+r}$.",
+                }}
+                onMessagesChange={(msgs) => setExperimentMessages(msgs)}
+              />
+            </div>
+
+            <div className="w-full xl:w-80 flex-shrink-0 space-y-4">
+              <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)", color: "#fff" }}>
+                <h3 className="font-bold mb-1 text-sm">Experiments, verified</h3>
+                <p className="text-xs leading-relaxed" style={{ color: "#ddd6fe" }}>
+                  Plan the experiment with the assistant, then run{" "}
+                  <strong>Verify plan</strong> to re-evaluate every quantitative claim in the
+                  plan — sample sizes, expected gains, metric math — with mathjs.
+                </p>
+              </div>
+              <ExperimentsPanel jobId={jobId} messages={experimentMessages} />
+            </div>
+          </div>
+        )}
       </div>
 
       <NotesPanel jobId={jobId} topic={topicQuery} />
+
+      {pickerOpen && (
+        <PaperMapPicker jobId={jobId} onClose={() => setPickerOpen(false)} onImport={handleImportFromMap} />
+      )}
     </div>
   );
 }

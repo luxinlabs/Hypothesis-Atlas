@@ -60,9 +60,12 @@ interface ComparisonResult {
 interface PaperMapProps {
   jobId: string;
   theme?: "dark" | "light" | "vibrant";
+  selectable?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
 }
 
-const TIER_COLOR: Record<string, { fill: string; stroke: string; label: string }> = {
+export const TIER_COLOR: Record<string, { fill: string; stroke: string; label: string }> = {
   peer_reviewed: { fill: "#3b82f6", stroke: "#1d4ed8", label: "Peer-reviewed" },
   review:        { fill: "#14b8a6", stroke: "#0d9488", label: "Review" },
   conference:    { fill: "#f97316", stroke: "#ea580c", label: "Conference" },
@@ -76,7 +79,7 @@ const TIER_COLOR: Record<string, { fill: string; stroke: string; label: string }
 
 const fallbackColor = { fill: "#8b5cf6", stroke: "#6d28d9", label: "Other" };
 
-const REL_COLOR: Record<string, { color: string; dash: string; label: string }> = {
+export const REL_COLOR: Record<string, { color: string; dash: string; label: string }> = {
   CITES:        { color: "#6366f1", dash: "6,3",  label: "Cites" },
   SUPPORTS:     { color: "#22c55e", dash: "",      label: "Supports" },
   CONTRADICTS:  { color: "#ef4444", dash: "3,3",  label: "Contradicts" },
@@ -85,7 +88,7 @@ const REL_COLOR: Record<string, { color: string; dash: string; label: string }> 
   BELONGS_TO:   { color: "#8b5cf6", dash: "",      label: "Belongs To" },
 };
 
-const REL_FALLBACK = { color: "#9ca3af", dash: "5,4", label: "Related" };
+export const REL_FALLBACK = { color: "#9ca3af", dash: "5,4", label: "Related" };
 
 const W = 900;
 const H = 600;
@@ -246,7 +249,7 @@ function neo4jLayout(nodes: PaperNode[], links: PaperLink[]): SimNode[] {
   return placed;
 }
 
-export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
+export default function PaperMap({ jobId, theme = "light", selectable = false, selectedIds, onToggleSelect }: PaperMapProps) {
   const [nodes, setNodes] = useState<SimNode[]>([]);
   const [links, setLinks] = useState<PaperLink[]>([]);
   const [selected, setSelected] = useState<SimNode | null>(null);
@@ -328,6 +331,10 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
 
   const handleNodeClick = (node: SimNode, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (selectable) {
+      onToggleSelect?.(node.id);
+      return;
+    }
     if (compareMode) {
       setCompareSet((prev) => {
         if (prev.includes(node.id)) {
@@ -428,6 +435,7 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
                 {graphMode === "neo4j" ? "Hub View" : "Neo4j Graph"}
               </button>
             )}
+            {!selectable && (
             <button
               type="button"
               onClick={() => {
@@ -448,6 +456,7 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
             >
               {compareMode ? "Exit Compare" : "Compare Papers"}
             </button>
+            )}
           </div>
           {compareMode && (
             <p className={`text-xs text-center mt-1 ${isDark ? "text-zinc-400" : "text-gray-500"}`}>
@@ -635,6 +644,7 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
 
             const compareIndex = compareSet.indexOf(node.id);
             const isInCompare = compareIndex !== -1;
+            const isPickerSelected = selectable && (selectedIds ?? []).includes(node.id);
 
             return (
               <g
@@ -654,6 +664,27 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
                     strokeWidth={3}
                     strokeDasharray="6,3"
                   />
+                )}
+                {/* Picker selection ring */}
+                {isPickerSelected && (
+                  <>
+                    <circle
+                      r={r + 5}
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth={3}
+                    />
+                    <text
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontSize={8}
+                      fontWeight="700"
+                      fill="#fff"
+                      style={{ pointerEvents: "none" }}
+                    >
+                      ✓
+                    </text>
+                  </>
                 )}
                 <circle
                   r={r}
@@ -675,7 +706,7 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
                     {compareIndex + 1}
                   </text>
                 )}
-                {(isHovered || isSelected) && !isInCompare && (
+                {(isHovered || isSelected || isPickerSelected) && !isInCompare && (
                   <text
                     y={-r - 5}
                     textAnchor="middle"
@@ -761,7 +792,11 @@ export default function PaperMap({ jobId, theme = "light" }: PaperMapProps) {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              {compareMode ? (
+              {selectable ? (
+                <p className={`text-sm font-medium ${isDark ? "text-zinc-400" : "text-gray-500"}`}>
+                  Click papers on the map to select them for this session
+                </p>
+              ) : compareMode ? (
                 <p className={`text-sm font-medium ${isDark ? "text-zinc-400" : "text-gray-500"}`}>
                   Click two papers on the map to compare them
                 </p>

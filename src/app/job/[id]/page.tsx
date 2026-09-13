@@ -10,6 +10,7 @@ import NotebookTab from "@/components/NotebookTab";
 import PaperMap from "@/components/PaperMap";
 import NotesPanel from "@/components/NotesPanel";
 import NotesTab from "@/components/NotesTab";
+import QuestionBot from "@/components/QuestionBot";
 
 interface Job {
   id: string;
@@ -425,6 +426,7 @@ export default function JobPage() {
 
       {/* Floating notes button — hidden on the Notes tab since it's fully visible there */}
       <NotesPanel jobId={jobId} topic={job.topicQuery} theme={theme} hidden={activeTab === "notes"} />
+      <QuestionBot jobId={jobId} topic={job.topicQuery} />
     </div>
   );
 }

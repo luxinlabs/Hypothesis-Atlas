@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateWithGroq } from '@/lib/groq'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const top3 = await prisma.top3Ideas.findUnique({ where: { jobId: params.id } })
+    if (!top3) return NextResponse.json({ ideas: [] })
+    return NextResponse.json({ ideas: JSON.parse(top3.ideasJson) })
+  } catch (error) {
+    console.error('Error loading converged ideas:', error)
+    return NextResponse.json({ ideas: [] })
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

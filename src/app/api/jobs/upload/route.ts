@@ -145,6 +145,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Text-only extraction for the Peer Review page — no job created
+  if (form.get('textOnly') === '1') {
+    return NextResponse.json({ text, fileName: file.name })
+  }
+
   const fallbackTitle = fileBaseName(file.name) || 'Uploaded Paper'
   const insight = await extractPaperInsight(text, fallbackTitle)
 

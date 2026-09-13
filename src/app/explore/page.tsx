@@ -322,6 +322,16 @@ export default function ExplorePage() {
                 Write Paper
               </Link>
             )}
+            <Link
+              href="/review"
+              className="px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2"
+              style={{ background: "linear-gradient(to right, #9333ea, #db2777)", color: "#fff" }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              Peer Review
+            </Link>
             <Link href="/docs" className={`px-4 py-2 rounded-lg font-semibold transition-colors ${t.docsButton}`}>Docs</Link>
           </div>
         </div>

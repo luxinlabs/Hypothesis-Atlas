@@ -145,7 +145,7 @@ const THEME_STYLES = {
     cloud: "bg-zinc-900/70 border border-zinc-700",
     futureButton: "bg-zinc-800/70 border border-zinc-600 text-zinc-300 cursor-not-allowed",
     headingPlate: "inline-flex px-4 py-2 rounded-xl border border-zinc-600 bg-zinc-900/80 shadow-sm backdrop-blur-sm",
-    heading: "bg-gradient-to-r from-indigo-200 via-cyan-200 to-emerald-200 bg-clip-text text-transparent drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]",
+    heading: "bg-gradient-to-r from-indigo-300 via-cyan-300 to-emerald-300 bg-clip-text text-transparent drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]",
     toggleTrackOff: "bg-zinc-700",
     toggleTrackOn: "bg-indigo-500",
     subscribeCard: "bg-indigo-500/10 border-indigo-500/40 text-zinc-100",
@@ -164,7 +164,7 @@ const THEME_STYLES = {
     cloud: "bg-white/90 border border-gray-200/50",
     futureButton: "bg-white border border-slate-300 text-slate-700 cursor-not-allowed",
     headingPlate: "inline-flex px-4 py-2 rounded-xl border border-slate-300/90 bg-white/95 shadow-md",
-    heading: "bg-gradient-to-r from-slate-900 via-indigo-900 to-fuchsia-900 bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.55)]",
+    heading: "bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 bg-clip-text text-transparent",
     toggleTrackOff: "bg-gray-300",
     toggleTrackOn: "bg-indigo-500",
     subscribeCard: "bg-indigo-50 border-indigo-200 text-gray-900",
@@ -183,7 +183,7 @@ const THEME_STYLES = {
     cloud: "bg-white/85 border border-zinc-200",
     futureButton: "bg-white/90 border border-rose-300 text-zinc-700 cursor-not-allowed",
     headingPlate: "inline-flex px-4 py-2 rounded-xl border border-rose-300/90 bg-white/92 shadow-md",
-    heading: "bg-gradient-to-r from-fuchsia-900 via-orange-900 to-cyan-900 bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.45)]",
+    heading: "bg-gradient-to-r from-rose-700 via-pink-600 to-fuchsia-600 bg-clip-text text-transparent",
     toggleTrackOff: "bg-gray-300",
     toggleTrackOn: "bg-indigo-500",
     subscribeCard: "bg-indigo-50 border-indigo-200 text-zinc-900",
@@ -325,7 +325,7 @@ export default function ExplorePage() {
             <Link
               href="/review"
               className="px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2"
-              style={{ background: "linear-gradient(to right, #9333ea, #db2777)", color: "#fff" }}
+              style={{ background: "linear-gradient(to right, #059669, #0d9488)", color: "#fff" }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -399,6 +399,33 @@ export default function ExplorePage() {
                 style={{ minWidth: 0 }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSearchTopic(); }}
               />
+              <label
+                title="Start from your own paper"
+                className={`px-3 py-2.5 rounded-xl border cursor-pointer flex items-center justify-center flex-shrink-0 transition hover:opacity-80 ${uploading ? "opacity-60 pointer-events-none" : ""} ${t.card}`}
+              >
+                <input
+                  type="file"
+                  accept=".pdf,.txt,.md"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadPaper(file);
+                    e.target.value = "";
+                  }}
+                />
+                {uploading ? (
+                  <svg className="w-4 h-4 animate-spin" style={{ color: "#4f46e5" }} fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className={`w-4 h-4 ${t.subText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6h-1.348A4 4 0 007 16z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12v9m0-9l-3 3m3-3l3 3" />
+                  </svg>
+                )}
+              </label>
               <button
                 type="button"
                 onClick={handleSearchTopic}
@@ -409,47 +436,8 @@ export default function ExplorePage() {
               </button>
             </div>
             {topicError && <p className="text-center text-xs mt-2" style={{ color: "#dc2626" }}>{topicError}</p>}
-            <p className={`text-center text-xs mt-2 ${t.subText}`}>2–5 words for best results</p>
-          </div>
-
-          {/* Upload a paper to start a session */}
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-center mb-4">Start from your own paper</h2>
-            <label
-              className={`max-w-xl mx-auto flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-8 cursor-pointer transition hover:opacity-80 ${uploading ? "opacity-60 pointer-events-none" : ""} ${t.card}`}
-            >
-              <input
-                type="file"
-                accept=".pdf,.txt,.md"
-                className="hidden"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleUploadPaper(file);
-                  e.target.value = "";
-                }}
-              />
-              {uploading ? (
-                <>
-                  <svg className="w-6 h-6 animate-spin" style={{ color: "#4f46e5" }} fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <p className="text-sm font-semibold" style={{ color: "#4f46e5" }}>Building your research session…</p>
-                  <p className={`text-xs ${t.subText}`}>Reading the paper and mapping the knowledge tree</p>
-                </>
-              ) : (
-                <>
-                  <svg className={`w-6 h-6 ${t.subText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6h-1.348A4 4 0 007 16z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12v9m0-9l-3 3m3-3l3 3" />
-                  </svg>
-                  <p className="text-sm font-semibold">Upload a paper (.pdf, .txt, .md)</p>
-                  <p className={`text-xs ${t.subText}`}>We extract the findings and build a full session around it</p>
-                </>
-              )}
-            </label>
             {uploadError && <p className="text-center text-xs mt-2" style={{ color: "#dc2626" }}>{uploadError}</p>}
+            <p className={`text-center text-xs mt-2 ${t.subText}`}>2–5 words for best results — or upload a paper to start from it</p>
           </div>
 
           <div className={`flex items-center gap-3 mb-8 ${t.subText}`}>

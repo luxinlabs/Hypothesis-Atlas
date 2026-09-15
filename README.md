@@ -50,6 +50,14 @@ It now includes a full **Academic Paper Pipeline** powered by the [ARS (Academic
   - Full context import: topic, peer-reviewed literature, and selected idea injected into every session
 - **Export to Claude Code** — generate a structured context file and continue with the full 12-agent ARS pipeline
 
+### Peer Review
+- Standalone **Peer Review session** at `/review` (nav button on Explore, next to Write Paper)
+- A committee of three reviewer agents — methodology & novelty, venue fit & impact, statistical rigor & reproducibility — plus an optional custom reviewer with your own name and persona
+- Publisher/venue picker; paste a **call-for-papers URL** and the app scrapes the page to extract the venue's real review criteria so agents grade against them
+- Paper source defaults to your **current Write Paper draft**, or upload any `.pdf` / `.txt` / `.md`
+- Final verdict panel: averaged 1–10 scores across novelty / soundness / clarity / significance / overall, consensus recommendation (accept → reject), and an editor-style meta-review — plus full per-agent reviews with strengths, weaknesses, and questions
+- Results cached in localStorage; re-run or clear anytime
+
 ### Research Management
 - `/jobs` page listing all past research runs with status, source counts, and actions
 - Per-job: View Research · Write Paper · Delete
@@ -100,7 +108,8 @@ Open http://localhost:3000
 2. Watch the real-time evidence gathering in the Knowledge Tree
 3. Open the **Notebook** tab → brainstorm → **Converge to Top 3** ideas
 4. Click **Write Paper** in the tab bar → select an idea → plan and draft with ARS
-5. Optionally export context and continue in Claude Code with `/ars-full`
+5. Click **Peer Review** next to Write Paper → your current draft is loaded by default → a committee of reviewer agents grades it against your target venue
+6. Optionally export context and continue in Claude Code with `/ars-full`
 
 ### Paper Pipeline flow
 
@@ -161,6 +170,23 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 ---
 
 ## Version History
+
+### V2.5 — Standalone Peer Review Session & Explore Upload Control
+
+- **Standalone Peer Review session** at `/review`: a committee of three reviewer agents (methodology & novelty, venue fit & impact, statistical rigor & reproducibility) plus an optional custom reviewer with a user-defined name and persona
+- **Venue-aware grading**: pick a publisher/venue preset, or paste a call-for-papers URL — the app scrapes the page, extracts the venue's stated review criteria and focus, and every agent reviews against them
+- **Flexible paper source**: defaults to your current Write Paper draft (latest ARS chat), or upload any `.pdf` / `.txt` / `.md` for text-only extraction
+- **Final verdict panel**: averaged 1–10 scores across five criteria, consensus recommendation, editor-style meta-review, and full per-agent reviews — cached in localStorage
+- **Upload control moved**: the "Start from your own paper" section is gone; a compact upload icon button now sits in the topic search row before Search, with a "Start from your own paper" hover tooltip
+- **Visual polish**: Explore heading gradients redesigned across all three themes for full letter visibility; Peer Review recolored emerald→teal to distinguish it from Write Paper
+- Step 6 (review) removed from the Write Paper pipeline — review now lives entirely on `/review`
+
+#### New API routes (V2.5)
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/paper-review` | POST | Run reviewer-agent committee + meta-review (moved from `/api/jobs/[id]/paper-review`) |
+| `/api/jobs/upload` | POST | Now supports `textOnly=1` for paper text extraction without creating a job |
 
 ### V2.4 — Comprehension Quiz, UI Polish & Prisma Pool Fix
 

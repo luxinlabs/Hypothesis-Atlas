@@ -171,6 +171,13 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 
 ## Version History
 
+### V3.2 — License Switch: MIT → AGPL-3.0 (dual licensing)
+
+- Core is now licensed under **GNU AGPL-3.0**: free for everyone including commercial use, but anyone hosting a modified version as a network service must offer users the complete corresponding source
+- **Commercial licenses** available for embedding/hosting without copyleft obligations — see `COMMERCIAL-LICENSE.md`
+- **DCO sign-off** required on all contributions (`git commit -s`) to keep the copyright chain sole-owned — see `CONTRIBUTING.md`
+- All releases before the `v3.2.0` tag remain **MIT-licensed forever**; the switch point is tagged `v3.2.0`
+
 ### V2.5 — Standalone Peer Review Session & Explore Upload Control
 
 - **Standalone Peer Review session** at `/review`: a committee of three reviewer agents (methodology & novelty, venue fit & impact, statistical rigor & reproducibility) plus an optional custom reviewer with a user-defined name and persona
@@ -281,7 +288,7 @@ See `SECURITY.md` for responsible disclosure.
 
 ### Hypothesis Atlas
 
-MIT License — see `LICENSE` file.
+Dual-licensed — your choice of **GNU AGPL-3.0** (copyleft; see `LICENSE`) or a **commercial license** for use without copyleft obligations (see `COMMERCIAL-LICENSE.md`). All releases before the `v3.2.0` tag remain MIT-licensed forever. Contributions require DCO sign-off — see `CONTRIBUTING.md`.
 
 ### Academic Research Skills (ARS) Plugin
 

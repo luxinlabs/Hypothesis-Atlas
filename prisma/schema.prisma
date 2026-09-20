@@ -59,6 +59,7 @@ model Source {
   
   job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   nodeSources     NodeSource[]
+  entitySources   EntitySource[]
   
   @@index([jobId])
   @@index([type])
@@ -173,4 +174,61 @@ model PaperSubscription {
 
   @@index([email])
   @@index([topic])
+}
+
+// V3 — Persistent cross-run research graph (single source of truth)
+
+model GraphEntity {
+  id           String   @id @default(cuid())
+  type         String   // 'topic' | 'hypothesis' | 'method' | 'evidence' | 'gap' | 'note'
+  label        String
+  content      String?  @db.Text
+  jobId        String?  // provenance: run that produced it (survives job deletion)
+  origin       String   @default("system") // 'system' (synced from a run) | 'user' (manually created)
+  syncKey      String?  @unique // deterministic key for idempotent run-sync upserts
+  metadataJson String?  @db.Text // e.g. {"noteType":"manual"} for notes
+  pinned       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  edgesFrom     GraphEdge[]    @relation("GraphEdgeFrom")
+  edgesTo       GraphEdge[]    @relation("GraphEdgeTo")
+  entitySources EntitySource[]
+
+  @@index([type])
+  @@index([jobId])
+  @@index([origin])
+}
+
+model GraphEdge {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  type      String   // 'motivates' | 'provides' | 'uses_method' | 'contradicts' | 'reveals' | 'related_to' | 'notes_on'
+  jobId     String?
+  origin    String   @default("system")
+  createdAt DateTime @default(now())
+
+  from      GraphEntity @relation("GraphEdgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        GraphEntity @relation("GraphEdgeTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId, type])
+  @@index([fromId])
+  @@index([toId])
+  @@index([type])
+}
+
+model EntitySource {
+  id        String   @id @default(cuid())
+  entityId  String
+  sourceId  String
+  role      String   @default("supporting")
+  createdAt DateTime @default(now())
+
+  entity    GraphEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  source    Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, sourceId])
+  @@index([entityId])
+  @@index([sourceId])
 }

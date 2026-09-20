@@ -130,13 +130,43 @@ const DOMAIN_META: Record<Domain, { label: string; subtitle: string; emoji: stri
   finance:   { label: "Finance",   subtitle: "Markets, risk, and quantitative strategies", emoji: "📈" },
 };
 
+const BRAND_ICON =
+  "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1";
+
+const NAV_ITEMS: { href: string; label: string; icon: string; iconClass: string }[] = [
+  {
+    href: "/jobs",
+    label: "My Research",
+    icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z",
+    iconClass: "text-amber-500",
+  },
+  {
+    href: "/graph",
+    label: "Research Graph",
+    icon: BRAND_ICON,
+    iconClass: "text-cyan-500",
+  },
+  {
+    href: "/review",
+    label: "Peer Review",
+    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
+    iconClass: "text-emerald-500",
+  },
+  {
+    href: "/docs",
+    label: "Docs",
+    icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5H4v15h3.5c1.746 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5H20v15h-3.5c-1.746 0-3.332.477-4.5 1.253",
+    iconClass: "text-zinc-500",
+  },
+];
+
 const THEME_STYLES = {
   dark: {
     mainBg: "bg-[#0a0a0f]",
     text: "text-white",
     subText: "text-zinc-400",
-    navButton: "bg-zinc-900 border border-zinc-700 text-zinc-200 hover:bg-zinc-800",
-    docsButton: "bg-white text-black hover:bg-zinc-200",
+    navLink: "text-zinc-300 hover:bg-zinc-800/80 hover:text-white",
+    navBorder: "border-zinc-800",
     banner: "border-amber-500/30 bg-amber-500/10 text-amber-100",
     panel: "bg-zinc-900/80 border border-zinc-700",
     card: "bg-zinc-900 border border-zinc-700 hover:border-indigo-400/60",
@@ -154,8 +184,8 @@ const THEME_STYLES = {
     mainBg: "bg-gradient-to-b from-white to-zinc-50",
     text: "text-zinc-900",
     subText: "text-zinc-600",
-    navButton: "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-    docsButton: "bg-zinc-900 text-white hover:bg-zinc-800",
+    navLink: "text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900",
+    navBorder: "border-gray-200",
     banner: "border-amber-200 bg-amber-50 text-amber-900",
     panel: "bg-white/90 border border-gray-200/70",
     card: "bg-white border border-gray-200 hover:border-blue-300",
@@ -173,8 +203,8 @@ const THEME_STYLES = {
     mainBg: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50",
     text: "text-zinc-900",
     subText: "text-zinc-600",
-    navButton: "bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50",
-    docsButton: "bg-zinc-900 text-white hover:bg-zinc-800",
+    navLink: "text-zinc-600 hover:bg-white/80 hover:text-zinc-900",
+    navBorder: "border-rose-200",
     banner: "border-rose-200 bg-white/70 text-rose-900",
     panel: "bg-white/80 border border-rose-200",
     card: "bg-white border border-zinc-200 hover:border-fuchsia-300",
@@ -295,45 +325,56 @@ export default function ExplorePage() {
   return (
     <main className={`min-h-screen ${t.mainBg} ${t.text} transition-all duration-500`}>
       <div className="container mx-auto px-4 py-10">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className={t.headingPlate}>
-              <h1 className={`text-4xl font-bold ${t.heading}`}>Hypothesis Atlas Explorer</h1>
-            </div>
-            <p className={`${t.subText} mt-2`}>
-              {exploreMode
-                ? "Explore mode: click a topic to subscribe to weekly papers."
-                : "Click a topic to launch an evidence-mapping run."}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/" className={`px-4 py-2 rounded-lg font-semibold transition-colors ${t.navButton}`}>Home</Link>
-            <Link href="/jobs" className={`px-4 py-2 rounded-lg font-semibold transition-colors ${t.navButton}`}>My Research</Link>
+        {/* Quiet global nav — the word cloud below is the page's real CTA,
+            so navigation recedes: one consistent ghost style, color only in the icons. */}
+        <nav className={`-mx-4 mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-4 pb-4 ${t.navBorder}`}>
+          <Link href="/" className="flex items-center gap-2.5" title="Home">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={BRAND_ICON} />
+              </svg>
+            </span>
+            <span className={`text-base font-bold tracking-tight ${t.text}`}>Hypothesis Atlas</span>
+          </Link>
+          <div className="flex flex-wrap items-center gap-1">
             {lastJobId && (
               <Link
                 href={`/job/${lastJobId}/paper`}
-                className="px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2"
-                style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${t.navLink}`}
+                title="Write Paper"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 flex-shrink-0 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Write Paper
+                <span className="hidden sm:inline">Write Paper</span>
               </Link>
             )}
-            <Link
-              href="/review"
-              className="px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2"
-              style={{ background: "linear-gradient(to right, #059669, #0d9488)", color: "#fff" }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              Peer Review
-            </Link>
-            <Link href="/docs" className={`px-4 py-2 rounded-lg font-semibold transition-colors ${t.docsButton}`}>Docs</Link>
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${t.navLink}`}
+                title={item.label}
+              >
+                <svg className={`h-4 w-4 flex-shrink-0 ${item.iconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                </svg>
+                <span className="hidden sm:inline">{item.label}</span>
+              </Link>
+            ))}
           </div>
+        </nav>
+
+        {/* Page identity */}
+        <div className="mb-8">
+          <div className={t.headingPlate}>
+            <h1 className={`text-4xl font-bold ${t.heading}`}>Topic Explorer</h1>
+          </div>
+          <p className={`${t.subText} mt-3`}>
+            {exploreMode
+              ? "Explore mode: click a topic to subscribe to weekly papers."
+              : "Click a topic to launch an evidence-mapping run."}
+          </p>
         </div>
 
         <div className={`rounded-3xl p-8 backdrop-blur-sm shadow-xl ${t.panel}`}>

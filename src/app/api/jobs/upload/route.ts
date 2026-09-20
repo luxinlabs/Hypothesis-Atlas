@@ -3,6 +3,7 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { prisma } from '@/lib/prisma'
 import { groq } from '@/lib/groq'
 import { populateNeo4jGraph } from '@/lib/neo4j-paper-graph'
+import { syncJobGraph } from '@/lib/research-graph'
 
 export const maxDuration = 60
 
@@ -267,6 +268,12 @@ export async function POST(request: NextRequest) {
     await populateNeo4jGraph(job.id)
   } catch (err) {
     console.warn('Neo4j population skipped for uploaded paper:', err)
+  }
+
+  try {
+    await syncJobGraph(job.id)
+  } catch (err) {
+    console.warn('Research graph sync skipped for uploaded paper:', err)
   }
 
   return NextResponse.json({ jobId: job.id, title: insight.title })

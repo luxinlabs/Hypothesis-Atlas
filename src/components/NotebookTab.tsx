@@ -45,7 +45,22 @@ export default function NotebookTab({
   const [suggestedTopics, setSuggestedTopics] = useState<SuggestedTopic[]>([]);
   const [savedInsight, setSavedInsight] = useState(false);
   const [savedChat, setSavedChat] = useState(false);
-  const noteCount = loadNotes(jobId).length;
+  const [noteCount, setNoteCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshCount = () => {
+      loadNotes(jobId)
+        .then((notes) => { if (!cancelled) setNoteCount(notes.length); })
+        .catch(() => {});
+    };
+    refreshCount();
+    window.addEventListener("atlas:notes-update", refreshCount);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("atlas:notes-update", refreshCount);
+    };
+  }, [jobId]);
 
   const isDark = theme === "dark";
   const isVibrant = theme === "vibrant";

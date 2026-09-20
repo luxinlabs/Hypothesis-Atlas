@@ -10,38 +10,112 @@ export function notesKey(jobId: string) {
   return `notes:${jobId}`;
 }
 
-export function loadNotes(jobId: string): NoteEntry[] {
+function migrationFlagKey(jobId: string) {
+  return `notes-migrated:${jobId}`;
+}
+
+function isNoteType(v: unknown): v is NoteEntry["type"] {
+  return v === "manual" || v === "comparison" || v === "session" || v === "insight";
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) throw new Error(`Notes API ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+/**
+ * One-time migration: pushes any localStorage notes for this job into the
+ * research graph as note entities, then flags the job as migrated.
+ */
+async function migrateLocalNotes(jobId: string): Promise<NoteEntry[]> {
   if (typeof window === "undefined") return [];
+  let local: NoteEntry[] = [];
   try {
+    if (localStorage.getItem(migrationFlagKey(jobId))) return [];
     const raw = localStorage.getItem(notesKey(jobId));
-    return raw ? (JSON.parse(raw) as NoteEntry[]) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+    local = parsed.filter(
+      (e): e is NoteEntry =>
+        e && typeof e.id === "string" && typeof e.content === "string" && isNoteType(e.type)
+    );
+  } catch {
+    return [];
+  }
+  if (local.length === 0) return [];
+
+  try {
+    await api(`/api/jobs/${jobId}/notes/migrate`, {
+      method: "POST",
+      body: JSON.stringify({ notes: local }),
+    });
+    localStorage.setItem(migrationFlagKey(jobId), "1");
+    localStorage.removeItem(notesKey(jobId));
+  } catch {
+    // Keep local notes untouched; retry on next load.
+    return [];
+  }
+  return [];
+}
+
+export async function loadNotes(jobId: string): Promise<NoteEntry[]> {
+  const migrated = await migrateLocalNotes(jobId);
+  if (migrated.length > 0) return migrated;
+
+  try {
+    const data = await api<{ notes: NoteEntry[] }>(`/api/jobs/${jobId}/notes`);
+    return data.notes;
   } catch {
     return [];
   }
 }
 
-export function saveNotes(jobId: string, entries: NoteEntry[]) {
-  localStorage.setItem(notesKey(jobId), JSON.stringify(entries));
+function notifyUpdate() {
   window.dispatchEvent(new Event("atlas:notes-update"));
 }
 
-export function appendNote(
+export async function appendNote(
   jobId: string,
   entry: Omit<NoteEntry, "id" | "timestamp">
-): NoteEntry {
-  const entries = loadNotes(jobId);
-  const full: NoteEntry = {
-    ...entry,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    timestamp: new Date().toISOString(),
-  };
-  saveNotes(jobId, [...entries, full]);
-  return full;
+): Promise<NoteEntry> {
+  const created = await api<{ note: NoteEntry }>(`/api/jobs/${jobId}/notes`, {
+    method: "POST",
+    body: JSON.stringify(entry),
+  });
+  notifyUpdate();
+  return created.note;
 }
 
-export function deleteNote(jobId: string, id: string) {
-  const entries = loadNotes(jobId).filter((e) => e.id !== id);
-  saveNotes(jobId, entries);
+export async function updateNote(
+  jobId: string,
+  id: string,
+  patch: Partial<Pick<NoteEntry, "content" | "title" | "type">>
+): Promise<NoteEntry> {
+  const updated = await api<{ note: NoteEntry }>(`/api/jobs/${jobId}/notes/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  notifyUpdate();
+  return updated.note;
+}
+
+export async function deleteNote(jobId: string, id: string): Promise<void> {
+  await api(`/api/jobs/${jobId}/notes/${id}`, { method: "DELETE" });
+  notifyUpdate();
+}
+
+/** Replaces the whole note list for a job (used by legacy save-notes call sites). */
+export async function saveNotes(jobId: string, entries: NoteEntry[]): Promise<void> {
+  await api(`/api/jobs/${jobId}/notes/replace`, {
+    method: "POST",
+    body: JSON.stringify({ notes: entries }),
+  });
+  notifyUpdate();
 }
 
 export function exportMarkdown(entries: NoteEntry[], topic: string): string {

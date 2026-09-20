@@ -5,7 +5,8 @@ import {
   NoteEntry,
   appendNote,
   loadNotes,
-  saveNotes,
+  deleteNote,
+  updateNote,
   exportMarkdown,
   TYPE_META,
 } from "@/lib/notes";
@@ -46,27 +47,29 @@ export default function NotesTab({ jobId, topic, theme = "light" }: NotesTabProp
   const memoryBg = isDark ? "bg-indigo-500/10 border-indigo-500/30" : "bg-indigo-50 border-indigo-200";
 
   const refresh = () => {
-    const all = loadNotes(jobId);
-    setEntries(all);
-    // keep selected in sync
-    if (selected) {
-      const updated = all.find((e) => e.id === selected.id);
-      setSelected(updated ?? null);
-    }
+    loadNotes(jobId)
+      .then((all) => {
+        setEntries(all);
+        setSelected((prev) => (prev ? all.find((e) => e.id === prev.id) ?? null : null));
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
-    // Ensure session entry exists
-    const existing = loadNotes(jobId);
-    if (existing.length === 0) {
-      appendNote(jobId, {
-        type: "session",
-        title: "Session Started",
-        content: `**Research Topic:** ${topic}\n\nThis notes session captures your research memory — add thoughts, save paper comparisons, and export everything as Markdown.`,
-      });
-    }
-    refresh();
-  }, [jobId]);
+    let cancelled = false;
+    loadNotes(jobId).then((existing) => {
+      if (cancelled) return;
+      setEntries(existing);
+      if (existing.length === 0) {
+        appendNote(jobId, {
+          type: "session",
+          title: "Session Started",
+          content: `**Research Topic:** ${topic}\n\nThis notes session captures your research memory — add thoughts, save paper comparisons, and export everything as Markdown.`,
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [jobId, topic]);
 
   useEffect(() => {
     const handler = () => refresh();
@@ -77,17 +80,21 @@ export default function NotesTab({ jobId, topic, theme = "light" }: NotesTabProp
   const addNote = () => {
     const text = draft.trim();
     if (!text) return;
+    setDraft("");
+    setDraftTitle("");
     appendNote(jobId, {
       type: "manual",
       title: draftTitle.trim() || undefined,
       content: text,
-    });
-    setDraft("");
-    setDraftTitle("");
+    })
+      .then(() => refresh())
+      .catch(() => {});
   };
 
   const deleteEntry = (id: string) => {
-    saveNotes(jobId, entries.filter((e) => e.id !== id));
+    deleteNote(jobId, id)
+      .then(() => refresh())
+      .catch(() => {});
     if (selected?.id === id) setSelected(null);
   };
 
@@ -98,11 +105,12 @@ export default function NotesTab({ jobId, topic, theme = "light" }: NotesTabProp
 
   const saveEdit = () => {
     if (!selected) return;
-    const updated = entries.map((e) =>
-      e.id === selected.id ? { ...e, content: editContent } : e
-    );
-    saveNotes(jobId, updated);
-    setEditing(false);
+    updateNote(jobId, selected.id, { content: editContent })
+      .then(() => {
+        setEditing(false);
+        refresh();
+      })
+      .catch(() => {});
   };
 
   const handleExport = () => {

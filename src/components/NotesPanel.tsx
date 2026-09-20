@@ -5,7 +5,7 @@ import {
   NoteEntry,
   appendNote,
   loadNotes,
-  saveNotes,
+  deleteNote,
   exportMarkdown,
   TYPE_META,
 } from "@/lib/notes";
@@ -42,18 +42,26 @@ export default function NotesPanel({ jobId, topic, theme = "light", hidden = fal
   const cardCls = isDark ? "bg-zinc-800/60 border-zinc-700" : "bg-gray-50 border-gray-200";
   const divider = isDark ? "border-zinc-700" : "border-gray-100";
 
-  const refresh = () => setEntries(loadNotes(jobId));
+  const refresh = () => {
+    loadNotes(jobId)
+      .then(setEntries)
+      .catch(() => {});
+  };
 
   useEffect(() => {
-    const existing = loadNotes(jobId);
-    if (existing.length === 0) {
-      appendNote(jobId, {
-        type: "session",
-        title: "Session Started",
-        content: `**Research Topic:** ${topic}\n\nThis notes session captures your research memory — add thoughts, save paper comparisons, and export everything as Markdown.`,
-      });
-    }
-    refresh();
+    let cancelled = false;
+    loadNotes(jobId).then((existing) => {
+      if (cancelled) return;
+      setEntries(existing);
+      if (existing.length === 0) {
+        appendNote(jobId, {
+          type: "session",
+          title: "Session Started",
+          content: `**Research Topic:** ${topic}\n\nThis notes session captures your research memory — add thoughts, save paper comparisons, and export everything as Markdown.`,
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [jobId, topic]);
 
   useEffect(() => {
@@ -69,12 +77,16 @@ export default function NotesPanel({ jobId, topic, theme = "light", hidden = fal
   const addManualNote = () => {
     const text = draft.trim();
     if (!text) return;
-    appendNote(jobId, { type: "manual", content: text });
     setDraft("");
+    appendNote(jobId, { type: "manual", content: text })
+      .then(() => refresh())
+      .catch(() => {});
   };
 
   const deleteEntry = (id: string) => {
-    saveNotes(jobId, entries.filter((e) => e.id !== id));
+    deleteNote(jobId, id)
+      .then(() => refresh())
+      .catch(() => {});
   };
 
   const toggleExpand = (id: string) => {

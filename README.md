@@ -23,6 +23,7 @@ It now includes a full **Academic Paper Pipeline** powered by the [ARS (Academic
 - Custom topic search: type 2–5 words → Groq generates a live keyword cloud centered on your topic
 - **Explore toggle**: switch the word cloud to subscription mode — clicking a word subscribes to weekly papers instead of launching a research run
 - Real-time knowledge tree built from peer-reviewed papers, datasets, and social signals
+- **Redesigned Explore header**: one quiet ghost-style nav (brand + My Research · Research Graph · Write Paper · Peer Review · Docs) with color only in the icons — the word cloud stays the page's primary call to action
 - **Node-aware Explore Papers**: click any tree node to scope paper fetching to that node's topic; results show node-connection badges
 - Hub-and-spoke Paper Map: Research hub at center, weighted lines to each paper, no visual clutter between peers
 - Paper Compare Mode: pick 2 papers → Claude generates methodology differences + research gap analysis
@@ -57,6 +58,16 @@ It now includes a full **Academic Paper Pipeline** powered by the [ARS (Academic
 - Paper source defaults to your **current Write Paper draft**, or upload any `.pdf` / `.txt` / `.md`
 - Final verdict panel: averaged 1–10 scores across novelty / soundness / clarity / significance / overall, consensus recommendation (accept → reject), and an editor-style meta-review — plus full per-agent reviews with strengths, weaknesses, and questions
 - Results cached in localStorage; re-run or clear anytime
+
+### Persistent Research Graph
+- **Cross-run knowledge graph** at `/graph` (nav button on Explore): every completed run automatically syncs its topics, hypotheses, methods, evidence, and gaps into a single persistent graph in PostgreSQL — your research memory across all sessions
+- **Deduplicated by design**: entities are keyed by (type, normalized label), so the same concept found in different runs converges onto one node; papers collapse by title; `POST /api/graph/dedupe` merges any stragglers (user-created entities always win the merge)
+- **Ask across all runs**: type "what have I learned about X" and Groq synthesizes an answer grounded in the matched entities, their connected context, and the supporting papers — with inline citations and a key-takeaways / open-gaps breakdown
+- **Full graph editing**: create, edit, and delete entities and edges; connect any two entities with typed relationships (motivates / provides / uses method / contradicts / reveals / related to / notes on)
+- **Origin tracking**: run-derived entities refresh on every re-sync; anything you create or edit is marked user-created/user-edited (white ring on the canvas) and is never overwritten
+- **Provenance**: every entity carries its supporting papers — click a node to see the source list and jump back to the originating run
+- **Interactive canvas**: force-directed layout, type filter chips with counts, entity search, wheel zoom / drag pan, and a per-node inspector with inline editing
+- **Notes live in the graph**: job notes are stored as graph entities (not localStorage) with automatic one-time migration of existing local notes; they feed cross-run queries like everything else
 
 ### Research Management
 - `/jobs` page listing all past research runs with status, source counts, and actions
@@ -110,6 +121,7 @@ Open http://localhost:3000
 4. Click **Write Paper** in the tab bar → select an idea → plan and draft with ARS
 5. Click **Peer Review** next to Write Paper → your current draft is loaded by default → a committee of reviewer agents grades it against your target venue
 6. Optionally export context and continue in Claude Code with `/ars-full`
+7. Open **Research Graph** (`/graph`) any time → every run's knowledge accumulates into one persistent, duplicate-free graph (the same concept across runs converges onto one node) → ask "what have I learned about X across all my runs" → edit or extend the graph yourself
 
 ### Paper Pipeline flow
 
@@ -177,6 +189,47 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 - **Commercial licenses** available for embedding/hosting without copyleft obligations — see `COMMERCIAL-LICENSE.md`
 - **DCO sign-off** required on all contributions (`git commit -s`) to keep the copyright chain sole-owned — see `CONTRIBUTING.md`
 - All releases before the `v3.2.0` tag remain **MIT-licensed forever**; the switch point is tagged `v3.2.0`
+
+### V3.1 — Graph Deduplication & Explore Header Redesign
+
+- **No more duplicate topics/entities**: every synced entity now uses a label-based global sync key (`g:type:normalized-label`) instead of per-job keys, so the same concept discovered in different runs converges onto one node via the existing upsert
+- **`dedupeGraph()` merge pass**: groups entities by (type, normalized label) and folds each group onto a canonical node — edges and paper links are re-pointed, duplicates deleted (cascades clean up the originals); user-created entities always win the merge, and groups that are purely user-created are left alone as deliberate duplicates; notes are exempt
+- **Dedup runs automatically**: every `syncJobGraph` finishes with the merge pass, and `POST /api/graph/dedupe` can be called anytime to clean up stragglers (idempotent)
+- **Paper deduplication**: source rows are per-run (papers are re-fetched each run), so the graph and query APIs now collapse sources by normalized title when serializing — no repeated titles in inspector source lists or query citations
+- **Explore header redesigned** (UX pass): the old header mixed six button styles with three competing gradients; it's now a quiet ghost-style nav — brand mark (links home) + My Research · Research Graph · Write Paper · Peer Review · Docs, one consistent hover style, color only in the icons — followed by a clean page-identity block ("Topic Explorer" + subtitle), keeping the word cloud as the page's primary call to action; all three themes verified
+
+#### New API routes (V3.1)
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/graph/dedupe` | POST | One-shot graph deduplication: normalizes sync keys, merges duplicate groups (returns `{normalized, groups, merged}`) |
+
+### V3.0 — Persistent Research Graph (the infrastructure spine)
+
+- **`GraphEntity` / `GraphEdge` / `EntitySource` Prisma models** (PostgreSQL): a cross-project, cross-domain research graph of hypotheses, methods, evidence, gaps, topics, and notes — persisted in the database instead of per-job localStorage
+- **Automatic sync**: every completed run (and every uploaded-paper job) syncs its knowledge tree into the graph — root topic, hypotheses, methods, findings as evidence, disagreements, and open problems — via an idempotent `syncJobGraph` keyed on `syncKey`; the first visit to `/graph` backfills all past completed runs
+- **`/graph` page**: force-directed visualization of the whole graph with type-coloured nodes (topic / hypothesis / method / evidence / gap / note), type filter chips with live counts, entity search, wheel zoom + drag pan, per-type edge arrows and a relationship legend
+- **Full editing**: add entities (optionally linked to the selected node with a typed edge), inline edit of label/content, delete entities, create/delete edges between any two entities via the inspector's connect-to-entity search
+- **Origin protection**: entities synced from runs are marked *run-derived* and refresh on re-sync; user-created and user-edited entities (white ring on the canvas) are never overwritten by a re-sync
+- **Provenance**: `EntitySource` links every entity to its supporting papers; the inspector lists them and links back to the originating run
+- **Cross-run query** ("what have I learned across all my runs about X"): matches entities case-insensitively across label + content, expands to the 1-hop neighbourhood, and Groq synthesizes a grounded answer with inline entity citations, key takeaways, and open gaps — matched nodes are highlighted on the canvas
+- **Notes migrated into the graph**: all notes APIs (`/api/jobs/[id]/notes/*`) now read/write graph entities; existing localStorage notes migrate automatically on first load per job (one-time flag), and notes participate in cross-run queries like any other entity
+
+#### New API routes (V3.0)
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/graph` | GET | Full graph (entities + edges + stats); auto-backfills from completed runs when empty |
+| `/api/graph/entities` | POST | Create a user entity, optionally with an edge to an existing one |
+| `/api/graph/entities/[id]` | PATCH / DELETE | Edit (flips run-derived → user-edited) or delete an entity |
+| `/api/graph/edges` | POST | Create a typed edge between two entities |
+| `/api/graph/edges/[id]` | DELETE | Delete an edge |
+| `/api/graph/sync` | POST | Re-sync one job (`{jobId}`) or all completed jobs |
+| `/api/graph/query` | POST | Cross-run natural-language query with Groq synthesis + citations |
+| `/api/jobs/[id]/notes` | GET / POST | Notes list / create — now backed by graph entities |
+| `/api/jobs/[id]/notes/[noteId]` | PATCH / DELETE | Edit / delete a note entity |
+| `/api/jobs/[id]/notes/migrate` | POST | One-time bulk import of legacy localStorage notes |
+| `/api/jobs/[id]/notes/replace` | POST | Full notes replace (delete missing, upsert incoming) |
 
 ### V2.5 — Standalone Peer Review Session & Explore Upload Control
 

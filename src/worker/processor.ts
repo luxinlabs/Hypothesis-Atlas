@@ -6,6 +6,7 @@ import { searchGEO } from '../lib/apis/geo'
 import { searchSocialSignals } from '../lib/apis/social'
 import { generateWithGroq } from '../lib/groq'
 import { populateNeo4jGraph } from '../lib/neo4j-paper-graph'
+import { syncJobGraph } from '../lib/research-graph'
 
 export async function processEvidenceMapping(data: { jobId: string; topicQuery: string }) {
   const { jobId, topicQuery } = data
@@ -30,6 +31,7 @@ export async function processEvidenceMapping(data: { jobId: string; topicQuery: 
     const rootNode = await buildRootNode(jobId, topicQuery, rankedSources)
     await buildChildNodes(jobId, topicQuery, rootNode.id, rankedSources)
     await populateNeo4jGraph(jobId)
+    await syncJobGraph(jobId)
 
     await prisma.job.update({
       where: { id: jobId },

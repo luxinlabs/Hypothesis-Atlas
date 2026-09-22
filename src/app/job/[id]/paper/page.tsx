@@ -6,6 +6,7 @@ import Link from "next/link";
 import ARSPlanChat from "@/components/ARSPlanChat";
 import AssistantChat from "@/components/AssistantChat";
 import ExperimentsPanel from "@/components/ExperimentsPanel";
+import ProveClaimPanel from "@/components/ProveClaimPanel";
 import NotesPanel from "@/components/NotesPanel";
 import PaperMapPicker from "@/components/PaperMapPicker";
 import PaperQuizPanel from "@/components/PaperQuizPanel";
@@ -1119,6 +1120,7 @@ function PaperPipelineInner() {
                 </p>
               </div>
               <ExperimentsPanel jobId={jobId} messages={experimentMessages} />
+              <ProveClaimPanel jobId={jobId} />
             </div>
           </div>
         )}

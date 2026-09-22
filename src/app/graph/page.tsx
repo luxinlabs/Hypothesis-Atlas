@@ -83,7 +83,7 @@ const THEME_STYLES = {
     card: "bg-zinc-900 border border-zinc-700",
     input: "bg-zinc-800 border border-zinc-600 text-zinc-100 placeholder-zinc-500",
     headingPlate: "inline-flex px-4 py-2 rounded-xl border border-zinc-600 bg-zinc-900/80 shadow-sm backdrop-blur-sm",
-    heading: "bg-gradient-to-r from-indigo-300 via-cyan-300 to-emerald-300 bg-clip-text text-transparent drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]",
+    heading: "text-indigo-200",
     divider: "border-zinc-700",
     chipOff: "bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-zinc-200",
   },
@@ -96,7 +96,7 @@ const THEME_STYLES = {
     card: "bg-white border border-gray-200",
     input: "bg-gray-50 border border-gray-300 text-zinc-900 placeholder-gray-400",
     headingPlate: "inline-flex px-4 py-2 rounded-xl border border-slate-300/90 bg-white/95 shadow-md",
-    heading: "bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 bg-clip-text text-transparent",
+    heading: "text-indigo-700",
     divider: "border-gray-200",
     chipOff: "bg-white border border-gray-200 text-gray-400 hover:text-gray-700",
   },
@@ -109,7 +109,7 @@ const THEME_STYLES = {
     card: "bg-white border border-zinc-200",
     input: "bg-white border border-gray-300 text-zinc-900 placeholder-gray-400",
     headingPlate: "inline-flex px-4 py-2 rounded-xl border border-rose-300/90 bg-white/92 shadow-md",
-    heading: "bg-gradient-to-r from-rose-700 via-pink-600 to-fuchsia-600 bg-clip-text text-transparent",
+    heading: "text-rose-700",
     divider: "border-rose-200",
     chipOff: "bg-white border border-zinc-200 text-gray-400 hover:text-gray-700",
   },
@@ -538,12 +538,13 @@ export default function ResearchGraphPage() {
     return 5 + Math.min(5, n.degree * 0.6);
   };
 
+  // Labels only appear for the node under the cursor (or selected/search-matched) —
+  // showing them for every topic/hypothesis node by default caused dense graphs to
+  // become an unreadable pile of overlapping text.
   const showLabel = (n: SimNode) =>
     n.entity.id === selectedId ||
     n.entity.id === hoveredId ||
-    matchedIds.has(n.entity.id) ||
-    n.entity.type === "topic" ||
-    (n.entity.type === "hypothesis" && n.degree > 0);
+    matchedIds.has(n.entity.id);
 
   return (
     <main className={`min-h-screen ${t.mainBg} ${t.text} transition-all duration-500`}>

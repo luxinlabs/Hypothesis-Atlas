@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { syncAllJobs } from '@/lib/research-graph'
+import { syncJobGraph } from '@/lib/research-graph'
 
 // Source rows are per-job (papers get re-fetched per run), so the same paper
 // can be linked several times via different rows — collapse them by title.
@@ -16,13 +16,28 @@ function dedupeSources<T extends { source: { title: string } }>(links: T[]): T[]
 
 export async function GET() {
   try {
-    let entityCount = await prisma.graphEntity.count()
-
-    if (entityCount === 0) {
-      const completedJobs = await prisma.job.count({ where: { status: 'completed' } })
-      if (completedJobs > 0) {
-        await syncAllJobs()
-        entityCount = await prisma.graphEntity.count()
+    // Backfill any completed job whose knowledge tree hasn't reached the graph yet
+    // (a pre-existing 'note' entity used to make this look already-synced and skip
+    // every job forever — checking entityCount === 0 isn't a valid "synced" signal).
+    // Sync completion is tracked via the 'research_graph' progress event syncJobGraph
+    // emits per job, rather than entity ownership — topic entities converge across
+    // jobs that share a label, so a later job's id may never own one.
+    const completedJobs = await prisma.job.findMany({
+      where: { status: 'completed' },
+      select: { id: true },
+    })
+    if (completedJobs.length > 0) {
+      const syncedJobIds = new Set(
+        (
+          await prisma.progressEvent.findMany({
+            where: { stage: 'research_graph', status: 'completed', jobId: { in: completedJobs.map((j) => j.id) } },
+            select: { jobId: true },
+          })
+        ).map((e) => e.jobId)
+      )
+      const unsyncedJobs = completedJobs.filter((job) => !syncedJobIds.has(job.id))
+      for (const job of unsyncedJobs) {
+        await syncJobGraph(job.id)
       }
     }
 

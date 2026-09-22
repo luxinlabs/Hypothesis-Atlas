@@ -28,7 +28,7 @@ export default function PricingPage() {
 
       {/* Pricing Header */}
       <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-800 via-purple-800 to-fuchsia-800 bg-clip-text text-transparent mb-4">
+        <h1 className="text-5xl font-bold text-indigo-800 mb-4">
           Simple Pricing
         </h1>
         <p className="text-xl text-gray-700 mb-12 max-w-2xl mx-auto">

@@ -47,8 +47,7 @@ const THEME_STYLES = {
     tabBar: "bg-zinc-900 border-zinc-800",
     tabActive: "border-indigo-400 text-indigo-300",
     tabIdle: "text-zinc-400 hover:text-zinc-200 hover:border-zinc-600",
-    title:
-      "bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent",
+    title: "text-indigo-200",
   },
   light: {
     page: "bg-gradient-to-b from-white to-zinc-50 text-zinc-900",
@@ -67,8 +66,7 @@ const THEME_STYLES = {
     tabBar: "bg-white border-gray-200",
     tabActive: "border-blue-500 text-blue-600",
     tabIdle: "text-gray-500 hover:text-gray-700 hover:border-gray-300",
-    title:
-      "bg-gradient-to-r from-blue-800 to-indigo-800 bg-clip-text text-transparent",
+    title: "text-indigo-800",
   },
   vibrant: {
     page: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50 text-zinc-900",
@@ -87,8 +85,7 @@ const THEME_STYLES = {
     tabBar: "bg-white/80 border-rose-200",
     tabActive: "border-fuchsia-500 text-fuchsia-700",
     tabIdle: "text-zinc-500 hover:text-zinc-700 hover:border-zinc-300",
-    title:
-      "bg-gradient-to-r from-fuchsia-700 to-orange-700 bg-clip-text text-transparent",
+    title: "text-fuchsia-700",
   },
 } as const;
 

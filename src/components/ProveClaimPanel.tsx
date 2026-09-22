@@ -69,7 +69,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
               VERDICT_STYLE[result.verdict]
             }`}
           >
-            {VERDICT_LABEL[result.verdict]}
+            {result.hasSorry ? "Contains sorry" : VERDICT_LABEL[result.verdict]}
           </span>
         )}
       </div>

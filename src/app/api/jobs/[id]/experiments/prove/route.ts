@@ -7,6 +7,31 @@ import type { ProofAttempt, ProofResult, ProofVerdict } from '@/lib/experiments/
 // V3-EXPERIMENTS-PLAN.md Phase 1.
 const MAX_ATTEMPTS = 3
 
+// Lean typechecking can hang on pathological input; bound it rather than
+// tying up the request indefinitely (Phase 2 guardrail).
+const LEAN_SERVICE_TIMEOUT_MS = 20_000
+
+// Cheap per-job rate limit so one job can't spam the autoformalization LLM
+// and the Lean service. In-memory only — resets on redeploy, which is fine
+// for a soft guard on an experimental feature (Phase 2 guardrail).
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX_REQUESTS = 5
+const requestLog = new Map<string, number[]>()
+
+function isRateLimited(jobId: string): boolean {
+  const now = Date.now()
+  const timestamps = (requestLog.get(jobId) ?? []).filter(
+    (t) => now - t < RATE_LIMIT_WINDOW_MS
+  )
+  if (timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+    requestLog.set(jobId, timestamps)
+    return true
+  }
+  timestamps.push(now)
+  requestLog.set(jobId, timestamps)
+  return false
+}
+
 const AUTOFORMALIZE_SYSTEM_PROMPT = `You are an expert Lean 4 + Mathlib formalizer. Given a mathematical claim \
 (possibly written in LaTeX and/or natural language), produce a Lean 4 theorem \
 statement and a complete proof using Mathlib.
@@ -35,15 +60,32 @@ async function checkWithLeanService(leanCode: string): Promise<LeanCheckResponse
   const url = process.env.LEAN_SERVICE_URL
   if (!url) return null
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: leanCode }),
-  })
-  if (!res.ok) {
-    return { success: false, errors: `Lean service returned ${res.status}` }
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), LEAN_SERVICE_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: leanCode }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      return { success: false, errors: `Lean service returned ${res.status}` }
+    }
+    return (await res.json()) as LeanCheckResponse
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === 'AbortError'
+    return {
+      success: false,
+      errors: timedOut
+        ? `Lean check timed out after ${LEAN_SERVICE_TIMEOUT_MS / 1000}s`
+        : err instanceof Error
+          ? err.message
+          : 'Lean service request failed',
+    }
+  } finally {
+    clearTimeout(timeout)
   }
-  return (await res.json()) as LeanCheckResponse
 }
 
 async function autoformalize(claim: string, priorAttempt?: ProofAttempt): Promise<string> {
@@ -71,6 +113,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json(
       { error: 'ANTHROPIC_API_KEY is not configured. Add it to your .env.local file.' },
       { status: 503 }
+    )
+  }
+
+  if (isRateLimited(params.id)) {
+    return NextResponse.json(
+      { error: `Too many proof attempts for this job — wait a minute and try again (limit: ${RATE_LIMIT_MAX_REQUESTS}/min).` },
+      { status: 429 }
     )
   }
 

@@ -231,6 +231,20 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 | `/api/jobs/[id]/notes/migrate` | POST | One-time bulk import of legacy localStorage notes |
 | `/api/jobs/[id]/notes/replace` | POST | Full notes replace (delete missing, upsert incoming) |
 
+### V3 (in progress) — Mathematical Proof Verification
+
+- **"Prove a Claim" panel** in the Experiments step, next to the existing quantitative-claim verifier: state a claim in LaTeX/plain English and it's autoformalized into **Lean 4 + Mathlib** by Claude, then checked against a real proof assistant instead of an LLM self-report
+- Up to 3 rounds of autoformalize → check → retry-with-Lean-error-feedback before giving up
+- Requires an external Lean 4 + Mathlib checking service, configured via `LEAN_SERVICE_URL` (`POST {code} -> {success, errors?, sorryCount?}`); without it, the panel shows the generated Lean source as unverified rather than claiming a pass
+- Per-job rate limit (5 proof attempts / minute) and a 20s timeout on the Lean service call
+- `ExperimentDomain` type (`math` now, `physics` / `biology` / `chemistry` scaffolded for later — see `V3-EXPERIMENTS-PLAN.md`)
+
+#### New API routes (V3)
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/jobs/[id]/experiments/prove` | POST | Autoformalize a claim to Lean 4 and check it via `LEAN_SERVICE_URL` |
+
 ### V2.5 — Standalone Peer Review Session & Explore Upload Control
 
 - **Standalone Peer Review session** at `/review`: a committee of three reviewer agents (methodology & novelty, venue fit & impact, statistical rigor & reproducibility) plus an optional custom reviewer with a user-defined name and persona

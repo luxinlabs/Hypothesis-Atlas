@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import MathText from "./MathText";
-import type { ProofResult } from "@/lib/experiments/types";
+import { EXPERIMENT_DOMAINS, type ExperimentDomain, type ProofResult } from "@/lib/experiments/types";
 
 interface ProveClaimPanelProps {
   jobId: string;
@@ -23,6 +23,7 @@ const VERDICT_LABEL: Record<string, string> = {
 };
 
 export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
+  const [domain, setDomain] = useState<ExperimentDomain>("math");
   const [claim, setClaim] = useState("");
   const [proving, setProving] = useState(false);
   const [result, setResult] = useState<ProofResult | null>(null);
@@ -74,6 +75,34 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
         )}
       </div>
 
+      <div className="px-4 pt-3 flex flex-wrap gap-1.5">
+        {EXPERIMENT_DOMAINS.map((d) => (
+          <button
+            key={d.id}
+            onClick={() => d.available && setDomain(d.id)}
+            disabled={!d.available}
+            title={d.available ? undefined : "Coming soon"}
+            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors ${
+              domain === d.id
+                ? "bg-indigo-600 text-white"
+                : d.available
+                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-gray-50 text-gray-300 cursor-not-allowed"
+            }`}
+          >
+            {d.label}
+            {!d.available && " · soon"}
+          </button>
+        ))}
+      </div>
+
+      {domain !== "math" ? (
+        <div className="px-4 py-6 text-xs text-gray-400 text-center">
+          {EXPERIMENT_DOMAINS.find((d) => d.id === domain)?.label} experiments are coming in a
+          future release — see V3-EXPERIMENTS-PLAN.md.
+        </div>
+      ) : (
+      <>
       <div className="px-4 py-3 space-y-3 text-xs text-gray-600 leading-relaxed">
         <p>
           State a mathematical claim in LaTeX or plain English. It's autoformalized into{" "}
@@ -127,6 +156,8 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
             </div>
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );

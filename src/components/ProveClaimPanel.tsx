@@ -8,6 +8,11 @@ interface ProveClaimPanelProps {
   jobId: string;
 }
 
+const EXAMPLE_CLAIMS = [
+  "For all naturals n, the sum 1 + 2 + ... + n equals n(n+1)/2.",
+  "For any natural number n, n^2 + n is even.",
+];
+
 const VERDICT_STYLE: Record<string, string> = {
   verified: "bg-emerald-50 text-emerald-700",
   failed: "bg-red-50 text-red-600",
@@ -63,6 +68,9 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0" />
           <span className="text-sm font-semibold text-gray-700">Prove a Claim</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+            Mathematics
+          </span>
         </div>
         {result && (
           <span
@@ -109,6 +117,18 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
           <strong>Lean 4 + Mathlib</strong> and checked against a real proof assistant —
           not just an LLM self-report.
         </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] text-gray-400">Try:</span>
+          {EXAMPLE_CLAIMS.map((example) => (
+            <button
+              key={example}
+              onClick={() => setClaim(example)}
+              className="text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full"
+            >
+              {example.length > 28 ? `${example.slice(0, 28)}…` : example}
+            </button>
+          ))}
+        </div>
         <textarea
           value={claim}
           onChange={(e) => setClaim(e.target.value)}

@@ -8,9 +8,13 @@ interface ProveClaimPanelProps {
   jobId: string;
 }
 
-const EXAMPLE_CLAIMS = [
-  "For all naturals n, the sum 1 + 2 + ... + n equals n(n+1)/2.",
-  "For any natural number n, n^2 + n is even.",
+const EXAMPLE_CLAIMS: { label: string; value: string }[] = [
+  { label: "Sum formula", value: "For all naturals n, the sum 1 + 2 + ... + n equals n(n+1)/2." },
+  { label: "Parity", value: "For any natural number n, n^2 + n is even." },
+  {
+    label: "Sum of squares (LaTeX)",
+    value: "$$\\forall n \\in \\mathbb{N},\\ \\sum_{k=1}^{n} k^2 = \\frac{n(n+1)(2n+1)}{6}$$",
+  },
 ];
 
 const VERDICT_STYLE: Record<string, string> = {
@@ -113,7 +117,9 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       <>
       <div className="px-4 py-3 space-y-3 text-xs text-gray-600 leading-relaxed">
         <p>
-          State a mathematical claim in LaTeX or plain English. It's autoformalized into{" "}
+          State a mathematical claim in LaTeX or plain English — inline (<code>$...$</code> or{" "}
+          <code>\(...\)</code>) and display (<code>$$...$$</code> or <code>\[...\]</code>) math
+          both render live below the input. The claim is autoformalized into{" "}
           <strong>Lean 4 + Mathlib</strong> and checked against a real proof assistant —
           not just an LLM self-report.
         </p>
@@ -121,11 +127,11 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
           <span className="text-[10px] text-gray-400">Try:</span>
           {EXAMPLE_CLAIMS.map((example) => (
             <button
-              key={example}
-              onClick={() => setClaim(example)}
+              key={example.label}
+              onClick={() => setClaim(example.value)}
               className="text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full"
             >
-              {example.length > 28 ? `${example.slice(0, 28)}…` : example}
+              {example.label}
             </button>
           ))}
         </div>

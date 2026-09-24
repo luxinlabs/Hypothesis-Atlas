@@ -6,7 +6,6 @@ import Link from "next/link";
 import ARSPlanChat from "@/components/ARSPlanChat";
 import AssistantChat from "@/components/AssistantChat";
 import ExperimentsPanel from "@/components/ExperimentsPanel";
-import ProveClaimPanel from "@/components/ProveClaimPanel";
 import NotesPanel from "@/components/NotesPanel";
 import PaperMapPicker from "@/components/PaperMapPicker";
 import PaperQuizPanel from "@/components/PaperQuizPanel";
@@ -1120,7 +1119,12 @@ function PaperPipelineInner() {
                 </p>
               </div>
               <ExperimentsPanel jobId={jobId} messages={experimentMessages} />
-              <ProveClaimPanel jobId={jobId} />
+              <Link
+                href="/experiments/math"
+                className="block rounded-2xl border border-gray-200 bg-white px-4 py-3 text-center text-xs font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors shadow-sm"
+              >
+                Prove a math claim in Lean 4 → Math Experiments
+              </Link>
             </div>
           </div>
         )}

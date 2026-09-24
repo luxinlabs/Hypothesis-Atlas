@@ -212,13 +212,7 @@ export default function AssistantChat({
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0" />
           <span className="text-sm font-semibold text-gray-700 flex-shrink-0">Atlas Assistant</span>
-          {selectedIdea ? (
-            <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full truncate max-w-xs">
-              {selectedIdea.title}
-            </span>
-          ) : (
-            <span className="text-xs text-gray-400">Writing assistant · Groq</span>
-          )}
+          <span className="text-xs text-gray-400">Writing assistant · Groq</span>
         </div>
         <button
           onClick={handleReset}

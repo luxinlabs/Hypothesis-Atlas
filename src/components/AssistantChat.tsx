@@ -90,9 +90,18 @@ export default function AssistantChat({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Keep the latest callback in a ref instead of the effect's dependency
+  // array — callers commonly pass an inline arrow function, which is a new
+  // reference on every parent render. Depending on it directly re-fires this
+  // effect on every parent re-render (not just when messages actually
+  // change), which can cascade into "Maximum update depth exceeded" when the
+  // callback itself triggers a parent state update.
+  const onMessagesChangeRef = useRef(onMessagesChange);
+  onMessagesChangeRef.current = onMessagesChange;
+
   useEffect(() => {
-    onMessagesChange?.(messages);
-  }, [messages, onMessagesChange]);
+    onMessagesChangeRef.current?.(messages);
+  }, [messages]);
 
   const sendMessage = async (userText: string) => {
     const newMessages: Message[] = [...messages, { role: "user", content: userText }];

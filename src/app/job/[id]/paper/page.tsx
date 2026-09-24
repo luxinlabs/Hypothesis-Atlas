@@ -40,6 +40,15 @@ interface Outline {
 
 import { Suspense } from "react";
 
+// Module-level constant, not an inline object literal in JSX — a fresh
+// object reference on every render defeats effect dependency checks in
+// AssistantChat and was part of a "Maximum update depth exceeded" loop.
+const EXPERIMENT_CHAT_WELCOME = {
+  role: "assistant" as const,
+  content:
+    "I'm your experiment designer. Tell me which idea we're testing (or use the selected one above), and I'll turn it into a concrete plan: hypothesis, variables, baselines from the mapped papers, metrics with equations, and expected results with numbers you can verify.\n\nMath renders in LaTeX — try asking for a metric like $F_1 = 2\\frac{pr}{p+r}$.",
+};
+
 function PaperPipelineInner() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -1100,12 +1109,8 @@ function PaperPipelineInner() {
                 selectedIdea={idea ?? undefined}
                 persona="experiment"
                 storageKey={`experiment-chat:${jobId}`}
-                welcome={{
-                  role: "assistant",
-                  content:
-                    "I'm your experiment designer. Tell me which idea we're testing (or use the selected one above), and I'll turn it into a concrete plan: hypothesis, variables, baselines from the mapped papers, metrics with equations, and expected results with numbers you can verify.\n\nMath renders in LaTeX — try asking for a metric like $F_1 = 2\\frac{pr}{p+r}$.",
-                }}
-                onMessagesChange={(msgs) => setExperimentMessages(msgs)}
+                welcome={EXPERIMENT_CHAT_WELCOME}
+                onMessagesChange={setExperimentMessages}
               />
             </div>
 

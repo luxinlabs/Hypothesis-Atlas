@@ -19,23 +19,27 @@ function renderMath(tex: string, displayMode: boolean): string | null {
   }
 }
 
-/** Renders text containing $inline$ and $$block$$ LaTeX via KaTeX. */
+// Block: $$...$$ or \[...\]. Inline: $...$ or \(...\).
+// LLMs (Claude, Groq) commonly emit the \[ \] / \( \) LaTeX-native forms
+// instead of Markdown-style $ $, so both need to render.
+const BLOCK_REGEX = /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g;
+const INLINE_REGEX = /\$([^$\n]+?)\$|\\\(([^)]+?)\\\)/g;
+
+/** Renders text containing $inline$/\(inline\) and $$block$$/\[block\] LaTeX via KaTeX. */
 export default function MathText({ text, className }: MathTextProps) {
   const parts: React.ReactNode[] = [];
-  // Split on $$...$$ blocks first, then $...$ inline within the rest
-  const blockRegex = /\$\$([\s\S]+?)\$\$/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;
-  let inlineCursor = 0;
 
   const pushInline = (segment: string) => {
-    const inlineRegex = /\$([^$\n]+?)\$/g;
+    const inlineRegex = new RegExp(INLINE_REGEX);
     let m: RegExpExecArray | null;
     let cursor = 0;
     while ((m = inlineRegex.exec(segment)) !== null) {
       if (m.index > cursor) parts.push(<span key={key++}>{segment.slice(cursor, m.index)}</span>);
-      const html = renderMath(m[1], false);
+      const tex = m[1] ?? m[2] ?? "";
+      const html = renderMath(tex, false);
       if (html) {
         parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} />);
       } else {
@@ -44,12 +48,13 @@ export default function MathText({ text, className }: MathTextProps) {
       cursor = m.index + m[0].length;
     }
     if (cursor < segment.length) parts.push(<span key={key++}>{segment.slice(cursor)}</span>);
-    inlineCursor += segment.length;
   };
 
+  const blockRegex = new RegExp(BLOCK_REGEX);
   while ((match = blockRegex.exec(text)) !== null) {
     if (match.index > lastIndex) pushInline(text.slice(lastIndex, match.index));
-    const html = renderMath(match[1], true);
+    const tex = match[1] ?? match[2] ?? "";
+    const html = renderMath(tex, true);
     if (html) {
       parts.push(
         <div

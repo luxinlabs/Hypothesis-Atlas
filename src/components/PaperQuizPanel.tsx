@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import MathText from "./MathText";
 
 interface Question {
   id: number;
@@ -238,7 +239,9 @@ export default function PaperQuizPanel({ jobId, idea, inline = false }: PaperQui
                   </div>
 
                   {/* Question */}
-                  <p className="text-sm text-gray-800 leading-relaxed font-medium">{q.question}</p>
+                  <p className="text-sm text-gray-800 leading-relaxed font-medium">
+                    <MathText text={q.question} />
+                  </p>
 
                   {/* Options */}
                   <div className="space-y-2">
@@ -256,7 +259,7 @@ export default function PaperQuizPanel({ jobId, idea, inline = false }: PaperQui
                       }
                       return (
                         <button key={i} className={cls} onClick={() => handleSelect(i)}>
-                          {option}
+                          <MathText text={option} />
                         </button>
                       );
                     })}
@@ -268,7 +271,7 @@ export default function PaperQuizPanel({ jobId, idea, inline = false }: PaperQui
                       <span className="font-semibold text-gray-800">
                         {selectedIndex === q.correctIndex ? "✓ Correct — " : "✗ Incorrect — "}
                       </span>
-                      {q.explanation}
+                      <MathText text={q.explanation} />
                     </div>
                   )}
 

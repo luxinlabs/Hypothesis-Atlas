@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import MathText from "./MathText";
 
 interface Question {
   id: number;
@@ -189,7 +190,7 @@ export default function QuizPanel({ nodeId, theme = "light" }: QuizPanelProps) {
       </div>
 
       {/* Question */}
-      <p className={`text-sm leading-relaxed ${t.text}`}>{q.question}</p>
+      <p className={`text-sm leading-relaxed ${t.text}`}><MathText text={q.question} /></p>
 
       {/* Options */}
       <div className="space-y-2">
@@ -206,7 +207,7 @@ export default function QuizPanel({ nodeId, theme = "light" }: QuizPanelProps) {
           }
           return (
             <button key={i} className={cls} onClick={() => handleSelect(i)}>
-              {option}
+              <MathText text={option} />
             </button>
           );
         })}
@@ -218,7 +219,7 @@ export default function QuizPanel({ nodeId, theme = "light" }: QuizPanelProps) {
           <span className="font-semibold">
             {selectedIndex === q.correctIndex ? "✓ Correct — " : "✗ Incorrect — "}
           </span>
-          {q.explanation}
+          <MathText text={q.explanation} />
         </div>
       )}
 

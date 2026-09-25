@@ -153,9 +153,9 @@ const NAV_ITEMS: { href: string; label: string; icon: string; iconClass: string 
     iconClass: "text-emerald-500",
   },
   {
-    href: "/experiments/math",
-    label: "Math Experiments",
-    icon: "M9 7h6m0 0v6m0-6L4 20m5-13l6 13M4 20h16",
+    href: "/experiments",
+    label: "Experiments",
+    icon: "M9 3h6m-5 0v6.09a2 2 0 01-.4 1.2L5.3 17.5A2 2 0 007 21h10a2 2 0 001.7-3.5l-4.3-7.21a2 2 0 01-.4-1.2V3m-5 0h5",
     iconClass: "text-indigo-500",
   },
   {

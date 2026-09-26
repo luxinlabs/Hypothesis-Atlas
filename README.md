@@ -236,8 +236,10 @@ docker-compose down -v && docker-compose up -d && npm run db:push
 - **Standalone Experiments session** at `/experiments` (nav button on Explore, next to Peer Review) — not gated behind the paper pipeline. Pick a domain via the pills at the top of the panel; **Mathematics** is live, Physics/Biology/Chemistry show as "coming soon" (`ExperimentDomain` type — see `V3-EXPERIMENTS-PLAN.md`)
 - **"Prove a Claim" panel** (Mathematics domain): state a claim in LaTeX/plain English (`$..$`/`$$..$$` or `\(..\)`/`\[..\]`) and it's autoformalized into **Lean 4 + Mathlib** by Claude, then checked against a real proof assistant instead of an LLM self-report
 - Up to 3 rounds of autoformalize → check → retry-with-Lean-error-feedback before giving up
-- Requires an external Lean 4 + Mathlib checking service, configured via `LEAN_SERVICE_URL` (`POST {code} -> {success, errors?, sorryCount?}`); without it, the panel shows the generated Lean source as unverified rather than claiming a pass
-- Per-job rate limit (5 proof attempts / minute) and a 20s timeout on the Lean service call
+- Verification runs against a real Lean 4 + Mathlib checker configured via `LEAN_SERVICE_URL` (`POST {code} -> {success, errors?, sorryCount?}`); without it, the panel shows the generated Lean source as unverified rather than claiming a pass. A checker that is down is reported as an error, not as a failed proof
+- **Local checker** (`lean-checker/`): `make lean-up` builds and starts a Docker service (Lean + Mathlib pinned to one release, prebuilt Mathlib cache — multi-GB image, first build takes a while), then set `LEAN_SERVICE_URL="http://localhost:8765/check"` in `.env.local` and restart `make dev`. `make lean-logs` / `make lean-down` to inspect / stop. It executes untrusted Lean, so it runs non-root with CPU/memory/pid limits, is bound to `127.0.0.1`, and rejects `#eval`/`IO`/custom axioms/metaprogramming — do not expose the port publicly
+- "Verified" means Lean accepted the proof of the *formal statement shown* — it can't tell whether that statement faithfully captures your claim, so read the generated theorem
+- Per-job rate limit (5 proof attempts / minute) and a 60s timeout on the Lean service call
 - The paper pipeline's existing Experiments step (quantitative-claim verification tied to a job's plan chat) is unchanged, and now links out to the standalone `/experiments` session
 
 #### New API routes (V3)

@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install laptop-install infra-up infra-down infra-restart db-push db-studio dev worker build start lint test deploy-web deploy-preview deploy-worker-note
+.PHONY: help install laptop-install infra-up infra-down infra-restart lean-up lean-down lean-logs db-push db-studio dev worker build start lint test deploy-web deploy-preview deploy-worker-note
 
 help:
 	@echo "Available targets:"
@@ -9,6 +9,9 @@ help:
 	@echo "  make infra-up           Start local Postgres + Redis with Docker"
 	@echo "  make infra-down         Stop local Postgres + Redis"
 	@echo "  make infra-restart      Restart local Postgres + Redis"
+	@echo "  make lean-up            Build + start the local Lean 4 + Mathlib checker (multi-GB image)"
+	@echo "  make lean-down          Stop the Lean checker"
+	@echo "  make lean-logs          Tail the Lean checker logs"
 	@echo "  make db-push            Push Prisma schema to current DATABASE_URL"
 	@echo "  make db-studio          Open Prisma Studio"
 	@echo "  make dev                Start Next.js dev server"
@@ -36,6 +39,15 @@ infra-down:
 infra-restart:
 	docker-compose down
 	docker-compose up -d
+
+lean-up:
+	docker-compose --profile lean up -d --build lean-checker
+
+lean-down:
+	docker-compose --profile lean stop lean-checker
+
+lean-logs:
+	docker-compose --profile lean logs -f lean-checker
 
 db-push:
 	npm run db:push

@@ -8,8 +8,10 @@ import type { ProofAttempt, ProofResult, ProofVerdict } from '@/lib/experiments/
 const MAX_ATTEMPTS = 3
 
 // Lean typechecking can hang on pathological input; bound it rather than
-// tying up the request indefinitely (Phase 2 guardrail).
-const LEAN_SERVICE_TIMEOUT_MS = 20_000
+// tying up the request indefinitely (Phase 2 guardrail). Slightly above the
+// checker's own 50s kill timer so a slow proof comes back as a clean "timed
+// out" result from the service instead of an aborted request.
+const LEAN_SERVICE_TIMEOUT_MS = 60_000
 
 // Cheap per-job rate limit so one job can't spam the autoformalization LLM
 // and the Lean service. In-memory only — resets on redeploy, which is fine
@@ -37,8 +39,13 @@ const AUTOFORMALIZE_SYSTEM_PROMPT = `You are an expert Lean 4 + Mathlib formaliz
 statement and a complete proof using Mathlib.
 
 Rules:
+- Begin the file with \`import Mathlib\`.
+- State the theorem so it faithfully captures the claim — never weaken or \
+  change the statement to make the proof easier.
 - Prefer standard Mathlib lemmas and tactics (ring, linarith, nlinarith, simp, \
   induction, omega, field_simp, norm_num) over ad-hoc proofs.
+- Do not use #eval, axiom, IO, or metaprogramming (elab, run_cmd) — the \
+  checker rejects them.
 - If you cannot complete the proof, still emit a syntactically valid theorem \
   statement and use \`sorry\` for the parts you can't close — never fabricate \
   a proof that doesn't type-check.
@@ -50,15 +57,20 @@ interface LeanCheckResponse {
   sorryCount?: number
 }
 
+type LeanCheckOutcome =
+  | { kind: 'not-configured' }
+  | { kind: 'unreachable'; message: string }
+  | { kind: 'checked'; result: LeanCheckResponse }
+
 /**
- * Calls out to an external Lean 4 + Mathlib checking service, configured via
- * LEAN_SERVICE_URL. Standing up that service (a containerized `elan` + Lean +
- * pinned Mathlib checkout exposing this HTTP contract) is an infra task
- * outside this repo — see "Open questions" in V3-EXPERIMENTS-PLAN.md.
+ * Calls the Lean 4 + Mathlib checking service at LEAN_SERVICE_URL (see
+ * lean-checker/ and `make lean-up`). An unreachable service is reported
+ * separately from a failed proof so we don't burn retries feeding "fetch
+ * failed" back to the model as if it were a Lean error.
  */
-async function checkWithLeanService(leanCode: string): Promise<LeanCheckResponse | null> {
+async function checkWithLeanService(leanCode: string): Promise<LeanCheckOutcome> {
   const url = process.env.LEAN_SERVICE_URL
-  if (!url) return null
+  if (!url) return { kind: 'not-configured' }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), LEAN_SERVICE_TIMEOUT_MS)
@@ -70,18 +82,23 @@ async function checkWithLeanService(leanCode: string): Promise<LeanCheckResponse
       signal: controller.signal,
     })
     if (!res.ok) {
-      return { success: false, errors: `Lean service returned ${res.status}` }
+      return { kind: 'unreachable', message: `Lean service returned HTTP ${res.status}` }
     }
-    return (await res.json()) as LeanCheckResponse
+    return { kind: 'checked', result: (await res.json()) as LeanCheckResponse }
   } catch (err) {
-    const timedOut = err instanceof Error && err.name === 'AbortError'
+    if (err instanceof Error && err.name === 'AbortError') {
+      // Reachable but too slow — a simpler proof might pass, so treat as a failed check.
+      return {
+        kind: 'checked',
+        result: {
+          success: false,
+          errors: `Lean check timed out after ${LEAN_SERVICE_TIMEOUT_MS / 1000}s`,
+        },
+      }
+    }
     return {
-      success: false,
-      errors: timedOut
-        ? `Lean check timed out after ${LEAN_SERVICE_TIMEOUT_MS / 1000}s`
-        : err instanceof Error
-          ? err.message
-          : 'Lean service request failed',
+      kind: 'unreachable',
+      message: err instanceof Error ? err.message : 'Lean service request failed',
     }
   } finally {
     clearTimeout(timeout)
@@ -143,8 +160,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       break
     }
 
-    const checked = await checkWithLeanService(leanCode)
-    if (checked === null) {
+    const outcome = await checkWithLeanService(leanCode)
+    if (outcome.kind === 'not-configured') {
       // No Lean service configured — surface the generated formalization
       // without a verified/failed verdict rather than claiming success.
       attempts.push({ leanCode })
@@ -152,12 +169,21 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       note = 'LEAN_SERVICE_URL is not configured — showing the autoformalized proof unverified. Configure a Lean 4 + Mathlib checking service to get a real verdict.'
       break
     }
+    if (outcome.kind === 'unreachable') {
+      // Infrastructure problem, not a proof problem — retrying won't help.
+      attempts.push({ leanCode })
+      verdict = 'error'
+      note = `Could not reach the Lean checker (${outcome.message}). Is it running? Start it with \`make lean-up\`.`
+      break
+    }
 
+    const checked = outcome.result
     const attempt: ProofAttempt = { leanCode, diagnostics: checked.errors }
     attempts.push(attempt)
 
     if (checked.success && !checked.sorryCount) {
       verdict = 'verified'
+      note = 'Lean accepted this proof. The checker verifies the proof, not the translation — confirm the theorem statement below says what you meant.'
       break
     }
     if (checked.success && checked.sorryCount) {
@@ -170,6 +196,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Failed — retry with the error fed back, unless we're out of attempts.
     verdict = 'failed'
     priorAttempt = attempt
+  }
+
+  if (verdict === 'failed' && !note) {
+    note = `Lean rejected the proof after ${attempts.length} attempt(s) — see the error below.`
   }
 
   const result: ProofResult = { claim, verdict, attempts, hasSorry, note }

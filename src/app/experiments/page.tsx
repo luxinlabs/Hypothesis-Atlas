@@ -16,7 +16,7 @@ import ProveClaimPanel from "@/components/ProveClaimPanel";
 export default function ExperimentsPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-white to-zinc-50 text-gray-900">
-      <div className="max-w-2xl mx-auto px-6 py-8">
+      <div className="max-w-4xl mx-auto px-6 py-8">
         <header className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div
@@ -35,8 +35,8 @@ export default function ExperimentsPage() {
                 </span>
               </div>
               <p className="text-sm text-gray-500">
-                Pick a domain below. Mathematics is live today — claims are checked by a real
-                proof assistant, not just an LLM self-report.
+                Pick a domain below. Mathematics is live today: formalize a claim, review the
+                Lean code yourself, then verify it against a real proof assistant.
               </p>
             </div>
           </div>

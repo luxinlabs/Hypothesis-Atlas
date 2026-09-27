@@ -168,6 +168,103 @@ the full pipeline above on day one.
 3. What's acceptable latency for a "verify this proof" click — seconds (autoformalize
    + typecheck only, no search) or minutes (allow bounded automated proof search)?
 
+## Mass experiments — how others do it (research, Sep 2026)
+
+Researched before designing a "mass experiment" feature (many claims / many
+attempts, not one click). Everything below is from the linked sources; numbers
+are theirs, on their hardware.
+
+### 1. The standard architecture: a pool of persistent Lean REPLs behind HTTP
+- **Kimina Lean Server** (Project Numina, MIT, Docker image `projectnumina/kimina-lean-server`)
+  is the open-source reference. One persistent REPL process per core (a Lean
+  process is single-threaded); requests are routed to an idle REPL; an LRU cache
+  keyed on the file's *header* (its `import` lines) keeps warmed workers so
+  `import Mathlib` is paid once. Knobs: `LEAN_SERVER_MAX_REPLS` (default CPUs-1),
+  `LEAN_SERVER_MAX_REPL_MEM` (8G per REPL), `LEAN_SERVER_MAX_REPL_USES` (recycle
+  after N uses), `LEAN_SERVER_MAX_WAIT` (60s queue wait), `LEAN_SERVER_INIT_REPLS`
+  (pre-warm), optional API key. Runs commands with `gc: true` to drop
+  environments and avoid OOM.
+- Their benchmark (9,419 proofs, 72-vCPU box): 8 cores 42:40, 32 cores 11:33,
+  64 cores 7:56 (0.051 s/proof); import caching alone is a 1.94x speedup.
+- **What we have:** the single-worker version of this (one warm REPL, recycled
+  after 100 commands, killed on timeout). Same design, no pool.
+
+### 2. What companies run (Axiom's AXLE, Harmonic, ByteDance)
+- **AXLE** (Axiom Math; cloud service, >500M requests served, behind their
+  12/12 Putnam 2025 result): each request runs in its own sandboxed process
+  (no network, no filesystem writes; a crash or runaway can't affect other
+  requests); per-API-key fair-share queueing; elastic scaling up for training
+  runs and down when idle; several Lean/Mathlib versions behind one endpoint;
+  per-request wall-clock timeouts with automatic retry on infrastructure
+  failures. Isolation costs ~0.3 s/request versus a shared REPL.
+- Workloads they describe: RL training (thousands of candidate proofs per step,
+  sub-second checks), agentic proving (decompose → solve → merge loops, dozens
+  of checker calls per attempt), dataset curation (millions of requests).
+- **Aristotle (Harmonic)** and **Seed-Prover (ByteDance)**: same loop — generate,
+  compile in Lean, feed the compiler's feedback back, refine; Aristotle's IMO
+  2025 solutions were all machine-verified in Lean, no human checking.
+
+### 3. "It compiles" is not "it's verified"
+- AXLE's `verify_proof` exists because plain compilation happily accepts `sorry`,
+  custom axioms, and a theorem restated with a weaker type. It rejects `sorry`,
+  any axiom outside the standard three (`propext`, `Quot.sound`,
+  `Classical.choice`), and signature mismatches against the target statement.
+- Trade-off they document: this trusts the elaborator's declarations rather than
+  replaying everything through the kernel — ~100x faster than Comparator
+  (0.43 vs 0.026 req/s) and ~4x faster than SafeVerify (0.107 req/s), but open to
+  kernel-bypass via metaprogramming. Fine for cooperating AI clients, not for
+  adversarial input.
+- **What we have:** a denylist (`#eval`, IO, `axiom`, `elab`, ...), `sorry`
+  reported as incomplete. **Missing:** an axiom whitelist check (`#print axioms`)
+  and a statement/signature check.
+
+### 4. Mass *evaluation* harnesses (how they measure a prover across a benchmark)
+- `MechMath/lean-eval-toolkit`: N independent attempts per problem
+  (`--attempts`), a concurrency flag, pass@k (direct = first round only, final =
+  any round), repair rounds and truncation retries, dataset splits. Never runs
+  Lean locally — forwards every candidate to a strict verifier. Output per run:
+  `run.json` (settings), `results.jsonl` (one row per trajectory: rounds,
+  extraction strategy, verifier detail, token usage), `summary.json` (pass
+  rates, success-by-round, latency).
+- Benchmarks in use: miniF2F, PutnamBench, SorryDB (real in-the-wild `sorry`s),
+  FormalProofBench (graduate-level), MathArena's arXiv-Lean track.
+
+### 5. The unsolved problem: statement faithfulness
+- A miniF2F-Lean audit found the formal statement disagreeing with the informal
+  problem in **over half of 488 problems** (16 unprovable, 40 simplified, 45
+  excessively simplified), and LLM judges rated translation quality **97%
+  correct where human experts said 66%**. Correcting the statements moved prover
+  accuracy by up to 13 points.
+- Implication: an LLM cannot be the referee of "does this Lean theorem say what
+  the user claimed". Every "verified" in a mass run inherits this error rate
+  unless a human or a stronger independent check reviews the statements.
+
+### 6. Non-formal quantitative checking at scale
+- **Math-Verify** (Hugging Face): parses LaTeX/plain answers, normalizes them to
+  SymPy, and checks symbolic equivalence plus numeric tolerance; the common
+  reward function in RL-on-math pipelines. Same job as our mathjs claim
+  verifier, much more robust on LaTeX; Python-only.
+
+### What this implies for our design
+1. **Pool, not a single worker.** Size to cores, bounded by memory: in our
+   Docker VM (8 GB) a warm REPL is ~2.7 GB, so 2 workers max locally; Kimina's
+   per-REPL cap (8G) shows real deployments budget far more.
+2. **Never pay a reload on the request path.** Today a timeout kills the worker
+   and the next request waits ~60 s for `import Mathlib`. Keep a spare warm
+   worker to swap in (Kimina's pre-warm / AXLE's per-request isolation).
+3. **Batch + queue API, not one-click.** Accept a list of claims, N attempts
+   each, run through a bounded queue, persist every trajectory (claim, Lean
+   code, verifier output, timings) as `results.jsonl`-style records, report
+   pass@k.
+4. **Strict verification** before we call anything "verified": axiom whitelist
+   and signature match, not just "no errors".
+5. **Faithfulness is a first-class field**, not a footnote: store the generated
+   statement next to the claim, sample for human review, never let an LLM judge
+   be the only signal.
+6. **Separate "prove" from "measure".** Proving a user's claims and benchmarking
+   our own pipeline (miniF2F/PutnamBench subsets) are different products with
+   different needs; decide which "mass experiment" means before building.
+
 ## Sources consulted
 - [Discover and Prove: An Open-source Agentic Framework for Hard Mode Automated Theorem Proving in Lean 4](https://arxiv.org/pdf/2604.15839)
 - [SorryDB: Can AI Provers Complete Real-World Lean Theorems?](https://arxiv.org/pdf/2603.02668)
@@ -179,3 +276,10 @@ the full pipeline above on day one.
 - [Automatic Textbook Formalization (AutoformBot)](https://arxiv.org/pdf/2604.03071)
 - [Evaluating the Robustness of Proof Autoformalization in Lean 4](https://arxiv.org/pdf/2606.14867)
 - [Formalizing Mathematics at Scale](https://arxiv.org/html/2605.29955v1)
+- [Kimina Lean Server (paper)](https://arxiv.org/html/2504.21230v3) and [repo](https://github.com/project-numina/kimina-lean-server)
+- [AXLE: A Cloud Infrastructure for Lean 4 Theorem Proving Utilities](https://arxiv.org/html/2606.26442v1)
+- [Aristotle: IMO-level Automated Theorem Proving (Harmonic)](https://arxiv.org/pdf/2510.01346)
+- [lean-eval-toolkit](https://github.com/MechMath/lean-eval-toolkit)
+- [miniF2F-Lean Revisited: Reviewing Limitations and Charting a Path Forward](https://arxiv.org/html/2511.03108v1)
+- [Math-Verify (Hugging Face)](https://github.com/huggingface/Math-Verify)
+- [PutnamBench](https://arxiv.org/pdf/2407.11214), [FormalProofBench](https://arxiv.org/html/2603.26996v1), [SorryDB](https://arxiv.org/pdf/2603.02668)

@@ -63,6 +63,43 @@ function saveEntries(key: string, entries: ClaimEntry[]) {
   } catch {}
 }
 
+type FetchOutcome<T> = { ok: true; data: T } | { ok: false; message: string };
+
+/**
+ * fetch + JSON parsing with a distinct message per failure mode, instead of
+ * one generic "could not reach the service" catch-all that fires equally for
+ * "server isn't running", "server crashed mid-response", and "request
+ * succeeded but returned something unexpected".
+ */
+async function postJson<T>(url: string, body: unknown): Promise<FetchOutcome<T>> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, message: "Could not reach the server — is the dev server running?" };
+  }
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return {
+      ok: false,
+      message: `Server returned an unreadable response (HTTP ${res.status}) — check the server logs.`,
+    };
+  }
+  if (!res.ok) {
+    const message =
+      (typeof data === "object" && data && "error" in data && String((data as { error: unknown }).error)) ||
+      `Request failed (HTTP ${res.status})`;
+    return { ok: false, message };
+  }
+  return { ok: true, data: data as T };
+}
+
 function newId(): string {
   try {
     return crypto.randomUUID();
@@ -106,90 +143,70 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     if (!claim) return;
     setFormalizingNew(true);
     setError("");
-    try {
-      const res = await fetch(`/api/jobs/${jobId}/experiments/formalize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ claim }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? `Formalization failed (${res.status})`);
-        return;
-      }
-      const id = newId();
-      const now = Date.now();
-      const entry: ClaimEntry = {
-        id,
-        domain: "math",
-        claim,
-        leanCode: data.leanCode,
-        status: "ready",
-        reviewed: false,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setEntries((prev) => [entry, ...prev]);
-      setActiveId(id);
-      setNewClaim("");
-    } catch {
-      setError("Could not reach the formalization service.");
-    } finally {
+    const outcome = await postJson<{ leanCode: string }>(
+      `/api/jobs/${jobId}/experiments/formalize`,
+      { claim }
+    );
+    if (!outcome.ok) {
+      setError(outcome.message);
       setFormalizingNew(false);
+      return;
     }
+    const id = newId();
+    const now = Date.now();
+    const entry: ClaimEntry = {
+      id,
+      domain: "math",
+      claim,
+      leanCode: outcome.data.leanCode,
+      status: "ready",
+      reviewed: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setEntries((prev) => [entry, ...prev]);
+    setActiveId(id);
+    setNewClaim("");
+    setFormalizingNew(false);
   }
 
   async function handleVerify(entry: ClaimEntry) {
     updateEntry(entry.id, { status: "verifying" });
-    try {
-      const res = await fetch(`/api/jobs/${jobId}/experiments/prove`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leanCode: entry.leanCode }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        updateEntry(entry.id, { status: "error", note: data.error ?? `Verification failed (${res.status})` });
-        return;
-      }
-      updateEntry(entry.id, {
-        status: data.status,
-        hasSorry: data.hasSorry,
-        diagnostics: data.diagnostics,
-        note: data.note,
-      });
-    } catch {
-      updateEntry(entry.id, { status: "error", note: "Could not reach the verification service." });
+    const outcome = await postJson<{
+      status: ClaimStatus;
+      hasSorry?: boolean;
+      diagnostics?: string;
+      note?: string;
+    }>(`/api/jobs/${jobId}/experiments/prove`, { leanCode: entry.leanCode });
+    if (!outcome.ok) {
+      updateEntry(entry.id, { status: "error", note: outcome.message });
+      return;
     }
+    updateEntry(entry.id, {
+      status: outcome.data.status,
+      hasSorry: outcome.data.hasSorry,
+      diagnostics: outcome.data.diagnostics,
+      note: outcome.data.note,
+    });
   }
 
   async function handleAskAIToFix(entry: ClaimEntry) {
     updateEntry(entry.id, { status: "formalizing" });
-    try {
-      const res = await fetch(`/api/jobs/${jobId}/experiments/formalize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          claim: entry.claim,
-          priorLeanCode: entry.leanCode,
-          priorDiagnostics: entry.diagnostics,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        updateEntry(entry.id, { status: "error", note: data.error ?? "Could not get a fix" });
-        return;
-      }
-      updateEntry(entry.id, {
-        leanCode: data.leanCode,
-        status: "ready",
-        reviewed: false,
-        diagnostics: undefined,
-        note: "AI suggested a fix — review the updated Lean code, then verify again.",
-      });
-    } catch {
-      updateEntry(entry.id, { status: "error", note: "Could not reach the formalization service." });
+    const outcome = await postJson<{ leanCode: string }>(
+      `/api/jobs/${jobId}/experiments/formalize`,
+      { claim: entry.claim, priorLeanCode: entry.leanCode, priorDiagnostics: entry.diagnostics }
+    );
+    if (!outcome.ok) {
+      updateEntry(entry.id, { status: "error", note: outcome.message });
+      return;
     }
+    updateEntry(entry.id, {
+      leanCode: outcome.data.leanCode,
+      status: "ready",
+      reviewed: false,
+      diagnostics: undefined,
+      note: "AI suggested a fix — review the updated Lean code, then verify again.",
+    });
   }
 
   function handleEditLeanCode(entry: ClaimEntry, leanCode: string) {
@@ -349,6 +366,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
                   <button
                     onClick={() => handleVerify(active)}
                     disabled={active.status === "verifying" || active.status === "formalizing"}
+                    title="Runs the Lean code above through a real Lean 4 + Mathlib checker — it confirms this exact statement compiles, not that the statement matches your claim."
                     className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
                     style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
                   >

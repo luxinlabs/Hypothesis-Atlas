@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MathText from "./MathText";
 import {
   EXPERIMENT_DOMAINS,
@@ -28,16 +28,18 @@ const EXAMPLE_CLAIMS: Record<ExperimentDomain, { label: string; value: string }[
   ],
   physics: [
     { label: "Free fall", value: "9.8 m/s^2 * 2 s = 19.6 m/s" },
-    { label: "Kinetic energy", value: "0.5 * 2 kg * (3 m/s)^2 = 9 J" },
+    { label: "Orbital velocity", value: "sqrt(6.674e-11 m^3/(kg s^2) * 5.972e24 kg / (7000 km)) = 7545.78 m/s" },
   ],
   chemistry: [
     { label: "Molarity", value: "Dissolving 0.5 mol NaCl in 2 L of water gives a 0.25 mol/L solution." },
+    { label: "Stoichiometry", value: "Reacting 2 mol of H2 with 1 mol of O2 produces 2 mol of water, a yield of 36.03 g." },
   ],
   biology: [
     { label: "Dilution series", value: "A 1:10 serial dilution repeated 3 times from a 10^6 cells/mL stock gives 10^3 cells/mL." },
   ],
   drug_discovery: [
     { label: "Dose conversion", value: "A 70 kg patient dosed at 5 mg/kg receives 350 mg total." },
+    { label: "Half-life", value: "A drug with clearance CL = 5 L/h and volume of distribution Vd = 50 L has elimination half-life t1/2 = 0.693 * Vd / CL = 6.93 hours." },
   ],
 };
 
@@ -102,6 +104,32 @@ async function requestJson<T>(url: string, method: string, body?: unknown): Prom
   return { ok: true, data: data as T };
 }
 
+/** One-line result summary shown on the collapsed response bubble, before it's expanded into the full workspace. */
+function summaryLine(entry: ExperimentRecord): string {
+  if (entry.domain === "math") {
+    const r = entry.result as MathResult | null;
+    if (r?.hasSorry) return "Contains sorry — type-checks but incomplete";
+    if (r?.note) return r.note;
+    return STATUS_LABEL[entry.status];
+  }
+  if (entry.domain === "physics") {
+    const r = entry.result as PhysicsResult | null;
+    if (!r) return STATUS_LABEL[entry.status];
+    const parts: string[] = [];
+    if (r.unitsOk !== null) parts.push(`units ${r.unitsOk ? "consistent" : "mismatch"}`);
+    if (r.numericOk !== null) parts.push(`numeric ${r.numericOk ? "matches" : "mismatch"}`);
+    return parts.length > 0 ? parts.join(" · ") : STATUS_LABEL[entry.status];
+  }
+  const r = entry.result as ProtocolResult | null;
+  if (!r) return STATUS_LABEL[entry.status];
+  const checked = r.numericChecks.filter((c) => c.ok !== null).length;
+  const failed = r.numericChecks.filter((c) => c.ok === false).length;
+  const parts: string[] = [];
+  if (checked > 0) parts.push(`${checked - failed}/${checked} checks passed`);
+  if (r.flags.length > 0) parts.push(`${r.flags.length} flag${r.flags.length > 1 ? "s" : ""}`);
+  return parts.length > 0 ? parts.join(" · ") : STATUS_LABEL[entry.status];
+}
+
 export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const [domain, setDomain] = useState<ExperimentDomain>("math");
   const [experiments, setExperiments] = useState<ExperimentRecord[]>([]);
@@ -111,6 +139,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const [error, setError] = useState("");
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const feedEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,7 +153,10 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     };
   }, [jobId]);
 
-  const domainEntries = experiments.filter((e) => e.domain === domain);
+  // Feed reads oldest-first, newest at the bottom — a conversation, not an
+  // inbox. The API returns newest-first (for the old list-style UI this
+  // replaced), so reverse it here rather than changing the API's contract.
+  const domainEntries = experiments.filter((e) => e.domain === domain).slice().reverse();
   const active = experiments.find((e) => e.id === activeId) ?? null;
   const linkedSessions = active?.groupId
     ? experiments.filter((e) => e.groupId === active.groupId && e.id !== active.id)
@@ -132,6 +164,10 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const linkable = experiments.filter(
     (e) => e.id !== active?.id && (!active?.groupId || e.groupId !== active.groupId)
   );
+
+  useEffect(() => {
+    feedEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [domainEntries.length, domain]);
 
   // Background-only context for LLM steps (autoformalize, physics
   // extraction, protocol review) — the linked sessions' own claims/results
@@ -152,11 +188,6 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       next[idx] = record;
       return next;
     });
-  }
-
-  function removeLocal(id: string) {
-    setExperiments((prev) => prev.filter((e) => e.id !== id));
-    if (activeId === id) setActiveId(null);
   }
 
   async function handleCreate() {
@@ -209,6 +240,13 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     setNewClaim("");
     setCreating(false);
     await handleVerify(created.data.experiment);
+  }
+
+  function handleComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleCreate();
+    }
   }
 
   async function handleVerify(entry: ExperimentRecord) {
@@ -311,7 +349,8 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   }
 
   async function handleDelete(id: string) {
-    removeLocal(id);
+    setExperiments((prev) => prev.filter((e) => e.id !== id));
+    if (activeId === id) setActiveId(null);
     await requestJson(`/api/jobs/${jobId}/experiments/${id}`, "DELETE");
   }
 
@@ -341,13 +380,13 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[680px]">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 flex-shrink-0">
         <span className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0" />
         <span className="text-sm font-semibold text-gray-700">Claim Notebook</span>
       </div>
 
-      <div className="px-4 pt-3 flex flex-wrap gap-1.5">
+      <div className="px-4 pt-3 pb-1 flex flex-wrap gap-1.5 flex-shrink-0">
         {EXPERIMENT_DOMAINS.map((d) => (
           <button
             key={d.id}
@@ -361,95 +400,72 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
         ))}
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:h-[560px]">
-        {/* Left: compose + notebook history for the active domain */}
-        <div className="w-full lg:w-64 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-100 flex flex-col">
-          <div className="p-3 space-y-2 border-b border-gray-100">
-            <textarea
-              value={newClaim}
-              onChange={(e) => setNewClaim(e.target.value)}
-              placeholder="State a claim in LaTeX or plain English…"
-              rows={3}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none"
-            />
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {EXAMPLE_CLAIMS[domain].map((example) => (
-                <button
-                  key={example.label}
-                  onClick={() => setNewClaim(example.value)}
-                  className="text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full"
-                >
-                  {example.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={handleCreate}
-              disabled={!newClaim.trim() || creating}
-              className="w-full py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
-            >
-              {creating ? "Working…" : domain === "math" ? "Formalize claim" : "Check claim"}
-            </button>
-            {error && <p className="text-[11px] text-red-500">{error}</p>}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+      <div className="flex-1 flex min-h-0">
+        {/* Left: chat-style feed + bottom composer for the active domain */}
+        <div className="flex-1 min-w-0 flex flex-col border-r border-gray-100">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {loaded && domainEntries.length === 0 && (
-              <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
+              <div className="h-full flex items-center justify-center text-center text-xs text-gray-400 px-8">
                 {domain === "math"
-                  ? "Formalized claims appear here. Nothing runs through Lean until you review the code and click Verify."
-                  : "Checked claims appear here."}
-              </p>
+                  ? "Formalize a claim below, then review and verify it — the formal statement is shown before anything runs through Lean, since an LLM's translation can silently change what's actually being proved."
+                  : "State a claim below to check it."}
+              </div>
             )}
             {domainEntries.map((entry) => (
-              <button
+              <FeedItem
                 key={entry.id}
-                onClick={() => setActiveId(entry.id)}
-                className={`w-full text-left rounded-lg px-2.5 py-2 border transition-colors ${
-                  activeId === entry.id ? "border-indigo-300 bg-indigo-50" : "border-transparent hover:bg-gray-50"
-                }`}
-              >
-                <p className="text-[11px] text-gray-700 leading-snug line-clamp-2">{entry.claim}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
-                    {entry.domain === "math" && (entry.result as MathResult | null)?.hasSorry
-                      ? "Contains sorry"
-                      : STATUS_LABEL[entry.status]}
-                  </span>
-                  {entry.groupId && (
-                    <span className="text-[10px] text-gray-400" title="Linked to other sessions">
-                      🔗
-                    </span>
-                  )}
-                </div>
-              </button>
+                entry={entry}
+                expanded={activeId === entry.id}
+                onToggle={() => setActiveId(activeId === entry.id ? null : entry.id)}
+                onVerify={handleVerify}
+                onAskAIToFix={handleAskAIToFix}
+                onEditLeanCode={handleEditLeanCode}
+                onDelete={handleDelete}
+              />
             ))}
+            <div ref={feedEndRef} />
           </div>
-        </div>
 
-        {/* Middle: workspace for the active claim */}
-        <div className="flex-1 min-w-0 overflow-y-auto p-4 space-y-3">
-          {!active ? (
-            <div className="h-full flex items-center justify-center text-center text-xs text-gray-400 px-8">
-              {domain === "math"
-                ? "Formalize a claim on the left, then review and verify it here — the formal statement is shown before anything runs through Lean, since an LLM's translation can silently change what's actually being proved."
-                : "State a claim on the left to check it."}
+          {/* Bottom composer — larger, chat-style input bar */}
+          <div className="border-t border-gray-100 bg-gray-50/60 p-3 flex-shrink-0">
+            {EXAMPLE_CLAIMS[domain].length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                {EXAMPLE_CLAIMS[domain].map((example) => (
+                  <button
+                    key={example.label}
+                    onClick={() => setNewClaim(example.value)}
+                    className="text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full"
+                  >
+                    {example.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <textarea
+                value={newClaim}
+                onChange={(e) => setNewClaim(e.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder="State a claim in LaTeX or plain English… (Enter to send, Shift+Enter for a new line)"
+                rows={3}
+                className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none min-h-[72px] max-h-48"
+              />
+              <button
+                onClick={handleCreate}
+                disabled={!newClaim.trim() || creating}
+                className="h-[72px] px-5 rounded-2xl text-sm font-semibold text-white transition-colors disabled:opacity-40 flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
+              >
+                {creating ? "…" : domain === "math" ? "Formalize" : "Check"}
+              </button>
             </div>
-          ) : (
-            <ActiveExperiment
-              entry={active}
-              onVerify={handleVerify}
-              onAskAIToFix={handleAskAIToFix}
-              onEditLeanCode={handleEditLeanCode}
-              onDelete={handleDelete}
-            />
-          )}
+            {error && <p className="text-[11px] text-red-500 mt-1.5">{error}</p>}
+          </div>
         </div>
 
         {/* Right: linked sessions sidebar */}
-        <div className="w-full lg:w-56 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-gray-100 flex flex-col">
-          <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
+        <div className="w-full lg:w-56 flex-shrink-0 flex flex-col">
+          <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
             <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Linked sessions</span>
             {active && (
               <button
@@ -508,14 +524,25 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   );
 }
 
-function ActiveExperiment({
+/**
+ * One claim in the feed, rendered as a two-bubble exchange like a chat turn:
+ * the claim itself (what the user stated) followed by the verifier's
+ * response. Collapsed by default to a one-line summary; expanding it swaps
+ * in the full domain workspace (editable Lean code, physics breakdown, or
+ * protocol review) in place.
+ */
+function FeedItem({
   entry,
+  expanded,
+  onToggle,
   onVerify,
   onAskAIToFix,
   onEditLeanCode,
   onDelete,
 }: {
   entry: ExperimentRecord;
+  expanded: boolean;
+  onToggle: () => void;
   onVerify: (e: ExperimentRecord) => void;
   onAskAIToFix: (e: ExperimentRecord) => void;
   onEditLeanCode: (e: ExperimentRecord, leanCode: string) => void;
@@ -524,38 +551,67 @@ function ActiveExperiment({
   const busy = entry.status === "verifying" || entry.status === "formalizing";
 
   return (
-    <>
-      <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Claim</p>
-        <MathText text={entry.claim} className="text-xs text-gray-700" />
+    <div className="space-y-1.5">
+      {/* Claim bubble */}
+      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2.5">
+        <MathText text={entry.claim} className="text-sm text-gray-800" />
       </div>
 
-      {entry.domain === "math" && <MathWorkspace entry={entry} onVerify={onVerify} onAskAIToFix={onAskAIToFix} onEditLeanCode={onEditLeanCode} />}
-      {entry.domain === "physics" && <PhysicsWorkspace entry={entry} onVerify={onVerify} />}
-      {(entry.domain === "chemistry" || entry.domain === "biology" || entry.domain === "drug_discovery") && (
-        <ProtocolWorkspace entry={entry} onVerify={onVerify} />
-      )}
-
-      <div className="flex items-center gap-2">
-        {entry.domain !== "math" && (
-          <button
-            onClick={() => onVerify(entry)}
-            disabled={busy}
-            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
-          >
-            {busy ? "Checking…" : "Re-check"}
-          </button>
-        )}
+      {/* Response bubble */}
+      <div className="max-w-[92%] ml-2">
         <button
-          onClick={() => onDelete(entry.id)}
-          className="py-2 px-3 rounded-xl text-sm font-medium text-gray-400 hover:text-red-500 transition-colors"
-          title="Remove from notebook"
+          onClick={onToggle}
+          className={`w-full text-left rounded-2xl rounded-tl-sm px-4 py-2.5 transition-colors ${
+            expanded ? "bg-indigo-50" : "bg-indigo-50/60 hover:bg-indigo-50"
+          }`}
         >
-          Delete
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
+              {STATUS_LABEL[entry.status]}
+            </span>
+            {entry.groupId && (
+              <span className="text-[10px] text-gray-400" title="Linked to other sessions">
+                🔗
+              </span>
+            )}
+            <span className="text-xs text-gray-600 truncate">{summaryLine(entry)}</span>
+            <span className="ml-auto text-[10px] text-indigo-400">{expanded ? "hide details ▲" : "details ▼"}</span>
+          </div>
         </button>
+
+        {expanded && (
+          <div className="mt-2 rounded-xl border border-indigo-100 bg-white p-3 space-y-3">
+            {entry.domain === "math" && (
+              <MathWorkspace entry={entry} onVerify={onVerify} onAskAIToFix={onAskAIToFix} onEditLeanCode={onEditLeanCode} />
+            )}
+            {entry.domain === "physics" && <PhysicsWorkspace entry={entry} />}
+            {(entry.domain === "chemistry" || entry.domain === "biology" || entry.domain === "drug_discovery") && (
+              <ProtocolWorkspace entry={entry} />
+            )}
+
+            <div className="flex items-center gap-2">
+              {entry.domain !== "math" && (
+                <button
+                  onClick={() => onVerify(entry)}
+                  disabled={busy}
+                  className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
+                >
+                  {busy ? "Checking…" : "Re-check"}
+                </button>
+              )}
+              <button
+                onClick={() => onDelete(entry.id)}
+                className="py-2 px-3 rounded-xl text-sm font-medium text-gray-400 hover:text-red-500 transition-colors"
+                title="Remove from notebook"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -626,7 +682,7 @@ function MathWorkspace({
   );
 }
 
-function PhysicsWorkspace({ entry }: { entry: ExperimentRecord; onVerify: (e: ExperimentRecord) => void }) {
+function PhysicsWorkspace({ entry }: { entry: ExperimentRecord }) {
   const result = entry.result as PhysicsResult | null;
   return (
     <div className="space-y-2">
@@ -657,6 +713,7 @@ function PhysicsWorkspace({ entry }: { entry: ExperimentRecord; onVerify: (e: Ex
               </>
             )}
           </p>
+          {result.computed !== null && <p>computed: {result.computed}</p>}
           {result.unitError && <p className="text-red-500">{result.unitError}</p>}
           {result.note && <p className="text-gray-400 italic">{result.note}</p>}
         </div>
@@ -665,7 +722,7 @@ function PhysicsWorkspace({ entry }: { entry: ExperimentRecord; onVerify: (e: Ex
   );
 }
 
-function ProtocolWorkspace({ entry }: { entry: ExperimentRecord; onVerify: (e: ExperimentRecord) => void }) {
+function ProtocolWorkspace({ entry }: { entry: ExperimentRecord }) {
   const result = entry.result as ProtocolResult | null;
   return (
     <div className="space-y-2">

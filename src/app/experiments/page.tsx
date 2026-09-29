@@ -5,13 +5,14 @@ import ProveClaimPanel from "@/components/ProveClaimPanel";
 
 /**
  * Standalone Experiments session. Not gated behind a research job's paper
- * pipeline — the prove route only uses the job id as a rate-limit key (see
- * src/app/api/jobs/[id]/experiments/prove/route.ts), so this page uses a
- * fixed session id and works on its own.
+ * pipeline — Experiment rows carry jobId only as provenance, not an
+ * enforced foreign key (see the schema comment on Experiment.jobId), so
+ * this page uses a fixed session id and works on its own.
  *
- * Mathematics is the first domain (Lean 4 proof verification, via
- * ProveClaimPanel's own domain selector); physics/biology/chemistry are
- * scaffolded there as "coming soon" — see V3-EXPERIMENTS-PLAN.md.
+ * Five domains, each with its own verification backend behind one shared
+ * notebook/linking UI (ProveClaimPanel): math (Lean 4 proof), physics
+ * (dimensional analysis + numeric check), chemistry/biology/drug_discovery
+ * (protocol review + dose/reagent math) — see V3-EXPERIMENTS-PLAN.md.
  */
 export default function ExperimentsPage() {
   return (
@@ -59,11 +60,11 @@ export default function ExperimentsPage() {
         <ProveClaimPanel jobId="experiments-session" />
 
         <p className="text-xs text-gray-400 mt-6 leading-relaxed">
-          Physics, biology, and chemistry experiment domains are scaffolded but not built yet —
-          see <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">V3-EXPERIMENTS-PLAN.md</code>{" "}
-          in the repo. Without <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">LEAN_SERVICE_URL</code>{" "}
-          configured, math claims are autoformalized to Lean 4 but shown as unverified — a real
-          Lean checker isn't wired up in this environment yet.
+          See <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">V3-EXPERIMENTS-PLAN.md</code> in the
+          repo for how each domain is verified. Without{" "}
+          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">LEAN_SERVICE_URL</code> configured, math
+          claims are autoformalized to Lean 4 but shown as unverified — a real Lean checker isn&rsquo;t wired
+          up in this environment yet.
         </p>
       </div>
     </main>

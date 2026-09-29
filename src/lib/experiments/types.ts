@@ -1,7 +1,8 @@
-// Shared types for the V3 "Experiments" module. Math is the first domain
-// (formal proof verification via Lean 4); physics/chemistry/biology/
-// drug_discovery plug into the same shell with domain-specific verification
-// backends as each one is built (see V3-EXPERIMENTS-PLAN.md, Phase 3).
+// Shared types for the V3 "Experiments" module. Math was the first domain
+// (formal proof verification via Lean 4); physics (dimensional analysis +
+// numeric check) and chemistry/biology/drug_discovery (protocol review +
+// dose/reagent math) plug into the same shell with their own verification
+// backends (see V3-EXPERIMENTS-PLAN.md, Phase 3).
 //
 // Sessions are persisted server-side as `Experiment` rows (see
 // prisma/schema.prisma) rather than in localStorage, so they can be linked
@@ -16,9 +17,9 @@ export const EXPERIMENT_DOMAINS: {
 }[] = [
   { id: "math", label: "Mathematics", available: true },
   { id: "physics", label: "Physics", available: true },
-  { id: "chemistry", label: "Chemistry", available: false },
-  { id: "biology", label: "Biology", available: false },
-  { id: "drug_discovery", label: "Drug Discovery", available: false },
+  { id: "chemistry", label: "Chemistry", available: true },
+  { id: "biology", label: "Biology", available: true },
+  { id: "drug_discovery", label: "Drug Discovery", available: true },
 ];
 
 export type ProofVerdict = "verified" | "failed" | "incomplete" | "error";

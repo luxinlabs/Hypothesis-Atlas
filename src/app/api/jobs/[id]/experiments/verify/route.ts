@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { groq } from '@/lib/groq'
 import { create, all } from 'mathjs'
+import { toAsciiMath, closeEnough } from '@/lib/experiments/numeric'
 
 const math = create(all)
 
@@ -22,24 +23,6 @@ interface ClaimResult {
   computed: number | null
   ok: boolean | null
   note?: string
-}
-
-function toAsciiMath(expr: string): string {
-  // mathjs accepts ^ for power; strip LaTeX-isms that slip through
-  return expr
-    .replace(/\\times|\\cdot|\\ast/g, '*')
-    .replace(/\\div/g, '/')
-    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '($1)/($2)')
-    .replace(/\\sqrt\{([^}]*)\}/g, 'sqrt($1)')
-    .replace(/\\sqrt(\d)/g, 'sqrt($1)')
-    .replace(/\\left|\\right|\\,/g, '')
-    .replace(/\^\{([^}]*)\}/g, '^($1)')
-    .trim()
-}
-
-function closeEnough(a: number, b: number): boolean {
-  const scale = Math.max(1, Math.abs(a), Math.abs(b))
-  return Math.abs(a - b) <= 1e-6 * scale
 }
 
 async function extractClaims(transcript: string): Promise<RawClaim[]> {

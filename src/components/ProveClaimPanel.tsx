@@ -9,6 +9,7 @@ import {
   type ExperimentRecord,
   type MathResult,
   type PhysicsResult,
+  type ProtocolResult,
 } from "@/lib/experiments/types";
 
 interface ProveClaimPanelProps {
@@ -28,9 +29,15 @@ const EXAMPLE_CLAIMS: Record<ExperimentDomain, { label: string; value: string }[
     { label: "Free fall", value: "9.8 m/s^2 * 2 s = 19.6 m/s" },
     { label: "Kinetic energy", value: "0.5 * 2 kg * (3 m/s)^2 = 9 J" },
   ],
-  chemistry: [],
-  biology: [],
-  drug_discovery: [],
+  chemistry: [
+    { label: "Molarity", value: "Dissolving 0.5 mol NaCl in 2 L of water gives a 0.25 mol/L solution." },
+  ],
+  biology: [
+    { label: "Dilution series", value: "A 1:10 serial dilution repeated 3 times from a 10^6 cells/mL stock gives 10^3 cells/mL." },
+  ],
+  drug_discovery: [
+    { label: "Dose conversion", value: "A 70 kg patient dosed at 5 mg/kg receives 350 mg total." },
+  ],
 };
 
 const STATUS_STYLE: Record<ClaimStatus, string> = {
@@ -101,12 +108,9 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const [newClaim, setNewClaim] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
-  const [loaded, setLoaded] = useState(false);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  // Experiments are persisted server-side (see prisma Experiment model)
-  // rather than in localStorage, so a session survives across devices/tabs
-  // and can be linked to other sessions across domains.
   useEffect(() => {
     let cancelled = false;
     requestJson<{ experiments: ExperimentRecord[] }>(`/api/jobs/${jobId}/experiments`, "GET").then((outcome) => {
@@ -138,16 +142,9 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     });
   }
 
-  async function patchExperiment(
-    id: string,
-    patch: { status?: ClaimStatus; claim?: string; result?: unknown }
-  ): Promise<ExperimentRecord | null> {
-    const outcome = await requestJson<{ experiment: ExperimentRecord }>(
-      `/api/jobs/${jobId}/experiments/${id}`,
-      "PATCH",
-      patch
-    );
-    return outcome.ok ? outcome.data.experiment : null;
+  function removeLocal(id: string) {
+    setExperiments((prev) => prev.filter((e) => e.id !== id));
+    if (activeId === id) setActiveId(null);
   }
 
   async function handleCreate() {
@@ -182,8 +179,9 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       return;
     }
 
-    // physics: no separate review step before a checker runs — there's no
-    // formal statement to review, unlike math's Lean code.
+    // physics / chemistry / biology / drug_discovery: create a draft record
+    // immediately, then verify — unlike math there's no separate review step
+    // before a checker runs (no formal statement to review).
     const created = await requestJson<{ experiment: ExperimentRecord }>(`/api/jobs/${jobId}/experiments`, "POST", {
       domain,
       claim,
@@ -228,11 +226,28 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       return;
     }
 
-    // physics
-    const outcome = await requestJson<{ status: ClaimStatus; result: PhysicsResult }>(
-      `/api/jobs/${jobId}/experiments/verify-physics`,
+    if (entry.domain === "physics") {
+      const outcome = await requestJson<{ status: ClaimStatus; result: PhysicsResult }>(
+        `/api/jobs/${jobId}/experiments/verify-physics`,
+        "POST",
+        { claim: entry.claim }
+      );
+      if (!outcome.ok) {
+        const patched = await patchExperiment(entry.id, { status: "error" });
+        if (patched) upsert(patched);
+        setError(outcome.message);
+        return;
+      }
+      const patched = await patchExperiment(entry.id, { status: outcome.data.status, result: outcome.data.result });
+      if (patched) upsert(patched);
+      return;
+    }
+
+    // chemistry / biology / drug_discovery
+    const outcome = await requestJson<{ status: ClaimStatus; result: ProtocolResult }>(
+      `/api/jobs/${jobId}/experiments/verify-protocol`,
       "POST",
-      { claim: entry.claim }
+      { domain: entry.domain, claim: entry.claim }
     );
     if (!outcome.ok) {
       const patched = await patchExperiment(entry.id, { status: "error" });
@@ -242,6 +257,18 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     }
     const patched = await patchExperiment(entry.id, { status: outcome.data.status, result: outcome.data.result });
     if (patched) upsert(patched);
+  }
+
+  async function patchExperiment(
+    id: string,
+    patch: { status?: ClaimStatus; claim?: string; result?: unknown }
+  ): Promise<ExperimentRecord | null> {
+    const outcome = await requestJson<{ experiment: ExperimentRecord }>(
+      `/api/jobs/${jobId}/experiments/${id}`,
+      "PATCH",
+      patch
+    );
+    return outcome.ok ? outcome.data.experiment : null;
   }
 
   async function handleAskAIToFix(entry: ExperimentRecord) {
@@ -271,8 +298,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   }
 
   async function handleDelete(id: string) {
-    setExperiments((prev) => prev.filter((e) => e.id !== id));
-    if (activeId === id) setActiveId(null);
+    removeLocal(id);
     await requestJson(`/api/jobs/${jobId}/experiments/${id}`, "DELETE");
   }
 
@@ -301,8 +327,6 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     if (outcome.ok) upsert(outcome.data.experiment);
   }
 
-  const domainBuilt = domain === "math" || domain === "physics";
-
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
@@ -314,173 +338,159 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
         {EXPERIMENT_DOMAINS.map((d) => (
           <button
             key={d.id}
-            onClick={() => d.available && setDomain(d.id)}
-            disabled={!d.available}
-            title={d.available ? undefined : "Coming soon"}
+            onClick={() => setDomain(d.id)}
             className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors ${
-              domain === d.id
-                ? "bg-indigo-600 text-white"
-                : d.available
-                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  : "bg-gray-50 text-gray-300 cursor-not-allowed"
+              domain === d.id ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             {d.label}
-            {!d.available && " · soon"}
           </button>
         ))}
       </div>
 
-      {!domainBuilt ? (
-        <div className="px-4 py-6 text-xs text-gray-400 text-center">
-          {EXPERIMENT_DOMAINS.find((d) => d.id === domain)?.label} experiments are coming in a
-          future release — see V3-EXPERIMENTS-PLAN.md.
-        </div>
-      ) : (
-        <div className="flex flex-col lg:flex-row lg:h-[560px]">
-          {/* Left: compose + notebook history for the active domain */}
-          <div className="w-full lg:w-64 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-100 flex flex-col">
-            <div className="p-3 space-y-2 border-b border-gray-100">
-              <textarea
-                value={newClaim}
-                onChange={(e) => setNewClaim(e.target.value)}
-                placeholder="State a claim in LaTeX or plain English…"
-                rows={3}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none"
-              />
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {EXAMPLE_CLAIMS[domain].map((example) => (
-                  <button
-                    key={example.label}
-                    onClick={() => setNewClaim(example.value)}
-                    className="text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full"
-                  >
-                    {example.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={handleCreate}
-                disabled={!newClaim.trim() || creating}
-                className="w-full py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
-                style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
-              >
-                {creating ? "Working…" : domain === "math" ? "Formalize claim" : "Check claim"}
-              </button>
-              {error && <p className="text-[11px] text-red-500">{error}</p>}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-              {loaded && domainEntries.length === 0 && (
-                <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
-                  {domain === "math"
-                    ? "Formalized claims appear here. Nothing runs through Lean until you review the code and click Verify."
-                    : "Checked claims appear here."}
-                </p>
-              )}
-              {domainEntries.map((entry) => (
+      <div className="flex flex-col lg:flex-row lg:h-[560px]">
+        {/* Left: compose + notebook history for the active domain */}
+        <div className="w-full lg:w-64 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-100 flex flex-col">
+          <div className="p-3 space-y-2 border-b border-gray-100">
+            <textarea
+              value={newClaim}
+              onChange={(e) => setNewClaim(e.target.value)}
+              placeholder="State a claim in LaTeX or plain English…"
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none"
+            />
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {EXAMPLE_CLAIMS[domain].map((example) => (
                 <button
-                  key={entry.id}
-                  onClick={() => setActiveId(entry.id)}
-                  className={`w-full text-left rounded-lg px-2.5 py-2 border transition-colors ${
-                    activeId === entry.id ? "border-indigo-300 bg-indigo-50" : "border-transparent hover:bg-gray-50"
-                  }`}
+                  key={example.label}
+                  onClick={() => setNewClaim(example.value)}
+                  className="text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full"
                 >
-                  <p className="text-[11px] text-gray-700 leading-snug line-clamp-2">{entry.claim}</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
-                      {entry.domain === "math" && (entry.result as MathResult | null)?.hasSorry
-                        ? "Contains sorry"
-                        : STATUS_LABEL[entry.status]}
-                    </span>
-                    {entry.groupId && (
-                      <span className="text-[10px] text-gray-400" title="Linked to other sessions">
-                        🔗
-                      </span>
-                    )}
-                  </div>
+                  {example.label}
                 </button>
               ))}
             </div>
+            <button
+              onClick={handleCreate}
+              disabled={!newClaim.trim() || creating}
+              className="w-full py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
+              style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
+            >
+              {creating ? "Working…" : domain === "math" ? "Formalize claim" : "Check claim"}
+            </button>
+            {error && <p className="text-[11px] text-red-500">{error}</p>}
           </div>
 
-          {/* Middle: workspace for the active claim */}
-          <div className="flex-1 min-w-0 overflow-y-auto p-4 space-y-3">
-            {!active ? (
-              <div className="h-full flex items-center justify-center text-center text-xs text-gray-400 px-8">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+            {loaded && domainEntries.length === 0 && (
+              <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
                 {domain === "math"
-                  ? "Formalize a claim on the left, then review and verify it here — the formal statement is shown before anything runs through Lean, since an LLM's translation can silently change what's actually being proved."
-                  : "State a claim on the left to check it."}
-              </div>
-            ) : (
-              <ActiveExperiment
-                entry={active}
-                onVerify={handleVerify}
-                onAskAIToFix={handleAskAIToFix}
-                onEditLeanCode={handleEditLeanCode}
-                onDelete={handleDelete}
-              />
+                  ? "Formalized claims appear here. Nothing runs through Lean until you review the code and click Verify."
+                  : "Checked claims appear here."}
+              </p>
             )}
-          </div>
-
-          {/* Right: linked sessions sidebar */}
-          <div className="w-full lg:w-56 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-gray-100 flex flex-col">
-            <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Linked sessions</span>
-              {active && (
-                <button
-                  onClick={() => setLinkPickerOpen((v) => !v)}
-                  className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-700"
-                >
-                  + Link
-                </button>
-              )}
-            </div>
-
-            {!active ? (
-              <p className="text-[11px] text-gray-400 px-3 py-3">Select a session to see or add links.</p>
-            ) : linkPickerOpen ? (
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {linkable.length === 0 && <p className="text-[11px] text-gray-400 px-1 py-2">No other sessions to link yet.</p>}
-                {linkable.map((e) => (
-                  <button
-                    key={e.id}
-                    onClick={() => handleLink(e.id)}
-                    className="w-full text-left rounded-lg px-2 py-1.5 border border-transparent hover:bg-gray-50 hover:border-gray-200"
-                  >
-                    <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
-                    <span className="text-[10px] text-gray-400">{EXPERIMENT_DOMAINS.find((d) => d.id === e.domain)?.label}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                {linkedSessions.length === 0 && (
-                  <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
-                    Not linked to anything. Link this session to related claims to browse them together.
-                  </p>
-                )}
-                {linkedSessions.map((e) => (
-                  <div key={e.id} className="rounded-lg border border-gray-100 px-2 py-1.5">
-                    <button onClick={() => setActiveId(e.id)} className="w-full text-left">
-                      <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
-                      <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[e.status]}`}>
-                        {STATUS_LABEL[e.status]}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => handleUnlink(e.id)}
-                      className="text-[10px] text-gray-400 hover:text-red-500 mt-1"
-                    >
-                      Unlink
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            {domainEntries.map((entry) => (
+              <button
+                key={entry.id}
+                onClick={() => setActiveId(entry.id)}
+                className={`w-full text-left rounded-lg px-2.5 py-2 border transition-colors ${
+                  activeId === entry.id ? "border-indigo-300 bg-indigo-50" : "border-transparent hover:bg-gray-50"
+                }`}
+              >
+                <p className="text-[11px] text-gray-700 leading-snug line-clamp-2">{entry.claim}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
+                    {entry.domain === "math" && (entry.result as MathResult | null)?.hasSorry
+                      ? "Contains sorry"
+                      : STATUS_LABEL[entry.status]}
+                  </span>
+                  {entry.groupId && (
+                    <span className="text-[10px] text-gray-400" title="Linked to other sessions">
+                      🔗
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* Middle: workspace for the active claim */}
+        <div className="flex-1 min-w-0 overflow-y-auto p-4 space-y-3">
+          {!active ? (
+            <div className="h-full flex items-center justify-center text-center text-xs text-gray-400 px-8">
+              {domain === "math"
+                ? "Formalize a claim on the left, then review and verify it here — the formal statement is shown before anything runs through Lean, since an LLM's translation can silently change what's actually being proved."
+                : "State a claim on the left to check it."}
+            </div>
+          ) : (
+            <ActiveExperiment
+              entry={active}
+              onVerify={handleVerify}
+              onAskAIToFix={handleAskAIToFix}
+              onEditLeanCode={handleEditLeanCode}
+              onDelete={handleDelete}
+            />
+          )}
+        </div>
+
+        {/* Right: linked sessions sidebar */}
+        <div className="w-full lg:w-56 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-gray-100 flex flex-col">
+          <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Linked sessions</span>
+            {active && (
+              <button
+                onClick={() => setLinkPickerOpen((v) => !v)}
+                className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-700"
+              >
+                + Link
+              </button>
+            )}
+          </div>
+
+          {!active ? (
+            <p className="text-[11px] text-gray-400 px-3 py-3">Select a session to see or add links.</p>
+          ) : linkPickerOpen ? (
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {linkable.length === 0 && <p className="text-[11px] text-gray-400 px-1 py-2">No other sessions to link yet.</p>}
+              {linkable.map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => handleLink(e.id)}
+                  className="w-full text-left rounded-lg px-2 py-1.5 border border-transparent hover:bg-gray-50 hover:border-gray-200"
+                >
+                  <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
+                  <span className="text-[10px] text-gray-400">{EXPERIMENT_DOMAINS.find((d) => d.id === e.domain)?.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+              {linkedSessions.length === 0 && (
+                <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
+                  Not linked to anything. Link this session to related claims to browse them together.
+                </p>
+              )}
+              {linkedSessions.map((e) => (
+                <div key={e.id} className="rounded-lg border border-gray-100 px-2 py-1.5">
+                  <button onClick={() => setActiveId(e.id)} className="w-full text-left">
+                    <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
+                    <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[e.status]}`}>
+                      {STATUS_LABEL[e.status]}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleUnlink(e.id)}
+                    className="text-[10px] text-gray-400 hover:text-red-500 mt-1"
+                  >
+                    Unlink
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -508,7 +518,10 @@ function ActiveExperiment({
       </div>
 
       {entry.domain === "math" && <MathWorkspace entry={entry} onVerify={onVerify} onAskAIToFix={onAskAIToFix} onEditLeanCode={onEditLeanCode} />}
-      {entry.domain === "physics" && <PhysicsWorkspace entry={entry} />}
+      {entry.domain === "physics" && <PhysicsWorkspace entry={entry} onVerify={onVerify} />}
+      {(entry.domain === "chemistry" || entry.domain === "biology" || entry.domain === "drug_discovery") && (
+        <ProtocolWorkspace entry={entry} onVerify={onVerify} />
+      )}
 
       <div className="flex items-center gap-2">
         {entry.domain !== "math" && (
@@ -600,7 +613,7 @@ function MathWorkspace({
   );
 }
 
-function PhysicsWorkspace({ entry }: { entry: ExperimentRecord }) {
+function PhysicsWorkspace({ entry }: { entry: ExperimentRecord; onVerify: (e: ExperimentRecord) => void }) {
   const result = entry.result as PhysicsResult | null;
   return (
     <div className="space-y-2">
@@ -633,6 +646,70 @@ function PhysicsWorkspace({ entry }: { entry: ExperimentRecord }) {
           </p>
           {result.unitError && <p className="text-red-500">{result.unitError}</p>}
           {result.note && <p className="text-gray-400 italic">{result.note}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProtocolWorkspace({ entry }: { entry: ExperimentRecord; onVerify: (e: ExperimentRecord) => void }) {
+  const result = entry.result as ProtocolResult | null;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Protocol review</p>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
+          {STATUS_LABEL[entry.status]}
+        </span>
+      </div>
+      {!result ? (
+        <p className="text-[11px] text-gray-400">Not checked yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {result.numericChecks.length > 0 && (
+            <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 space-y-1.5">
+              {result.numericChecks.map((c, i) => (
+                <div key={i} className="text-[11px]">
+                  <span
+                    className={`inline-block w-3.5 h-3.5 rounded-full text-center text-[9px] font-bold text-white mr-1.5 ${
+                      c.ok === true ? "bg-emerald-500" : c.ok === false ? "bg-red-500" : "bg-amber-400"
+                    }`}
+                  >
+                    {c.ok === true ? "✓" : c.ok === false ? "✗" : "!"}
+                  </span>
+                  <span className="text-gray-700 font-medium">{c.label}</span>
+                  <span className="text-gray-400 font-mono ml-1">
+                    ({c.expression} = {c.expected}, computed {c.computed ?? "—"})
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {result.flags.length > 0 && (
+            <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 space-y-1.5">
+              {result.flags.map((f, i) => (
+                <div key={i} className="text-[11px]">
+                  <span
+                    className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full mr-1.5 ${
+                      f.severity === "high"
+                        ? "bg-red-500 text-white"
+                        : f.severity === "medium"
+                          ? "bg-amber-400 text-white"
+                          : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {f.severity}
+                  </span>
+                  <span className="text-gray-700 font-medium">{f.step}</span>
+                  <span className="text-gray-500 block pl-6">{f.reason}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {result.numericChecks.length === 0 && result.flags.length === 0 && (
+            <p className="text-[11px] text-gray-400">No checkable arithmetic or flagged steps found.</p>
+          )}
+          {result.note && <p className="text-[11px] text-gray-400 italic">{result.note}</p>}
         </div>
       )}
     </div>

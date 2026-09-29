@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/weekly-digest",

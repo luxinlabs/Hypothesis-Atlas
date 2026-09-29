@@ -15,7 +15,7 @@ export const EXPERIMENT_DOMAINS: {
   available: boolean;
 }[] = [
   { id: "math", label: "Mathematics", available: true },
-  { id: "physics", label: "Physics", available: false },
+  { id: "physics", label: "Physics", available: true },
   { id: "chemistry", label: "Chemistry", available: false },
   { id: "biology", label: "Biology", available: false },
   { id: "drug_discovery", label: "Drug Discovery", available: false },

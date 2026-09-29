@@ -92,19 +92,20 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
   // Experiments are persisted server-side (see prisma Experiment model)
   // rather than in localStorage, so a session survives across devices/tabs
-  // and can eventually be linked to other sessions.
+  // and can be linked to other sessions. Fetching every domain (not just
+  // math) here — even though only math has a workspace today — is what lets
+  // the linked-sessions sidebar show links across domains once they exist.
   useEffect(() => {
     let cancelled = false;
-    requestJson<{ experiments: ExperimentRecord[] }>(`/api/jobs/${jobId}/experiments?domain=math`, "GET").then(
-      (outcome) => {
-        if (cancelled) return;
-        if (outcome.ok) setExperiments(outcome.data.experiments);
-        setLoaded(true);
-      }
-    );
+    requestJson<{ experiments: ExperimentRecord[] }>(`/api/jobs/${jobId}/experiments`, "GET").then((outcome) => {
+      if (cancelled) return;
+      if (outcome.ok) setExperiments(outcome.data.experiments);
+      setLoaded(true);
+    });
     return () => {
       cancelled = true;
     };
@@ -112,6 +113,12 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
 
   const domainEntries = experiments.filter((e) => e.domain === "math");
   const active = domainEntries.find((e) => e.id === activeId) ?? null;
+  const linkedSessions = active?.groupId
+    ? experiments.filter((e) => e.groupId === active.groupId && e.id !== active.id)
+    : [];
+  const linkable = experiments.filter(
+    (e) => e.id !== active?.id && (!active?.groupId || e.groupId !== active.groupId)
+  );
 
   function upsert(record: ExperimentRecord) {
     setExperiments((prev) => {
@@ -225,6 +232,31 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     await requestJson(`/api/jobs/${jobId}/experiments/${id}`, "DELETE");
   }
 
+  async function handleLink(targetId: string) {
+    if (!active) return;
+    const outcome = await requestJson<{ experiments: ExperimentRecord[] }>(
+      `/api/jobs/${jobId}/experiments/${active.id}/link`,
+      "POST",
+      { targetId }
+    );
+    if (outcome.ok) {
+      setExperiments((prev) => {
+        const byId = new Map(prev.map((e) => [e.id, e]));
+        for (const e of outcome.data.experiments) byId.set(e.id, e);
+        return Array.from(byId.values());
+      });
+    }
+    setLinkPickerOpen(false);
+  }
+
+  async function handleUnlink(id: string) {
+    const outcome = await requestJson<{ experiment: ExperimentRecord }>(
+      `/api/jobs/${jobId}/experiments/${id}/link`,
+      "DELETE"
+    );
+    if (outcome.ok) upsert(outcome.data.experiment);
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
@@ -262,9 +294,9 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
           future release — see V3-EXPERIMENTS-PLAN.md.
         </div>
       ) : (
-        <div className="flex flex-col md:flex-row md:h-[560px]">
+        <div className="flex flex-col lg:flex-row lg:h-[560px]">
           {/* Left: compose + notebook history */}
-          <div className="w-full md:w-72 flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
+          <div className="w-full lg:w-64 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-100 flex flex-col">
             <div className="p-3 space-y-2 border-b border-gray-100">
               <textarea
                 value={newClaim}
@@ -313,11 +345,18 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
                   }`}
                 >
                   <p className="text-[11px] text-gray-700 leading-snug line-clamp-2">{entry.claim}</p>
-                  <span
-                    className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}
-                  >
-                    {(entry.result as MathResult | null)?.hasSorry ? "Contains sorry" : STATUS_LABEL[entry.status]}
-                  </span>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span
+                      className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}
+                    >
+                      {(entry.result as MathResult | null)?.hasSorry ? "Contains sorry" : STATUS_LABEL[entry.status]}
+                    </span>
+                    {entry.groupId && (
+                      <span className="text-[10px] text-gray-400" title="Linked to other sessions">
+                        🔗
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -401,6 +440,66 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
                   </pre>
                 )}
               </>
+            )}
+          </div>
+
+          {/* Right: linked sessions sidebar */}
+          <div className="w-full lg:w-56 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-gray-100 flex flex-col">
+            <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Linked sessions</span>
+              {active && (
+                <button
+                  onClick={() => setLinkPickerOpen((v) => !v)}
+                  className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-700"
+                >
+                  + Link
+                </button>
+              )}
+            </div>
+
+            {!active ? (
+              <p className="text-[11px] text-gray-400 px-3 py-3">Select a session to see or add links.</p>
+            ) : linkPickerOpen ? (
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {linkable.length === 0 && (
+                  <p className="text-[11px] text-gray-400 px-1 py-2">No other sessions to link yet.</p>
+                )}
+                {linkable.map((e) => (
+                  <button
+                    key={e.id}
+                    onClick={() => handleLink(e.id)}
+                    className="w-full text-left rounded-lg px-2 py-1.5 border border-transparent hover:bg-gray-50 hover:border-gray-200"
+                  >
+                    <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
+                    <span className="text-[10px] text-gray-400">
+                      {EXPERIMENT_DOMAINS.find((d) => d.id === e.domain)?.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                {linkedSessions.length === 0 && (
+                  <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
+                    Not linked to anything. Link this session to related claims to browse them together.
+                  </p>
+                )}
+                {linkedSessions.map((e) => (
+                  <div key={e.id} className="rounded-lg border border-gray-100 px-2 py-1.5">
+                    <button onClick={() => setActiveId(e.id)} className="w-full text-left">
+                      <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
+                      <span
+                        className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[e.status]}`}
+                      >
+                        {STATUS_LABEL[e.status]}
+                      </span>
+                    </button>
+                    <button onClick={() => handleUnlink(e.id)} className="text-[10px] text-gray-400 hover:text-red-500 mt-1">
+                      Unlink
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

@@ -48,8 +48,31 @@ async function extractPhysicsClaim(claim: string, linkedContext?: string): Promi
   }
 }
 
+/**
+ * Extracts a plain number from a mathjs value, normalizing any Unit to SI
+ * base units first. This matters more than it looks: `.toNumber()` with no
+ * argument returns the value expressed in whatever compound unit list the
+ * value happens to carry internally (e.g. a `sqrt()` of a chain of
+ * multiplied/divided unit literals can end up with a unit list like
+ * `sqrt(km)`-flavored fractional units) — that is NOT the same as "the
+ * value in a standard unit," and silently returning it produces numbers off
+ * by an arbitrary, non-obvious factor. `.toSI()` first forces a genuine
+ * base-SI representation (kg, m, s, ...) so `.toNumber()` afterward is
+ * unambiguous. Confirmed empirically: an orbital-velocity claim (sqrt of
+ * G*M/r) was wrongly flagged as a numeric mismatch before this fix, because
+ * the un-normalized `.toNumber()` returned a value off by a factor of ~31.6.
+ */
 function toPlainNumber(value: unknown): number | null {
   if (typeof value === 'number') return isFinite(value) ? value : null
+  if (value && typeof (value as { toSI?: unknown }).toSI === 'function') {
+    try {
+      const si = (value as { toSI: () => { toNumber: () => number } }).toSI()
+      const n = si.toNumber()
+      return typeof n === 'number' && isFinite(n) ? n : null
+    } catch {
+      return null
+    }
+  }
   if (value && typeof (value as { toNumber?: unknown }).toNumber === 'function') {
     try {
       const n = (value as { toNumber: () => number }).toNumber()
@@ -147,7 +170,15 @@ export async function verifyPhysicsClaim(claim: string, linkedContext?: string):
       note: 'Units check out, but the result was not a plain numeric/unit quantity to compare.',
     }
   }
-  const scale = Math.max(1, Math.abs(scaleNumber))
+  // Unlike the math-domain checker's closeEnough() (unitless, human-scale
+  // numbers, where flooring the scale at 1 avoids blowing up near zero),
+  // physical SI quantities routinely have magnitude far below 1 — a charge
+  // in coulombs, a force in newtons, G itself (~6.674e-11). Flooring at 1
+  // there made the tolerance absurdly loose (an expected value of 6.674e-11
+  // would accept anything within 1e-6 of it — nine orders of magnitude too
+  // permissive). Only fall back to 1 when the expected value is exactly
+  // zero, to keep the tolerance from collapsing to zero itself.
+  const scale = scaleNumber === 0 ? 1 : Math.abs(scaleNumber)
   const numericOk = Math.abs(diffNumber) <= 1e-6 * scale
 
   return {

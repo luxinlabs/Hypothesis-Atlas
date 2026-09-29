@@ -57,6 +57,12 @@ export interface ProtocolFlag {
   severity: "low" | "medium" | "high";
 }
 
+export interface GroundedFact {
+  compound: string;
+  molecularWeightGMol: number | null;
+  source: string;
+}
+
 export interface ProtocolResult {
   numericChecks: {
     label: string;
@@ -66,6 +72,8 @@ export interface ProtocolResult {
     ok: boolean | null;
   }[];
   flags: ProtocolFlag[];
+  /** Reference facts pulled from an external database (currently: PubChem for chemistry), not the LLM's own recollection. */
+  groundedFacts?: GroundedFact[];
   note?: string;
 }
 

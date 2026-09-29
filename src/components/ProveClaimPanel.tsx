@@ -722,6 +722,20 @@ function ProtocolWorkspace({ entry }: { entry: ExperimentRecord; onVerify: (e: E
           {result.numericChecks.length === 0 && result.flags.length === 0 && (
             <p className="text-[11px] text-gray-400">No checkable arithmetic or flagged steps found.</p>
           )}
+          {result.groundedFacts && result.groundedFacts.length > 0 && (
+            <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 space-y-1">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-blue-500">Reference data</p>
+              {result.groundedFacts.map((f, i) => (
+                <p key={i} className="text-[11px] text-gray-700">
+                  <span className="font-medium">{f.compound}</span>
+                  {f.molecularWeightGMol !== null && (
+                    <span className="text-gray-500"> — {f.molecularWeightGMol} g/mol</span>
+                  )}
+                  <span className="text-gray-400 ml-1">({f.source})</span>
+                </p>
+              ))}
+            </div>
+          )}
           {result.note && <p className="text-[11px] text-gray-400 italic">{result.note}</p>}
         </div>
       )}

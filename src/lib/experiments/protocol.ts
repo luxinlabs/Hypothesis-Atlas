@@ -1,6 +1,7 @@
 import { create, all } from 'mathjs'
 import { groq } from '@/lib/groq'
 import { toAsciiMath, closeEnough } from './numeric'
+import { lookupCompounds } from './pubchem'
 import type { ExperimentDomain, ProtocolFlag, ProtocolResult } from './types'
 
 const math = create(all)
@@ -18,6 +19,7 @@ interface RawFlag {
 interface RawReview {
   numericChecks?: RawNumericCheck[]
   flags?: RawFlag[]
+  compounds?: string[]
 }
 
 const DOMAIN_FOCUS: Record<Extract<ExperimentDomain, 'chemistry' | 'biology' | 'drug_discovery'>, string> = {
@@ -47,6 +49,14 @@ async function reviewProtocol(
   const contextBlock = linkedContext
     ? `\n\nRelated sessions already investigated in this notebook (background only, not verified facts to assume):\n${linkedContext}`
     : ''
+  // Chemistry gets a third extraction task: named compounds, so their
+  // molecular weight can be grounded against PubChem instead of trusting
+  // the LLM's own recollection (see lookupCompounds below).
+  const compoundTask =
+    domain === 'chemistry'
+      ? ' (3) Extract up to 3 chemical compound names mentioned by name (e.g. "NaCl", "ethanol") into "compounds".'
+      : ''
+  const compoundSchema = domain === 'chemistry' ? ',"compounds":["..."]' : ''
   const completion = await groq.chat.completions.create({
     model: 'openai/gpt-oss-120b',
     temperature: 0,
@@ -56,13 +66,13 @@ async function reviewProtocol(
         role: 'system',
         content:
           `You are reviewing a ${domain} experimental protocol/claim, focused on ${DOMAIN_FOCUS[domain]}. ` +
-          'Do two things: ' +
+          'Do these things: ' +
           '(1) Extract up to 5 checkable arithmetic claims (numeric expression + its claimed value), ' +
           'converting any LaTeX to ASCII math (+, -, *, /, ^, parentheses, sqrt()). ' +
           '(2) Flag any step that looks implausible: missing controls, unit errors, a dose/concentration ' +
-          'far outside typical ranges, or an internally inconsistent quantity. Do not flag stylistic issues. ' +
+          `far outside typical ranges, or an internally inconsistent quantity. Do not flag stylistic issues.${compoundTask} ` +
           'Respond with ONLY JSON: {"numericChecks":[{"label":"...","expression":"...","expected":"..."}],' +
-          '"flags":[{"step":"...","reason":"...","severity":"low"|"medium"|"high"}]}. ' +
+          `"flags":[{"step":"...","reason":"...","severity":"low"|"medium"|"high"}]${compoundSchema}}. ` +
           `Empty arrays are fine if nothing applies.${contextBlock}`,
       },
       { role: 'user', content: claim },
@@ -127,5 +137,11 @@ export async function verifyProtocolClaim(
       severity: f.severity === 'high' || f.severity === 'medium' ? f.severity : 'low',
     }))
 
-  return { numericChecks, flags }
+  // Ground chemistry claims against PubChem when the review named specific
+  // compounds. A miss (not found, PubChem unreachable) is silently dropped —
+  // this is confidence on top of the LLM review, not a new hard requirement.
+  const compoundNames = (review.compounds ?? []).map((c) => String(c).trim()).filter(Boolean)
+  const groundedFacts = domain === 'chemistry' && compoundNames.length > 0 ? await lookupCompounds(compoundNames) : []
+
+  return { numericChecks, flags, ...(groundedFacts.length > 0 ? { groundedFacts } : {}) }
 }

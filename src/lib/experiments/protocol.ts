@@ -40,9 +40,13 @@ const DOMAIN_FOCUS: Record<Extract<ExperimentDomain, 'chemistry' | 'biology' | '
  */
 async function reviewProtocol(
   domain: 'chemistry' | 'biology' | 'drug_discovery',
-  claim: string
+  claim: string,
+  linkedContext?: string
 ): Promise<RawReview | null> {
   if (!groq) return null
+  const contextBlock = linkedContext
+    ? `\n\nRelated sessions already investigated in this notebook (background only, not verified facts to assume):\n${linkedContext}`
+    : ''
   const completion = await groq.chat.completions.create({
     model: 'openai/gpt-oss-120b',
     temperature: 0,
@@ -59,7 +63,7 @@ async function reviewProtocol(
           'far outside typical ranges, or an internally inconsistent quantity. Do not flag stylistic issues. ' +
           'Respond with ONLY JSON: {"numericChecks":[{"label":"...","expression":"...","expected":"..."}],' +
           '"flags":[{"step":"...","reason":"...","severity":"low"|"medium"|"high"}]}. ' +
-          'Empty arrays are fine if nothing applies.',
+          `Empty arrays are fine if nothing applies.${contextBlock}`,
       },
       { role: 'user', content: claim },
     ],
@@ -76,9 +80,10 @@ async function reviewProtocol(
 
 export async function verifyProtocolClaim(
   domain: 'chemistry' | 'biology' | 'drug_discovery',
-  claim: string
+  claim: string,
+  linkedContext?: string
 ): Promise<ProtocolResult> {
-  const review = await reviewProtocol(domain, claim)
+  const review = await reviewProtocol(domain, claim, linkedContext)
   if (!review) {
     return {
       numericChecks: [],

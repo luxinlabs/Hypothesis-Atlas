@@ -86,13 +86,20 @@ export async function checkWithLeanService(leanCode: string): Promise<LeanCheckO
 export async function autoformalize(
   claim: string,
   priorLeanCode?: string,
-  priorDiagnostics?: string
+  priorDiagnostics?: string,
+  linkedContext?: string
 ): Promise<string> {
   if (!anthropic) throw new Error('ANTHROPIC_API_KEY is not configured')
 
+  // Background only — see lib/experiments/context.ts. Never treated as a
+  // premise the new proof can cite; just context to avoid contradicting.
+  const contextBlock = linkedContext
+    ? `Related sessions already investigated in this notebook (background only — do not assume they are correct, and do not cite them as proved facts):\n${linkedContext}\n\n`
+    : ''
+
   const userContent = priorLeanCode
-    ? `Claim:\n${claim}\n\nPrevious attempt:\n${priorLeanCode}\n\nLean reported these errors — fix them:\n${priorDiagnostics ?? '(no diagnostics)'}`
-    : `Claim:\n${claim}`
+    ? `${contextBlock}Claim:\n${claim}\n\nPrevious attempt:\n${priorLeanCode}\n\nLean reported these errors — fix them:\n${priorDiagnostics ?? '(no diagnostics)'}`
+    : `${contextBlock}Claim:\n${claim}`
 
   const message = await anthropic.messages.create({
     model: ANTHROPIC_MODEL,

@@ -24,17 +24,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     )
   }
 
-  const { claim, priorLeanCode, priorDiagnostics } = (await request.json()) as {
+  const { claim, priorLeanCode, priorDiagnostics, linkedContext } = (await request.json()) as {
     claim?: string
     priorLeanCode?: string
     priorDiagnostics?: string
+    linkedContext?: string
   }
   if (!claim || !claim.trim()) {
     return NextResponse.json({ error: 'No claim provided' }, { status: 400 })
   }
 
   try {
-    const leanCode = await autoformalize(claim, priorLeanCode, priorDiagnostics)
+    const leanCode = await autoformalize(claim, priorLeanCode, priorDiagnostics, linkedContext)
     return NextResponse.json({ leanCode })
   } catch (err) {
     return NextResponse.json(

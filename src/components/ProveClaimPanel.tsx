@@ -11,6 +11,7 @@ import {
   type PhysicsResult,
   type ProtocolResult,
 } from "@/lib/experiments/types";
+import { formatLinkedContext } from "@/lib/experiments/context";
 
 interface ProveClaimPanelProps {
   jobId: string;
@@ -132,6 +133,17 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     (e) => e.id !== active?.id && (!active?.groupId || e.groupId !== active.groupId)
   );
 
+  // Background-only context for LLM steps (autoformalize, physics
+  // extraction, protocol review) — the linked sessions' own claims/results
+  // are shown so a re-check doesn't contradict them, but never trusted as
+  // verified premises. See the V3 follow-up on sharing context across
+  // linked sessions.
+  function getLinkedContext(entry: ExperimentRecord): string | undefined {
+    if (!entry.groupId) return undefined;
+    const linked = experiments.filter((e) => e.groupId === entry.groupId && e.id !== entry.id);
+    return formatLinkedContext(linked);
+  }
+
   function upsert(record: ExperimentRecord) {
     setExperiments((prev) => {
       const idx = prev.findIndex((e) => e.id === record.id);
@@ -230,7 +242,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       const outcome = await requestJson<{ status: ClaimStatus; result: PhysicsResult }>(
         `/api/jobs/${jobId}/experiments/verify-physics`,
         "POST",
-        { claim: entry.claim }
+        { claim: entry.claim, linkedContext: getLinkedContext(entry) }
       );
       if (!outcome.ok) {
         const patched = await patchExperiment(entry.id, { status: "error" });
@@ -247,7 +259,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     const outcome = await requestJson<{ status: ClaimStatus; result: ProtocolResult }>(
       `/api/jobs/${jobId}/experiments/verify-protocol`,
       "POST",
-      { domain: entry.domain, claim: entry.claim }
+      { domain: entry.domain, claim: entry.claim, linkedContext: getLinkedContext(entry) }
     );
     if (!outcome.ok) {
       const patched = await patchExperiment(entry.id, { status: "error" });
@@ -278,6 +290,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       claim: entry.claim,
       priorLeanCode: mathResult?.leanCode,
       priorDiagnostics: mathResult?.diagnostics,
+      linkedContext: getLinkedContext(entry),
     });
     if (!outcome.ok) {
       const patched = await patchExperiment(entry.id, { status: "error" });

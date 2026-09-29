@@ -32,11 +32,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     )
   }
 
-  const { claim } = (await request.json().catch(() => ({}))) as { claim?: string }
+  const { claim, linkedContext } = (await request.json().catch(() => ({}))) as { claim?: string; linkedContext?: string }
   if (!claim || !claim.trim()) {
     return NextResponse.json({ error: 'No claim provided' }, { status: 400 })
   }
 
-  const result = await verifyPhysicsClaim(claim)
+  const result = await verifyPhysicsClaim(claim, linkedContext)
   return NextResponse.json({ result, status: statusFor(result) })
 }

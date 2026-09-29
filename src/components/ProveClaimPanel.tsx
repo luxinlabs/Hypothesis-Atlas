@@ -43,6 +43,71 @@ const EXAMPLE_CLAIMS: Record<ExperimentDomain, { label: string; value: string }[
   ],
 };
 
+/**
+ * Per-domain visual identity — written as full literal class strings (not
+ * built via template interpolation) so Tailwind's JIT scanner can see them
+ * statically. Gives each domain a distinct color so the chat feels like a
+ * different "space" per subject rather than one undifferentiated stream.
+ */
+const DOMAIN_STYLE: Record<
+  ExperimentDomain,
+  { icon: string; tabActive: string; bubble: string; gradient: string; ring: string; accentText: string; accentBg: string }
+> = {
+  math: {
+    icon: "📐",
+    tabActive: "bg-indigo-600 text-white shadow-sm",
+    bubble: "bg-indigo-600 text-white",
+    gradient: "linear-gradient(135deg, #4f46e5, #6366f1)",
+    ring: "focus:ring-indigo-200",
+    accentText: "text-indigo-600",
+    accentBg: "bg-indigo-50",
+  },
+  physics: {
+    icon: "⚛️",
+    tabActive: "bg-blue-600 text-white shadow-sm",
+    bubble: "bg-blue-600 text-white",
+    gradient: "linear-gradient(135deg, #2563eb, #3b82f6)",
+    ring: "focus:ring-blue-200",
+    accentText: "text-blue-600",
+    accentBg: "bg-blue-50",
+  },
+  chemistry: {
+    icon: "🧪",
+    tabActive: "bg-emerald-600 text-white shadow-sm",
+    bubble: "bg-emerald-600 text-white",
+    gradient: "linear-gradient(135deg, #059669, #10b981)",
+    ring: "focus:ring-emerald-200",
+    accentText: "text-emerald-600",
+    accentBg: "bg-emerald-50",
+  },
+  biology: {
+    icon: "🧬",
+    tabActive: "bg-teal-600 text-white shadow-sm",
+    bubble: "bg-teal-600 text-white",
+    gradient: "linear-gradient(135deg, #0d9488, #14b8a6)",
+    ring: "focus:ring-teal-200",
+    accentText: "text-teal-600",
+    accentBg: "bg-teal-50",
+  },
+  drug_discovery: {
+    icon: "💊",
+    tabActive: "bg-purple-600 text-white shadow-sm",
+    bubble: "bg-purple-600 text-white",
+    gradient: "linear-gradient(135deg, #7c3aed, #a855f7)",
+    ring: "focus:ring-purple-200",
+    accentText: "text-purple-600",
+    accentBg: "bg-purple-50",
+  },
+};
+
+const DOMAIN_TAGLINE: Record<ExperimentDomain, string> = {
+  math: "Autoformalize a claim to Lean 4, review it yourself, then verify against a real proof assistant.",
+  physics: "State a unit-bearing equation — dimensional analysis and a numeric check run automatically.",
+  chemistry: "Dose/reagent math is checked exactly; named compounds are grounded against real PubChem data.",
+  biology: "Dilution, sample-size, and replicate math is checked; implausible steps get flagged for review.",
+  drug_discovery: "Dose conversions and pharmacokinetic math are checked; missing controls get flagged.",
+};
+
 const STATUS_STYLE: Record<ClaimStatus, string> = {
   verified: "bg-emerald-50 text-emerald-700",
   failed: "bg-red-50 text-red-600",
@@ -379,36 +444,46 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     if (outcome.ok) upsert(outcome.data.experiment);
   }
 
+  const style = DOMAIN_STYLE[domain];
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[680px]">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 flex-shrink-0">
-        <span className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0" />
-        <span className="text-sm font-semibold text-gray-700">Claim Notebook</span>
-      </div>
+    <div className="h-full flex bg-white">
+      {/* Center: domain switcher + chat feed + composer — the main event, given all the room */}
+      <div className="flex-1 min-w-0 flex flex-col h-full">
+        {/* Domain switcher: a segmented control with per-domain color + icon, and a one-line
+            tagline that changes with it so the "what am I checking here" question is always answered. */}
+        <div className="flex-shrink-0 border-b border-gray-100 px-4 sm:px-6 pt-3 pb-3 bg-white/95 backdrop-blur sticky top-0 z-10">
+          <div className="flex flex-wrap gap-1.5">
+            {EXPERIMENT_DOMAINS.map((d) => {
+              const s = DOMAIN_STYLE[d.id];
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => setDomain(d.id)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
+                    domain === d.id ? s.tabActive : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <span className="mr-1">{s.icon}</span>
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-2 max-w-2xl">{DOMAIN_TAGLINE[domain]}</p>
+        </div>
 
-      <div className="px-4 pt-3 pb-1 flex flex-wrap gap-1.5 flex-shrink-0">
-        {EXPERIMENT_DOMAINS.map((d) => (
-          <button
-            key={d.id}
-            onClick={() => setDomain(d.id)}
-            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors ${
-              domain === d.id ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {d.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 flex min-h-0">
-        {/* Left: chat-style feed + bottom composer for the active domain */}
-        <div className="flex-1 min-w-0 flex flex-col border-r border-gray-100">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Feed — centered reading column, oldest to newest, auto-scrolls to the latest turn */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5 min-h-full flex flex-col justify-end">
             {loaded && domainEntries.length === 0 && (
-              <div className="h-full flex items-center justify-center text-center text-xs text-gray-400 px-8">
-                {domain === "math"
-                  ? "Formalize a claim below, then review and verify it — the formal statement is shown before anything runs through Lean, since an LLM's translation can silently change what's actually being proved."
-                  : "State a claim below to check it."}
+              <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-12">
+                <span className="text-4xl mb-3">{style.icon}</span>
+                <p className="text-sm text-gray-500 max-w-sm">
+                  {domain === "math"
+                    ? "Formalize a claim below, then review and verify it — the formal statement is shown before anything runs through Lean, since an LLM's translation can silently change what's actually being proved."
+                    : "State a claim below to check it."}
+                </p>
               </div>
             )}
             {domainEntries.map((entry) => (
@@ -425,100 +500,114 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
             ))}
             <div ref={feedEndRef} />
           </div>
+        </div>
 
-          {/* Bottom composer — larger, chat-style input bar */}
-          <div className="border-t border-gray-100 bg-gray-50/60 p-3 flex-shrink-0">
+        {/* Composer — floating, full-width, large — the chat box itself */}
+        <div className="flex-shrink-0 bg-gradient-to-t from-white via-white to-transparent pt-4">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-5">
             {EXAMPLE_CLAIMS[domain].length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap mb-2">
+              <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
                 {EXAMPLE_CLAIMS[domain].map((example) => (
                   <button
                     key={example.label}
                     onClick={() => setNewClaim(example.value)}
-                    className="text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full"
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${style.accentText} ${style.accentBg} hover:brightness-95`}
                   >
                     {example.label}
                   </button>
                 ))}
               </div>
             )}
-            <div className="flex items-end gap-2">
+            <div className="relative rounded-3xl border border-gray-200 bg-white shadow-lg shadow-gray-900/5 focus-within:border-gray-300 transition-colors">
               <textarea
                 value={newClaim}
                 onChange={(e) => setNewClaim(e.target.value)}
                 onKeyDown={handleComposerKeyDown}
                 placeholder="State a claim in LaTeX or plain English… (Enter to send, Shift+Enter for a new line)"
                 rows={3}
-                className="flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none min-h-[72px] max-h-48"
+                className={`w-full rounded-3xl bg-transparent pl-5 pr-16 py-4 text-sm leading-relaxed focus:outline-none resize-none min-h-[88px] max-h-56 ${style.ring}`}
               />
               <button
                 onClick={handleCreate}
                 disabled={!newClaim.trim() || creating}
-                className="h-[72px] px-5 rounded-2xl text-sm font-semibold text-white transition-colors disabled:opacity-40 flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
+                aria-label={domain === "math" ? "Formalize claim" : "Check claim"}
+                title={domain === "math" ? "Formalize claim" : "Check claim"}
+                className="absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105"
+                style={{ background: style.gradient }}
               >
-                {creating ? "…" : domain === "math" ? "Formalize" : "Check"}
+                {creating ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                  </svg>
+                )}
               </button>
             </div>
-            {error && <p className="text-[11px] text-red-500 mt-1.5">{error}</p>}
+            {error && <p className="text-[11px] text-red-500 mt-1.5 px-1">{error}</p>}
           </div>
         </div>
+      </div>
 
-        {/* Right: linked sessions sidebar */}
-        <div className="w-full lg:w-56 flex-shrink-0 flex flex-col">
-          <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Linked sessions</span>
-            {active && (
-              <button
-                onClick={() => setLinkPickerOpen((v) => !v)}
-                className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-700"
-              >
-                + Link
-              </button>
-            )}
-          </div>
-
-          {!active ? (
-            <p className="text-[11px] text-gray-400 px-3 py-3">Select a session to see or add links.</p>
-          ) : linkPickerOpen ? (
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {linkable.length === 0 && <p className="text-[11px] text-gray-400 px-1 py-2">No other sessions to link yet.</p>}
-              {linkable.map((e) => (
-                <button
-                  key={e.id}
-                  onClick={() => handleLink(e.id)}
-                  className="w-full text-left rounded-lg px-2 py-1.5 border border-transparent hover:bg-gray-50 hover:border-gray-200"
-                >
-                  <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
-                  <span className="text-[10px] text-gray-400">{EXPERIMENT_DOMAINS.find((d) => d.id === e.domain)?.label}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-              {linkedSessions.length === 0 && (
-                <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
-                  Not linked to anything. Link this session to related claims to browse them together.
-                </p>
-              )}
-              {linkedSessions.map((e) => (
-                <div key={e.id} className="rounded-lg border border-gray-100 px-2 py-1.5">
-                  <button onClick={() => setActiveId(e.id)} className="w-full text-left">
-                    <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
-                    <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[e.status]}`}>
-                      {STATUS_LABEL[e.status]}
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => handleUnlink(e.id)}
-                    className="text-[10px] text-gray-400 hover:text-red-500 mt-1"
-                  >
-                    Unlink
-                  </button>
-                </div>
-              ))}
-            </div>
+      {/* Right: linked sessions sidebar */}
+      <div className="hidden lg:flex w-64 flex-shrink-0 flex-col border-l border-gray-100 h-full">
+        <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Linked sessions</span>
+          {active && (
+            <button
+              onClick={() => setLinkPickerOpen((v) => !v)}
+              className={`text-[10px] font-semibold ${style.accentText} hover:brightness-90`}
+            >
+              + Link
+            </button>
           )}
         </div>
+
+        {!active ? (
+          <p className="text-[11px] text-gray-400 px-4 py-4">Select a session to see or add links.</p>
+        ) : linkPickerOpen ? (
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {linkable.length === 0 && <p className="text-[11px] text-gray-400 px-2 py-2">No other sessions to link yet.</p>}
+            {linkable.map((e) => (
+              <button
+                key={e.id}
+                onClick={() => handleLink(e.id)}
+                className="w-full text-left rounded-xl px-3 py-2 border border-transparent hover:bg-gray-50 hover:border-gray-200"
+              >
+                <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
+                <span className="text-[10px] text-gray-400">
+                  {DOMAIN_STYLE[e.domain].icon} {EXPERIMENT_DOMAINS.find((d) => d.id === e.domain)?.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+            {linkedSessions.length === 0 && (
+              <p className="text-[11px] text-gray-400 px-3 py-4 text-center">
+                Not linked to anything. Link this session to related claims to browse them together.
+              </p>
+            )}
+            {linkedSessions.map((e) => (
+              <div key={e.id} className="rounded-xl border border-gray-100 px-3 py-2">
+                <button onClick={() => setActiveId(e.id)} className="w-full text-left">
+                  <p className="text-[11px] text-gray-700 line-clamp-2">
+                    {DOMAIN_STYLE[e.domain].icon} {e.claim}
+                  </p>
+                  <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[e.status]}`}>
+                    {STATUS_LABEL[e.status]}
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleUnlink(e.id)}
+                  className="text-[10px] text-gray-400 hover:text-red-500 mt-1"
+                >
+                  Unlink
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -549,67 +638,72 @@ function FeedItem({
   onDelete: (id: string) => void;
 }) {
   const busy = entry.status === "verifying" || entry.status === "formalizing";
+  const style = DOMAIN_STYLE[entry.domain];
 
   return (
-    <div className="space-y-1.5">
-      {/* Claim bubble */}
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2.5">
-        <MathText text={entry.claim} className="text-sm text-gray-800" />
+    <div className="space-y-2">
+      {/* Claim bubble — the "user" turn, right-aligned in the domain's color, the familiar chat convention */}
+      <div className="flex justify-end">
+        <div className={`max-w-[80%] rounded-3xl rounded-tr-md px-4 py-2.5 ${style.bubble}`}>
+          <MathText text={entry.claim} className="text-sm" />
+        </div>
       </div>
 
-      {/* Response bubble */}
-      <div className="max-w-[92%] ml-2">
-        <button
-          onClick={onToggle}
-          className={`w-full text-left rounded-2xl rounded-tl-sm px-4 py-2.5 transition-colors ${
-            expanded ? "bg-indigo-50" : "bg-indigo-50/60 hover:bg-indigo-50"
-          }`}
-        >
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
-              {STATUS_LABEL[entry.status]}
-            </span>
-            {entry.groupId && (
-              <span className="text-[10px] text-gray-400" title="Linked to other sessions">
-                🔗
+      {/* Response bubble — the "assistant" turn, left-aligned, expands in place for full detail */}
+      <div className="flex justify-start">
+        <div className="max-w-[85%] w-full sm:w-auto">
+          <button
+            onClick={onToggle}
+            className={`w-full text-left rounded-3xl rounded-tl-md px-4 py-2.5 border transition-colors ${
+              expanded ? "bg-gray-50 border-gray-200" : "bg-white border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
+                {STATUS_LABEL[entry.status]}
               </span>
-            )}
-            <span className="text-xs text-gray-600 truncate">{summaryLine(entry)}</span>
-            <span className="ml-auto text-[10px] text-indigo-400">{expanded ? "hide details ▲" : "details ▼"}</span>
-          </div>
-        </button>
-
-        {expanded && (
-          <div className="mt-2 rounded-xl border border-indigo-100 bg-white p-3 space-y-3">
-            {entry.domain === "math" && (
-              <MathWorkspace entry={entry} onVerify={onVerify} onAskAIToFix={onAskAIToFix} onEditLeanCode={onEditLeanCode} />
-            )}
-            {entry.domain === "physics" && <PhysicsWorkspace entry={entry} />}
-            {(entry.domain === "chemistry" || entry.domain === "biology" || entry.domain === "drug_discovery") && (
-              <ProtocolWorkspace entry={entry} />
-            )}
-
-            <div className="flex items-center gap-2">
-              {entry.domain !== "math" && (
-                <button
-                  onClick={() => onVerify(entry)}
-                  disabled={busy}
-                  className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
-                >
-                  {busy ? "Checking…" : "Re-check"}
-                </button>
+              {entry.groupId && (
+                <span className="text-[10px] text-gray-400" title="Linked to other sessions">
+                  🔗
+                </span>
               )}
-              <button
-                onClick={() => onDelete(entry.id)}
-                className="py-2 px-3 rounded-xl text-sm font-medium text-gray-400 hover:text-red-500 transition-colors"
-                title="Remove from notebook"
-              >
-                Delete
-              </button>
+              <span className="text-xs text-gray-600 truncate">{summaryLine(entry)}</span>
+              <span className={`ml-auto text-[10px] ${style.accentText}`}>{expanded ? "hide details ▲" : "details ▼"}</span>
             </div>
-          </div>
-        )}
+          </button>
+
+          {expanded && (
+            <div className="mt-2 rounded-2xl border border-gray-200 bg-white p-4 space-y-3 shadow-sm">
+              {entry.domain === "math" && (
+                <MathWorkspace entry={entry} onVerify={onVerify} onAskAIToFix={onAskAIToFix} onEditLeanCode={onEditLeanCode} />
+              )}
+              {entry.domain === "physics" && <PhysicsWorkspace entry={entry} />}
+              {(entry.domain === "chemistry" || entry.domain === "biology" || entry.domain === "drug_discovery") && (
+                <ProtocolWorkspace entry={entry} />
+              )}
+
+              <div className="flex items-center gap-2">
+                {entry.domain !== "math" && (
+                  <button
+                    onClick={() => onVerify(entry)}
+                    disabled={busy}
+                    className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
+                    style={{ background: style.gradient }}
+                  >
+                    {busy ? "Checking…" : "Re-check"}
+                  </button>
+                )}
+                <button
+                  onClick={() => onDelete(entry.id)}
+                  className="py-2 px-3 rounded-xl text-sm font-medium text-gray-400 hover:text-red-500 transition-colors"
+                  title="Remove from notebook"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

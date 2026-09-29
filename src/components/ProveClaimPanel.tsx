@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import MathText from "./MathText";
 import {
   EXPERIMENT_DOMAINS,
-  type ClaimEntry,
   type ClaimStatus,
   type ExperimentDomain,
+  type ExperimentRecord,
+  type MathResult,
 } from "@/lib/experiments/types";
 
 interface ProveClaimPanelProps {
@@ -26,8 +27,10 @@ const STATUS_STYLE: Record<ClaimStatus, string> = {
   verified: "bg-emerald-50 text-emerald-700",
   failed: "bg-red-50 text-red-600",
   incomplete: "bg-amber-50 text-amber-700",
+  flagged: "bg-amber-50 text-amber-700",
   error: "bg-gray-100 text-gray-500",
   ready: "bg-indigo-50 text-indigo-600",
+  draft: "bg-gray-100 text-gray-500",
   formalizing: "bg-indigo-50 text-indigo-400",
   verifying: "bg-indigo-50 text-indigo-400",
 };
@@ -36,32 +39,13 @@ const STATUS_LABEL: Record<ClaimStatus, string> = {
   verified: "Verified",
   failed: "Failed",
   incomplete: "Incomplete",
+  flagged: "Flagged for review",
   error: "Error",
   ready: "Ready to verify",
+  draft: "Draft",
   formalizing: "Formalizing…",
   verifying: "Verifying…",
 };
-
-function makeCacheKey(jobId: string, domain: ExperimentDomain): string {
-  return `experiments:${jobId}:${domain}`;
-}
-
-function loadEntries(key: string): ClaimEntry[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveEntries(key: string, entries: ClaimEntry[]) {
-  try {
-    localStorage.setItem(key, JSON.stringify(entries));
-  } catch {}
-}
 
 type FetchOutcome<T> = { ok: true; data: T } | { ok: false; message: string };
 
@@ -71,13 +55,13 @@ type FetchOutcome<T> = { ok: true; data: T } | { ok: false; message: string };
  * "server isn't running", "server crashed mid-response", and "request
  * succeeded but returned something unexpected".
  */
-async function postJson<T>(url: string, body: unknown): Promise<FetchOutcome<T>> {
+async function requestJson<T>(url: string, method: string, body?: unknown): Promise<FetchOutcome<T>> {
   let res: Response;
   try {
     res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      method,
+      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     return { ok: false, message: "Could not reach the server — is the dev server running?" };
@@ -100,126 +84,145 @@ async function postJson<T>(url: string, body: unknown): Promise<FetchOutcome<T>>
   return { ok: true, data: data as T };
 }
 
-function newId(): string {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
-}
-
 export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const [domain, setDomain] = useState<ExperimentDomain>("math");
-  const [entries, setEntries] = useState<ClaimEntry[]>([]);
+  const [experiments, setExperiments] = useState<ExperimentRecord[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newClaim, setNewClaim] = useState("");
-  const [formalizingNew, setFormalizingNew] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
-  const cacheKey = makeCacheKey(jobId, "math");
-
-  // Entries are only meaningful for the math domain today, but keyed and
-  // filtered by domain so a future domain doesn't have to migrate storage.
+  // Experiments are persisted server-side (see prisma Experiment model)
+  // rather than in localStorage, so a session survives across devices/tabs
+  // and can eventually be linked to other sessions.
   useEffect(() => {
-    setEntries(loadEntries(cacheKey));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey]);
+    let cancelled = false;
+    requestJson<{ experiments: ExperimentRecord[] }>(`/api/jobs/${jobId}/experiments?domain=math`, "GET").then(
+      (outcome) => {
+        if (cancelled) return;
+        if (outcome.ok) setExperiments(outcome.data.experiments);
+        setLoaded(true);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
-  useEffect(() => {
-    if (entries.length > 0) saveEntries(cacheKey, entries);
-  }, [entries, cacheKey]);
-
-  const domainEntries = entries.filter((e) => e.domain === "math");
+  const domainEntries = experiments.filter((e) => e.domain === "math");
   const active = domainEntries.find((e) => e.id === activeId) ?? null;
 
-  function updateEntry(id: string, patch: Partial<ClaimEntry>) {
-    setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...patch, updatedAt: Date.now() } : e))
+  function upsert(record: ExperimentRecord) {
+    setExperiments((prev) => {
+      const idx = prev.findIndex((e) => e.id === record.id);
+      if (idx === -1) return [record, ...prev];
+      const next = [...prev];
+      next[idx] = record;
+      return next;
+    });
+  }
+
+  async function patchExperiment(
+    id: string,
+    patch: { status?: ClaimStatus; claim?: string; result?: unknown }
+  ): Promise<ExperimentRecord | null> {
+    const outcome = await requestJson<{ experiment: ExperimentRecord }>(
+      `/api/jobs/${jobId}/experiments/${id}`,
+      "PATCH",
+      patch
     );
+    return outcome.ok ? outcome.data.experiment : null;
   }
 
   async function handleFormalizeNew() {
     const claim = newClaim.trim();
     if (!claim) return;
-    setFormalizingNew(true);
+    setCreating(true);
     setError("");
-    const outcome = await postJson<{ leanCode: string }>(
-      `/api/jobs/${jobId}/experiments/formalize`,
-      { claim }
-    );
+    const outcome = await requestJson<{ leanCode: string }>(`/api/jobs/${jobId}/experiments/formalize`, "POST", {
+      claim,
+    });
     if (!outcome.ok) {
       setError(outcome.message);
-      setFormalizingNew(false);
+      setCreating(false);
       return;
     }
-    const id = newId();
-    const now = Date.now();
-    const entry: ClaimEntry = {
-      id,
+    const result: MathResult = { leanCode: outcome.data.leanCode };
+    const created = await requestJson<{ experiment: ExperimentRecord }>(`/api/jobs/${jobId}/experiments`, "POST", {
       domain: "math",
       claim,
-      leanCode: outcome.data.leanCode,
       status: "ready",
-      reviewed: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setEntries((prev) => [entry, ...prev]);
-    setActiveId(id);
+      result,
+    });
+    if (!created.ok) {
+      setError(created.message);
+      setCreating(false);
+      return;
+    }
+    upsert(created.data.experiment);
+    setActiveId(created.data.experiment.id);
     setNewClaim("");
-    setFormalizingNew(false);
+    setCreating(false);
   }
 
-  async function handleVerify(entry: ClaimEntry) {
-    updateEntry(entry.id, { status: "verifying" });
-    const outcome = await postJson<{
+  async function handleVerify(entry: ExperimentRecord) {
+    upsert({ ...entry, status: "verifying" });
+    const leanCode = (entry.result as MathResult | null)?.leanCode ?? "";
+    const outcome = await requestJson<{
       status: ClaimStatus;
       hasSorry?: boolean;
       diagnostics?: string;
       note?: string;
-    }>(`/api/jobs/${jobId}/experiments/prove`, { leanCode: entry.leanCode });
+    }>(`/api/jobs/${jobId}/experiments/prove`, "POST", { leanCode });
     if (!outcome.ok) {
-      updateEntry(entry.id, { status: "error", note: outcome.message });
+      const patched = await patchExperiment(entry.id, { status: "error", result: { leanCode, note: outcome.message } });
+      if (patched) upsert(patched);
       return;
     }
-    updateEntry(entry.id, {
-      status: outcome.data.status,
+    const result: MathResult = {
+      leanCode,
       hasSorry: outcome.data.hasSorry,
       diagnostics: outcome.data.diagnostics,
       note: outcome.data.note,
-    });
+    };
+    const patched = await patchExperiment(entry.id, { status: outcome.data.status, result });
+    if (patched) upsert(patched);
   }
 
-  async function handleAskAIToFix(entry: ClaimEntry) {
-    updateEntry(entry.id, { status: "formalizing" });
-    const outcome = await postJson<{ leanCode: string }>(
-      `/api/jobs/${jobId}/experiments/formalize`,
-      { claim: entry.claim, priorLeanCode: entry.leanCode, priorDiagnostics: entry.diagnostics }
-    );
+  async function handleAskAIToFix(entry: ExperimentRecord) {
+    const mathResult = entry.result as MathResult | null;
+    upsert({ ...entry, status: "formalizing" });
+    const outcome = await requestJson<{ leanCode: string }>(`/api/jobs/${jobId}/experiments/formalize`, "POST", {
+      claim: entry.claim,
+      priorLeanCode: mathResult?.leanCode,
+      priorDiagnostics: mathResult?.diagnostics,
+    });
     if (!outcome.ok) {
-      updateEntry(entry.id, { status: "error", note: outcome.message });
+      const patched = await patchExperiment(entry.id, { status: "error" });
+      if (patched) upsert(patched);
+      setError(outcome.message);
       return;
     }
-    updateEntry(entry.id, {
+    const result: MathResult = {
       leanCode: outcome.data.leanCode,
-      status: "ready",
-      reviewed: false,
-      diagnostics: undefined,
       note: "AI suggested a fix — review the updated Lean code, then verify again.",
-    });
+    };
+    const patched = await patchExperiment(entry.id, { status: "ready", result });
+    if (patched) upsert(patched);
   }
 
-  function handleEditLeanCode(entry: ClaimEntry, leanCode: string) {
-    updateEntry(entry.id, { leanCode, status: "ready", reviewed: true, diagnostics: undefined, note: undefined });
+  async function handleEditLeanCode(entry: ExperimentRecord, leanCode: string) {
+    const result: MathResult = { leanCode };
+    upsert({ ...entry, status: "ready", result });
+    const patched = await patchExperiment(entry.id, { status: "ready", result });
+    if (patched) upsert(patched);
   }
 
-  function handleDelete(id: string) {
-    setEntries((prev) => {
-      const next = prev.filter((e) => e.id !== id);
-      saveEntries(cacheKey, next);
-      return next;
-    });
+  async function handleDelete(id: string) {
+    setExperiments((prev) => prev.filter((e) => e.id !== id));
     if (activeId === id) setActiveId(null);
+    await requestJson(`/api/jobs/${jobId}/experiments/${id}`, "DELETE");
   }
 
   return (
@@ -283,17 +286,17 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
               </div>
               <button
                 onClick={handleFormalizeNew}
-                disabled={!newClaim.trim() || formalizingNew}
+                disabled={!newClaim.trim() || creating}
                 className="w-full py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
                 style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)" }}
               >
-                {formalizingNew ? "Formalizing…" : "Formalize claim"}
+                {creating ? "Formalizing…" : "Formalize claim"}
               </button>
               {error && <p className="text-[11px] text-red-500">{error}</p>}
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-              {domainEntries.length === 0 && (
+              {loaded && domainEntries.length === 0 && (
                 <p className="text-[11px] text-gray-400 px-2 py-3 text-center">
                   Formalized claims appear here. Nothing runs through Lean until you review the
                   code and click Verify.
@@ -313,7 +316,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
                   <span
                     className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}
                   >
-                    {entry.hasSorry ? "Contains sorry" : STATUS_LABEL[entry.status]}
+                    {(entry.result as MathResult | null)?.hasSorry ? "Contains sorry" : STATUS_LABEL[entry.status]}
                   </span>
                 </button>
               ))}
@@ -345,11 +348,11 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
                     <span
                       className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLE[active.status]}`}
                     >
-                      {active.hasSorry ? "Contains sorry" : STATUS_LABEL[active.status]}
+                      {(active.result as MathResult | null)?.hasSorry ? "Contains sorry" : STATUS_LABEL[active.status]}
                     </span>
                   </div>
                   <textarea
-                    value={active.leanCode}
+                    value={(active.result as MathResult | null)?.leanCode ?? ""}
                     onChange={(e) => handleEditLeanCode(active, e.target.value)}
                     spellCheck={false}
                     rows={10}
@@ -389,10 +392,12 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
                   </button>
                 </div>
 
-                {active.note && <p className="text-[11px] text-gray-500">{active.note}</p>}
-                {active.diagnostics && (
+                {(active.result as MathResult | null)?.note && (
+                  <p className="text-[11px] text-gray-500">{(active.result as MathResult).note}</p>
+                )}
+                {(active.result as MathResult | null)?.diagnostics && (
                   <pre className="rounded-lg bg-red-50 text-red-700 text-[11px] px-3 py-2 overflow-x-auto whitespace-pre-wrap">
-                    {active.diagnostics}
+                    {(active.result as MathResult).diagnostics}
                   </pre>
                 )}
               </>

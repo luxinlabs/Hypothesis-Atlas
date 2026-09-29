@@ -22,7 +22,7 @@ model Job {
   messages      NotebookMessage[]
   candidates    CandidateTopic[]
   top3Ideas     Top3Ideas?
-  
+
   @@index([status])
   @@index([createdAt])
 }
@@ -161,6 +161,29 @@ model Top3Ideas {
   job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
+}
+
+// V3 — Experiments module (persisted claim sessions, domain-routed verification)
+
+// jobId is a provenance field only (like GraphEntity.jobId above), not an
+// enforced foreign key: the standalone /experiments page uses a fixed
+// pseudo-session id that isn't backed by a real Job row (see its page.tsx),
+// so a hard FK would break that flow. Experiments made inside a real
+// research job still get a real Job cuid here — it's just not constrained.
+model Experiment {
+  id          String   @id @default(cuid())
+  jobId       String
+  domain      String   // 'math' | 'physics' | 'chemistry' | 'biology' | 'drug_discovery'
+  claim       String   @db.Text
+  status      String   @default("draft") // 'draft' | 'ready' | 'formalizing' | 'verifying' | 'verified' | 'failed' | 'incomplete' | 'flagged' | 'error'
+  resultJson  String?  @db.Text // domain-specific payload: Lean code/diagnostics for math, unit-check detail for physics, protocol flags for chem/bio/drug_discovery
+  groupId     String?  // sessions sharing a groupId are "linked" together and browsed as one set; null = not linked to anything
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([domain])
+  @@index([groupId])
 }
 
 model PaperSubscription {

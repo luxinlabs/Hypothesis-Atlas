@@ -14,6 +14,7 @@ Thanks for your interest in contributing to Hypothesis Atlas.
 - Include a clear summary of what changed and why
 - Update docs if behavior or setup changes
 - Run `npm run build -- --no-lint` before opening a PR
+- See [`docs/CODE_REVIEW.md`](docs/CODE_REVIEW.md) for what reviewers check: duplication, reuse of existing code, simplification, clarity, and security (backend and frontend)
 
 ## DCO Sign-off Required
 

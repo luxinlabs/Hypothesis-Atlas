@@ -208,6 +208,8 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const feedEndRef = useRef<HTMLDivElement | null>(null);
+  const creatingRef = useRef(false);
+  const leanEditSeqRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -327,67 +329,70 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
 
   async function handleCreate() {
     const claim = newClaim.trim();
-    if (!claim) return;
+    // creatingRef is checked/set synchronously, unlike the `creating` state
+    // (which only takes effect on the next render) — this is what actually
+    // stops two rapid Enter presses or held-key auto-repeat from both
+    // reading the same claim text before either one commits, which
+    // otherwise created two sessions/claims from a single message.
+    if (!claim || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     setError("");
 
-    // Auto-create a session on first message, like a chat app opening a new
-    // conversation the moment you start typing — no separate "new session"
-    // click required.
-    let sessionId = activeSessionId;
-    if (!sessionId) {
-      const created = await createSession(claim.length > 60 ? `${claim.slice(0, 57)}...` : claim);
-      if (!created) {
-        setCreating(false);
-        return;
+    try {
+      // Auto-create a session on first message, like a chat app opening a new
+      // conversation the moment you start typing — no separate "new session"
+      // click required.
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        const created = await createSession(claim.length > 60 ? `${claim.slice(0, 57)}...` : claim);
+        if (!created) return;
+        sessionId = created.id;
       }
-      sessionId = created.id;
-    }
 
-    if (domain === "math") {
-      const outcome = await requestJson<{ leanCode: string }>(`/api/jobs/${jobId}/experiments/formalize`, "POST", { claim });
-      if (!outcome.ok) {
-        setError(outcome.message);
-        setCreating(false);
+      if (domain === "math") {
+        const outcome = await requestJson<{ leanCode: string }>(`/api/jobs/${jobId}/experiments/formalize`, "POST", { claim });
+        if (!outcome.ok) {
+          setError(outcome.message);
+          return;
+        }
+        const result: MathResult = { leanCode: outcome.data.leanCode };
+        const created = await requestJson<{ experiment: ExperimentRecord }>(`/api/jobs/${jobId}/experiments`, "POST", {
+          sessionId,
+          claim,
+          status: "ready",
+          result,
+        });
+        if (!created.ok) {
+          setError(created.message);
+          return;
+        }
+        upsert(created.data.experiment);
+        setActiveId(created.data.experiment.id);
+        setNewClaim("");
         return;
       }
-      const result: MathResult = { leanCode: outcome.data.leanCode };
+
+      // physics / chemistry / biology / drug_discovery: create a draft record
+      // immediately, then verify — unlike math there's no separate review step
+      // before a checker runs (no formal statement to review).
       const created = await requestJson<{ experiment: ExperimentRecord }>(`/api/jobs/${jobId}/experiments`, "POST", {
         sessionId,
         claim,
-        status: "ready",
-        result,
+        status: "draft",
       });
       if (!created.ok) {
         setError(created.message);
-        setCreating(false);
         return;
       }
       upsert(created.data.experiment);
       setActiveId(created.data.experiment.id);
       setNewClaim("");
+      await handleVerify(created.data.experiment);
+    } finally {
+      creatingRef.current = false;
       setCreating(false);
-      return;
     }
-
-    // physics / chemistry / biology / drug_discovery: create a draft record
-    // immediately, then verify — unlike math there's no separate review step
-    // before a checker runs (no formal statement to review).
-    const created = await requestJson<{ experiment: ExperimentRecord }>(`/api/jobs/${jobId}/experiments`, "POST", {
-      sessionId,
-      claim,
-      status: "draft",
-    });
-    if (!created.ok) {
-      setError(created.message);
-      setCreating(false);
-      return;
-    }
-    upsert(created.data.experiment);
-    setActiveId(created.data.experiment.id);
-    setNewClaim("");
-    setCreating(false);
-    await handleVerify(created.data.experiment);
   }
 
   function handleComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -491,9 +496,16 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
 
   async function handleEditLeanCode(entry: ExperimentRecord, leanCode: string) {
     const result: MathResult = { leanCode };
+    // The optimistic local update is the source of truth for what's in the
+    // textarea; the PATCH is just persisting it. A sequence number per
+    // entry guards against an out-of-order response overwriting newer text:
+    // if the user has typed again since this request went out, its response
+    // is stale by the time it arrives and must not be applied.
     upsert({ ...entry, status: "ready", result });
+    const seq = (leanEditSeqRef.current[entry.id] ?? 0) + 1;
+    leanEditSeqRef.current[entry.id] = seq;
     const patched = await patchExperiment(entry.id, { status: "ready", result });
-    if (patched) upsert(patched);
+    if (patched && leanEditSeqRef.current[entry.id] === seq) upsert(patched);
   }
 
   async function handleDelete(id: string) {

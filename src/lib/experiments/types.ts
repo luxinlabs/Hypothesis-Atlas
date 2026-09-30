@@ -1,8 +1,9 @@
 // Shared types for the V3 "Experiments" module. Math was the first domain
 // (formal proof verification via Lean 4); physics (dimensional analysis +
 // numeric check) and chemistry/biology/drug_discovery (protocol review +
-// dose/reagent math) plug into the same shell with their own verification
-// backends (see V3-EXPERIMENTS-PLAN.md, Phase 3).
+// dose/reagent math, plus a Lipinski Rule of Five check for drug_discovery)
+// plug into the same shell with their own verification backends (see
+// V3-EXPERIMENTS-PLAN.md, Phase 3).
 //
 // Claims are persisted server-side as `Experiment` rows (see
 // prisma/schema.prisma), grouped into `ExperimentSession`s. A session is
@@ -65,6 +66,17 @@ export interface GroundedFact {
   source: string;
 }
 
+export interface DrugLikeness {
+  compound: string;
+  molecularWeightGMol: number | null;
+  xLogP: number | null;
+  hBondDonorCount: number | null;
+  hBondAcceptorCount: number | null;
+  violations: string[];
+  passesRuleOfFive: boolean;
+  source: string;
+}
+
 export interface ProtocolResult {
   numericChecks: {
     label: string;
@@ -76,6 +88,8 @@ export interface ProtocolResult {
   flags: ProtocolFlag[];
   /** Reference facts pulled from an external database (currently: PubChem for chemistry), not the LLM's own recollection. */
   groundedFacts?: GroundedFact[];
+  /** drug_discovery only: Lipinski's Rule of Five, evaluated against real PubChem descriptors — a genuine pharmacology check, not arithmetic. */
+  drugLikeness?: DrugLikeness[];
   note?: string;
 }
 

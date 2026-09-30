@@ -41,6 +41,7 @@ const EXAMPLE_CLAIMS: Record<ExperimentDomain, { label: string; value: string }[
   drug_discovery: [
     { label: "Dose conversion", value: "A 70 kg patient dosed at 5 mg/kg receives 350 mg total." },
     { label: "Half-life", value: "A drug with clearance CL = 5 L/h and volume of distribution Vd = 50 L has elimination half-life t1/2 = 0.693 * Vd / CL = 6.93 hours." },
+    { label: "Drug-likeness", value: "Is cyclosporine a good candidate for an oral formulation?" },
   ],
 };
 
@@ -935,6 +936,37 @@ function ProtocolWorkspace({ entry }: { entry: ExperimentRecord }) {
                   )}
                   <span className="text-gray-400 ml-1">({f.source})</span>
                 </p>
+              ))}
+            </div>
+          )}
+          {result.drugLikeness && result.drugLikeness.length > 0 && (
+            <div className="rounded-lg bg-purple-50 border border-purple-100 px-3 py-2 space-y-2">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-purple-500">
+                Drug-likeness — Lipinski&rsquo;s Rule of Five
+              </p>
+              {result.drugLikeness.map((d, i) => (
+                <div key={i} className="text-[11px] text-gray-700">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${
+                        d.passesRuleOfFive ? "bg-emerald-500" : "bg-amber-400"
+                      }`}
+                    >
+                      {d.passesRuleOfFive ? "✓" : "!"}
+                    </span>
+                    <span className="font-medium">{d.compound}</span>
+                    <span className="text-gray-400">
+                      {d.passesRuleOfFive ? "likely orally bioavailable" : "likely poor oral bioavailability"}
+                    </span>
+                  </div>
+                  <p className="text-gray-400 font-mono pl-5">
+                    MW {d.molecularWeightGMol ?? "—"} · LogP {d.xLogP ?? "—"} · HBD {d.hBondDonorCount ?? "—"} · HBA{" "}
+                    {d.hBondAcceptorCount ?? "—"}
+                  </p>
+                  {d.violations.length > 0 && (
+                    <p className="text-amber-600 pl-5">{d.violations.join(", ")}</p>
+                  )}
+                </div>
               ))}
             </div>
           )}

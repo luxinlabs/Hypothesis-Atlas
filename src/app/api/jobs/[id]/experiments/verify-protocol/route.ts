@@ -11,8 +11,15 @@ function statusFor(result: ProtocolResult): ClaimStatus {
   const anyNumericFailed = checked.some((c) => c.ok === false)
   const anyHighFlag = result.flags.some((f) => f.severity === 'high')
   if (anyNumericFailed || anyHighFlag) return 'failed'
-  if (result.flags.length > 0) return 'flagged'
-  if (checked.length > 0) return 'verified'
+  // A Rule of Five violation is a prediction about oral bioavailability, not
+  // a correctness error like bad arithmetic — surface it as "flagged" (soft
+  // review), same tier as an LLM-raised flag, never "failed".
+  const anyPoorDrugLikeness = (result.drugLikeness ?? []).some((d) => !d.passesRuleOfFive)
+  if (result.flags.length > 0 || anyPoorDrugLikeness) return 'flagged'
+  // A clean drug-likeness pass is itself a completed check, same as a
+  // passing numeric check — it shouldn't report "incomplete" just because
+  // no arithmetic happened to be checkable in this claim.
+  if (checked.length > 0 || (result.drugLikeness ?? []).length > 0) return 'verified'
   return 'incomplete'
 }
 

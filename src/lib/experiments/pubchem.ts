@@ -45,3 +45,82 @@ export async function lookupCompounds(names: string[]): Promise<CompoundLookup[]
   const results = await Promise.all(names.slice(0, 3).map((name) => lookupCompound(name)))
   return results.filter((r): r is CompoundLookup => r !== null)
 }
+
+export interface DrugLikenessResult {
+  compound: string
+  molecularWeightGMol: number | null
+  xLogP: number | null
+  hBondDonorCount: number | null
+  hBondAcceptorCount: number | null
+  violations: string[]
+  passesRuleOfFive: boolean
+  source: string
+}
+
+/**
+ * Evaluates Lipinski's Rule of Five — the standard oral-bioavailability
+ * heuristic in drug discovery (Lipinski et al., 1997): a compound is
+ * unlikely to be orally bioavailable if it violates more than one of
+ * molecular weight ≤ 500, calculated LogP ≤ 5, H-bond donors ≤ 5, H-bond
+ * acceptors ≤ 10. This is a genuinely domain-specific check — unlike the
+ * generic dose/reagent arithmetic in protocol.ts, it doesn't reduce to
+ * "evaluate an expression"; it's a real pharmacology rule, evaluated
+ * against real PubChem descriptor data rather than an LLM's recollection.
+ */
+export async function lookupDrugLikeness(name: string): Promise<DrugLikenessResult | null> {
+  const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(
+    name
+  )}/property/MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount/JSON`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), PUBCHEM_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, { signal: controller.signal })
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      PropertyTable?: {
+        Properties?: {
+          MolecularWeight?: string | number
+          XLogP?: number
+          HBondDonorCount?: number
+          HBondAcceptorCount?: number
+        }[]
+      }
+    }
+    const props = data.PropertyTable?.Properties?.[0]
+    if (!props) return null
+
+    const mw = props.MolecularWeight !== undefined ? Number(props.MolecularWeight) : null
+    const logP = typeof props.XLogP === 'number' ? props.XLogP : null
+    const hbd = typeof props.HBondDonorCount === 'number' ? props.HBondDonorCount : null
+    const hba = typeof props.HBondAcceptorCount === 'number' ? props.HBondAcceptorCount : null
+
+    const violations: string[] = []
+    if (mw !== null && mw > 500) violations.push(`molecular weight ${mw.toFixed(1)} > 500`)
+    if (logP !== null && logP > 5) violations.push(`LogP ${logP} > 5`)
+    if (hbd !== null && hbd > 5) violations.push(`H-bond donors ${hbd} > 5`)
+    if (hba !== null && hba > 10) violations.push(`H-bond acceptors ${hba} > 10`)
+
+    return {
+      compound: name,
+      molecularWeightGMol: mw,
+      xLogP: logP,
+      hBondDonorCount: hbd,
+      hBondAcceptorCount: hba,
+      violations,
+      // The rule's own threshold: more than one violation predicts poor
+      // oral bioavailability, not zero violations — one alone is tolerated.
+      passesRuleOfFive: violations.length <= 1,
+      source: 'PubChem + Lipinski Rule of Five',
+    }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+/** Evaluates drug-likeness for several compounds concurrently, dropping any that fail or aren't found. */
+export async function lookupDrugLikenessMany(names: string[]): Promise<DrugLikenessResult[]> {
+  const results = await Promise.all(names.slice(0, 3).map((name) => lookupDrugLikeness(name)))
+  return results.filter((r): r is DrugLikenessResult => r !== null)
+}

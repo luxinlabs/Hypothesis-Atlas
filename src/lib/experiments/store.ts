@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Experiment, ExperimentSession } from "@prisma/client";
 import type {
   ExperimentDomain,

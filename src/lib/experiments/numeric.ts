@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Shared plain-arithmetic helpers used by every domain's fast numeric-claim
 // path (currently: the original math-domain claim verifier and the
 // chemistry/biology/drug_discovery protocol dose-math checker). Physics uses

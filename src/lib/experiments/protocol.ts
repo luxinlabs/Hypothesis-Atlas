@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { create, all } from 'mathjs'
 import { groq } from '@/lib/groq'
 import { toAsciiMath, closeEnough } from './numeric'

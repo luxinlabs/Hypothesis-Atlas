@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { NextRequest, NextResponse } from 'next/server'
 import { groq } from '@/lib/groq'
 import { verifyProtocolClaim } from '@/lib/experiments/protocol'

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { NextResponse } from 'next/server'
 import { isRateLimited, RATE_LIMIT_MAX_REQUESTS_PER_MIN } from './lean'
 

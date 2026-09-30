@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { domainKind, type ExperimentRecord, type MathResult, type PhysicsResult, type ProtocolResult } from './types'
 
 function resultSummary(record: ExperimentRecord): string {

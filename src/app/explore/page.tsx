@@ -153,6 +153,12 @@ const NAV_ITEMS: { href: string; label: string; icon: string; iconClass: string 
     iconClass: "text-emerald-500",
   },
   {
+    href: "/experiments",
+    label: "Experiments",
+    icon: "M9 3h6m-5 0v6.09a2 2 0 01-.4 1.2L5.3 17.5A2 2 0 007 21h10a2 2 0 001.7-3.5l-4.3-7.21a2 2 0 01-.4-1.2V3m-5 0h5",
+    iconClass: "text-indigo-500",
+  },
+  {
     href: "/docs",
     label: "Docs",
     icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5H4v15h3.5c1.746 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5H20v15h-3.5c-1.746 0-3.332.477-4.5 1.253",

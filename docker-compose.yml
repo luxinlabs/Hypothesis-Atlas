@@ -21,6 +21,30 @@ services:
     volumes:
       - redis_data:/data
 
+  # Opt-in (multi-GB image): `make lean-up`. Not started by `make infra-up`.
+  lean-checker:
+    profiles: ["lean"]
+    build: ./lean-checker
+    container_name: hypothesis_atlas_lean
+    init: true   # reap the REPL's child processes after a timeout kill
+    ports:
+      - "127.0.0.1:8765:8765"
+    mem_limit: 6g
+    cpus: 4
+    pids_limit: 512
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
   redis_data:

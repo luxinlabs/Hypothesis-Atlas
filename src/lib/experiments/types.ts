@@ -13,6 +13,24 @@
 
 export type ExperimentDomain = "math" | "physics" | "biology" | "chemistry" | "drug_discovery";
 
+/**
+ * Which verification backend a domain uses. Every place that needs to route
+ * by domain (creating a claim, verifying it, summarizing it, choosing which
+ * workspace component to render) should classify through this one function
+ * rather than re-writing its own `domain === 'math' ? ... : domain ===
+ * 'physics' ? ...` chain — four such chains existed independently before
+ * (ProveClaimPanel's create/verify dispatch, its summary line, its render
+ * switch, and context.ts's result summary) and could silently drift out of
+ * sync when a domain was added.
+ */
+export type DomainKind = "math" | "physics" | "protocol";
+
+export function domainKind(domain: ExperimentDomain): DomainKind {
+  if (domain === "math") return "math";
+  if (domain === "physics") return "physics";
+  return "protocol";
+}
+
 export const EXPERIMENT_DOMAINS: {
   id: ExperimentDomain;
   label: string;

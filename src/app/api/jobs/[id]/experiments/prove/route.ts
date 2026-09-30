@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkWithLeanService, isRateLimited, RATE_LIMIT_MAX_REQUESTS_PER_MIN } from '@/lib/experiments/lean'
+import { checkWithLeanService } from '@/lib/experiments/lean'
+import { rateLimitOrError } from '@/lib/experiments/guard'
 import type { ClaimStatus } from '@/lib/experiments/types'
 
 interface VerifyResult {
@@ -17,12 +18,8 @@ interface VerifyResult {
  * it's now a visible, human-in-the-loop step rather than hidden retries.
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  if (isRateLimited(params.id)) {
-    return NextResponse.json(
-      { error: `Too many requests for this job — wait a minute and try again (limit: ${RATE_LIMIT_MAX_REQUESTS_PER_MIN}/min).` },
-      { status: 429 }
-    )
-  }
+  const guard = rateLimitOrError(params.id)
+  if (guard) return guard
 
   const { leanCode } = (await request.json()) as { leanCode?: string }
   if (!leanCode || !leanCode.trim()) {

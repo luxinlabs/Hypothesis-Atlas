@@ -1,13 +1,14 @@
-import type { ExperimentRecord, MathResult, PhysicsResult, ProtocolResult } from './types'
+import { domainKind, type ExperimentRecord, type MathResult, type PhysicsResult, type ProtocolResult } from './types'
 
 function resultSummary(record: ExperimentRecord): string {
   if (!record.result) return record.status
-  if (record.domain === 'math') {
+  const kind = domainKind(record.domain)
+  if (kind === 'math') {
     const r = record.result as MathResult
     if (r.hasSorry) return 'proved with an unproved `sorry` step'
     return record.status === 'verified' ? 'proved in Lean' : record.status
   }
-  if (record.domain === 'physics') {
+  if (kind === 'physics') {
     const r = record.result as PhysicsResult
     if (r.unitsOk === false) return `dimensional mismatch (${r.unitError ?? 'units incompatible'})`
     if (r.numericOk === false) return 'units consistent but numeric value did not match'

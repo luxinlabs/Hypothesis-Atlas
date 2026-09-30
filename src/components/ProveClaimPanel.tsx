@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import MathText from "./MathText";
 import {
   EXPERIMENT_DOMAINS,
+  domainKind,
   type ClaimStatus,
   type ExperimentDomain,
   type ExperimentRecord,
@@ -173,13 +174,14 @@ async function requestJson<T>(url: string, method: string, body?: unknown): Prom
 
 /** One-line result summary shown on the collapsed response bubble, before it's expanded into the full workspace. */
 function summaryLine(entry: ExperimentRecord): string {
-  if (entry.domain === "math") {
+  const kind = domainKind(entry.domain);
+  if (kind === "math") {
     const r = entry.result as MathResult | null;
     if (r?.hasSorry) return "Contains sorry — type-checks but incomplete";
     if (r?.note) return r.note;
     return STATUS_LABEL[entry.status];
   }
-  if (entry.domain === "physics") {
+  if (kind === "physics") {
     const r = entry.result as PhysicsResult | null;
     if (!r) return STATUS_LABEL[entry.status];
     const parts: string[] = [];
@@ -350,7 +352,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
         sessionId = created.id;
       }
 
-      if (domain === "math") {
+      if (domainKind(domain) === "math") {
         const outcome = await requestJson<{ leanCode: string }>(`/api/jobs/${jobId}/experiments/formalize`, "POST", { claim });
         if (!outcome.ok) {
           setError(outcome.message);
@@ -403,9 +405,10 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   }
 
   async function handleVerify(entry: ExperimentRecord) {
-    upsert({ ...entry, status: entry.domain === "math" ? "verifying" : entry.status });
+    const kind = domainKind(entry.domain);
+    upsert({ ...entry, status: kind === "math" ? "verifying" : entry.status });
 
-    if (entry.domain === "math") {
+    if (kind === "math") {
       const leanCode = (entry.result as MathResult | null)?.leanCode ?? "";
       const outcome = await requestJson<{
         status: ClaimStatus;
@@ -429,7 +432,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       return;
     }
 
-    if (entry.domain === "physics") {
+    if (kind === "physics") {
       const outcome = await requestJson<{ status: ClaimStatus; result: PhysicsResult }>(
         `/api/jobs/${jobId}/experiments/verify-physics`,
         "POST",
@@ -708,6 +711,7 @@ function FeedItem({
 }) {
   const busy = entry.status === "verifying" || entry.status === "formalizing";
   const style = DOMAIN_STYLE[entry.domain];
+  const kind = domainKind(entry.domain);
 
   return (
     <div className="space-y-2">
@@ -738,16 +742,14 @@ function FeedItem({
 
           {expanded && (
             <div className="mt-2 rounded-2xl border border-gray-200 bg-white p-4 space-y-3 shadow-sm">
-              {entry.domain === "math" && (
+              {kind === "math" && (
                 <MathWorkspace entry={entry} onVerify={onVerify} onAskAIToFix={onAskAIToFix} onEditLeanCode={onEditLeanCode} />
               )}
-              {entry.domain === "physics" && <PhysicsWorkspace entry={entry} />}
-              {(entry.domain === "chemistry" || entry.domain === "biology" || entry.domain === "drug_discovery") && (
-                <ProtocolWorkspace entry={entry} />
-              )}
+              {kind === "physics" && <PhysicsWorkspace entry={entry} />}
+              {kind === "protocol" && <ProtocolWorkspace entry={entry} />}
 
               <div className="flex items-center gap-2">
-                {entry.domain !== "math" && (
+                {kind !== "math" && (
                   <button
                     onClick={() => onVerify(entry)}
                     disabled={busy}

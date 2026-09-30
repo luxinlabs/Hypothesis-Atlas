@@ -16,10 +16,10 @@ interface RawPhysicsClaim {
  * job here is much narrower: pull out an equation mathjs can evaluate with
  * units attached (e.g. "9.8 m/s^2 * 2 s"), not judge correctness itself.
  */
-async function extractPhysicsClaim(claim: string, linkedContext?: string): Promise<RawPhysicsClaim | null> {
+async function extractPhysicsClaim(claim: string, sessionContext?: string): Promise<RawPhysicsClaim | null> {
   if (!groq) return null
-  const contextBlock = linkedContext
-    ? `\n\nRelated sessions already investigated in this notebook (background only, not verified facts to assume):\n${linkedContext}`
+  const contextBlock = sessionContext
+    ? `\n\nEarlier claims already investigated in this conversation (background only, not verified facts to assume):\n${sessionContext}`
     : ''
   const completion = await groq.chat.completions.create({
     model: 'openai/gpt-oss-120b',
@@ -99,8 +99,8 @@ function errorMessage(err: unknown): string {
  * units, and otherwise returns their difference converted to a common unit —
  * exactly what "is this dimensionally consistent" means.
  */
-export async function verifyPhysicsClaim(claim: string, linkedContext?: string): Promise<PhysicsResult> {
-  const extracted = await extractPhysicsClaim(claim, linkedContext)
+export async function verifyPhysicsClaim(claim: string, sessionContext?: string): Promise<PhysicsResult> {
+  const extracted = await extractPhysicsClaim(claim, sessionContext)
   if (!extracted?.expression) {
     return {
       expression: '',

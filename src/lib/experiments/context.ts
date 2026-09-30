@@ -20,14 +20,17 @@ function resultSummary(record: ExperimentRecord): string {
 }
 
 /**
- * Formats linked sessions as a short read-only context block for an LLM
- * prompt (autoformalize, physics extraction, protocol review). This is
- * background only — the linked session's claim/result is shown so the model
- * can avoid contradicting or re-deriving it, but it is never treated as a
- * verified premise the new claim can lean on. See the V3 follow-up on
- * sharing verification context across linked sessions.
+ * Formats a session's other claims as a short read-only context block for an
+ * LLM prompt (autoformalize, physics extraction, protocol review). This is
+ * background only — a sibling claim's result is shown so the model can
+ * avoid contradicting or re-deriving it, but it is never treated as a
+ * verified premise the new claim can lean on. Every claim passed in is
+ * guaranteed to be the same domain as the one being checked, since a
+ * session is scoped to one domain for its whole lifetime — there is no
+ * cross-domain variant of this (see the schema comment on
+ * ExperimentSession for why that was removed).
  */
-export function formatLinkedContext(sessions: ExperimentRecord[]): string | undefined {
-  if (sessions.length === 0) return undefined
-  return sessions.map((s) => `- [${s.domain}] "${s.claim}" — ${resultSummary(s)}`).join('\n')
+export function formatSessionContext(siblingClaims: ExperimentRecord[]): string | undefined {
+  if (siblingClaims.length === 0) return undefined
+  return siblingClaims.map((s) => `- "${s.claim}" — ${resultSummary(s)}`).join('\n')
 }

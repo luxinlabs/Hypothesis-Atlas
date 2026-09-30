@@ -43,11 +43,11 @@ const DOMAIN_FOCUS: Record<Extract<ExperimentDomain, 'chemistry' | 'biology' | '
 async function reviewProtocol(
   domain: 'chemistry' | 'biology' | 'drug_discovery',
   claim: string,
-  linkedContext?: string
+  sessionContext?: string
 ): Promise<RawReview | null> {
   if (!groq) return null
-  const contextBlock = linkedContext
-    ? `\n\nRelated sessions already investigated in this notebook (background only, not verified facts to assume):\n${linkedContext}`
+  const contextBlock = sessionContext
+    ? `\n\nEarlier claims already investigated in this conversation (background only, not verified facts to assume):\n${sessionContext}`
     : ''
   // Chemistry gets a third extraction task: named compounds, so their
   // molecular weight can be grounded against PubChem instead of trusting
@@ -91,9 +91,9 @@ async function reviewProtocol(
 export async function verifyProtocolClaim(
   domain: 'chemistry' | 'biology' | 'drug_discovery',
   claim: string,
-  linkedContext?: string
+  sessionContext?: string
 ): Promise<ProtocolResult> {
-  const review = await reviewProtocol(domain, claim, linkedContext)
+  const review = await reviewProtocol(domain, claim, sessionContext)
   if (!review) {
     return {
       numericChecks: [],

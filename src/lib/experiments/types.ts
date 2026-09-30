@@ -4,9 +4,11 @@
 // dose/reagent math) plug into the same shell with their own verification
 // backends (see V3-EXPERIMENTS-PLAN.md, Phase 3).
 //
-// Sessions are persisted server-side as `Experiment` rows (see
-// prisma/schema.prisma) rather than in localStorage, so they can be linked
-// together (see `groupId`) and listed from the API.
+// Claims are persisted server-side as `Experiment` rows (see
+// prisma/schema.prisma), grouped into `ExperimentSession`s. A session is
+// scoped to exactly one domain by construction — this replaced an earlier
+// groupId-based "linking" scheme that had no domain check and let a math
+// claim and a drug-discovery claim end up sharing context.
 
 export type ExperimentDomain = "math" | "physics" | "biology" | "chemistry" | "drug_discovery";
 
@@ -80,20 +82,34 @@ export interface ProtocolResult {
 export type ExperimentResult = MathResult | PhysicsResult | ProtocolResult;
 
 /**
- * One claim/session in a research job's Experiments notebook, persisted as
- * an `Experiment` row. The workflow is client-driven and explicit rather
- * than one opaque "verify" call — see each domain's verify route for its
- * own state machine (math: formalize -> ready -> verify; physics/protocol:
+ * One claim in a session's Experiments notebook, persisted as an
+ * `Experiment` row. The workflow is client-driven and explicit rather than
+ * one opaque "verify" call — see each domain's verify route for its own
+ * state machine (math: formalize -> ready -> verify; physics/protocol:
  * state claim -> verify directly).
  */
 export interface ExperimentRecord {
   id: string;
   jobId: string;
+  sessionId: string;
   domain: ExperimentDomain;
   claim: string;
   status: ClaimStatus;
   result: ExperimentResult | null;
-  groupId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * A conversation thread, scoped to exactly one domain. Claims (Experiment
+ * rows) belong to a session; a session's domain determines what its claims
+ * are checked as, and there is no way to mix domains within one session.
+ */
+export interface ExperimentSessionRecord {
+  id: string;
+  jobId: string;
+  domain: ExperimentDomain;
+  title: string | null;
   createdAt: string;
   updatedAt: string;
 }

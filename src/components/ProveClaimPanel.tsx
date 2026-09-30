@@ -7,11 +7,12 @@ import {
   type ClaimStatus,
   type ExperimentDomain,
   type ExperimentRecord,
+  type ExperimentSessionRecord,
   type MathResult,
   type PhysicsResult,
   type ProtocolResult,
 } from "@/lib/experiments/types";
-import { formatLinkedContext } from "@/lib/experiments/context";
+import { formatSessionContext } from "@/lib/experiments/context";
 
 interface ProveClaimPanelProps {
   jobId: string;
@@ -197,20 +198,25 @@ function summaryLine(entry: ExperimentRecord): string {
 
 export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
   const [domain, setDomain] = useState<ExperimentDomain>("math");
+  const [sessions, setSessions] = useState<ExperimentSessionRecord[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [experiments, setExperiments] = useState<ExperimentRecord[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newClaim, setNewClaim] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
-  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const feedEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    requestJson<{ experiments: ExperimentRecord[] }>(`/api/jobs/${jobId}/experiments`, "GET").then((outcome) => {
+    Promise.all([
+      requestJson<{ sessions: ExperimentSessionRecord[] }>(`/api/jobs/${jobId}/experiment-sessions`, "GET"),
+      requestJson<{ experiments: ExperimentRecord[] }>(`/api/jobs/${jobId}/experiments`, "GET"),
+    ]).then(([sessionsOutcome, experimentsOutcome]) => {
       if (cancelled) return;
-      if (outcome.ok) setExperiments(outcome.data.experiments);
+      if (sessionsOutcome.ok) setSessions(sessionsOutcome.data.sessions);
+      if (experimentsOutcome.ok) setExperiments(experimentsOutcome.data.experiments);
       setLoaded(true);
     });
     return () => {
@@ -218,31 +224,48 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     };
   }, [jobId]);
 
+  // Sessions are scoped to exactly one domain by construction, so switching
+  // the domain tab naturally switches which sessions are even selectable —
+  // there is no way to see, let alone mix, another domain's sessions here.
+  const domainSessions = sessions.filter((s) => s.domain === domain);
+  const activeSession = domainSessions.find((s) => s.id === activeSessionId) ?? null;
+
   // Feed reads oldest-first, newest at the bottom — a conversation, not an
-  // inbox. The API returns newest-first (for the old list-style UI this
-  // replaced), so reverse it here rather than changing the API's contract.
-  const domainEntries = experiments.filter((e) => e.domain === domain).slice().reverse();
-  const active = experiments.find((e) => e.id === activeId) ?? null;
-  const linkedSessions = active?.groupId
-    ? experiments.filter((e) => e.groupId === active.groupId && e.id !== active.id)
+  // inbox. The API returns newest-first, so reverse it here rather than
+  // changing the API's contract. Scoped to the active session only — this
+  // is what replaced one never-ending per-domain feed with real,
+  // switchable conversations.
+  const domainEntries = activeSessionId
+    ? experiments.filter((e) => e.sessionId === activeSessionId).slice().reverse()
     : [];
-  const linkable = experiments.filter(
-    (e) => e.id !== active?.id && (!active?.groupId || e.groupId !== active.groupId)
-  );
+  const active = experiments.find((e) => e.id === activeId) ?? null;
 
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [domainEntries.length, domain]);
+  }, [domainEntries.length, activeSessionId]);
+
+  // Runs on domain change and once the initial fetch completes — lands on
+  // that domain's most recently active session (or none, if it has none
+  // yet). Switching domains should never leave a stale session from a
+  // different domain selected, since sessions are domain-exclusive.
+  useEffect(() => {
+    const stillValid = domainSessions.some((s) => s.id === activeSessionId);
+    if (!stillValid) {
+      setActiveSessionId(domainSessions[0]?.id ?? null);
+      setActiveId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domain, loaded]);
 
   // Background-only context for LLM steps (autoformalize, physics
-  // extraction, protocol review) — the linked sessions' own claims/results
-  // are shown so a re-check doesn't contradict them, but never trusted as
-  // verified premises. See the V3 follow-up on sharing context across
-  // linked sessions.
-  function getLinkedContext(entry: ExperimentRecord): string | undefined {
-    if (!entry.groupId) return undefined;
-    const linked = experiments.filter((e) => e.groupId === entry.groupId && e.id !== entry.id);
-    return formatLinkedContext(linked);
+  // extraction, protocol review) — sibling claims already in the same
+  // session are shown so a re-check doesn't contradict them, but never
+  // trusted as verified premises. Automatic and unconditional: every claim
+  // in a session is, by construction, the same domain and about the same
+  // line of investigation, so there's no picking/linking step needed.
+  function getSessionContext(entry: ExperimentRecord): string | undefined {
+    const siblings = experiments.filter((e) => e.sessionId === entry.sessionId && e.id !== entry.id);
+    return formatSessionContext(siblings);
   }
 
   function upsert(record: ExperimentRecord) {
@@ -255,11 +278,70 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     });
   }
 
+  function upsertSession(record: ExperimentSessionRecord) {
+    setSessions((prev) => {
+      const idx = prev.findIndex((s) => s.id === record.id);
+      if (idx === -1) return [record, ...prev];
+      const next = [...prev];
+      next[idx] = record;
+      return next;
+    });
+  }
+
+  /** Creates a new session in the current domain and makes it active. Used both by "+ New" and by auto-create-on-first-message. */
+  async function createSession(title?: string): Promise<ExperimentSessionRecord | null> {
+    const outcome = await requestJson<{ session: ExperimentSessionRecord }>(
+      `/api/jobs/${jobId}/experiment-sessions`,
+      "POST",
+      { domain, title }
+    );
+    if (!outcome.ok) {
+      setError(outcome.message);
+      return null;
+    }
+    upsertSession(outcome.data.session);
+    setActiveSessionId(outcome.data.session.id);
+    setActiveId(null);
+    return outcome.data.session;
+  }
+
+  async function handleRenameSession(session: ExperimentSessionRecord) {
+    const title = window.prompt("Rename session", session.title ?? "");
+    if (title === null) return;
+    const outcome = await requestJson<{ session: ExperimentSessionRecord }>(
+      `/api/jobs/${jobId}/experiment-sessions/${session.id}`,
+      "PATCH",
+      { title }
+    );
+    if (outcome.ok) upsertSession(outcome.data.session);
+  }
+
+  async function handleDeleteSession(session: ExperimentSessionRecord) {
+    if (!window.confirm(`Delete "${session.title ?? "this session"}" and everything in it?`)) return;
+    setSessions((prev) => prev.filter((s) => s.id !== session.id));
+    setExperiments((prev) => prev.filter((e) => e.sessionId !== session.id));
+    if (activeSessionId === session.id) setActiveSessionId(null);
+    await requestJson(`/api/jobs/${jobId}/experiment-sessions/${session.id}`, "DELETE");
+  }
+
   async function handleCreate() {
     const claim = newClaim.trim();
     if (!claim) return;
     setCreating(true);
     setError("");
+
+    // Auto-create a session on first message, like a chat app opening a new
+    // conversation the moment you start typing — no separate "new session"
+    // click required.
+    let sessionId = activeSessionId;
+    if (!sessionId) {
+      const created = await createSession(claim.length > 60 ? `${claim.slice(0, 57)}...` : claim);
+      if (!created) {
+        setCreating(false);
+        return;
+      }
+      sessionId = created.id;
+    }
 
     if (domain === "math") {
       const outcome = await requestJson<{ leanCode: string }>(`/api/jobs/${jobId}/experiments/formalize`, "POST", { claim });
@@ -270,7 +352,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       }
       const result: MathResult = { leanCode: outcome.data.leanCode };
       const created = await requestJson<{ experiment: ExperimentRecord }>(`/api/jobs/${jobId}/experiments`, "POST", {
-        domain,
+        sessionId,
         claim,
         status: "ready",
         result,
@@ -291,7 +373,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     // immediately, then verify — unlike math there's no separate review step
     // before a checker runs (no formal statement to review).
     const created = await requestJson<{ experiment: ExperimentRecord }>(`/api/jobs/${jobId}/experiments`, "POST", {
-      domain,
+      sessionId,
       claim,
       status: "draft",
     });
@@ -345,7 +427,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       const outcome = await requestJson<{ status: ClaimStatus; result: PhysicsResult }>(
         `/api/jobs/${jobId}/experiments/verify-physics`,
         "POST",
-        { claim: entry.claim, linkedContext: getLinkedContext(entry) }
+        { claim: entry.claim, sessionContext: getSessionContext(entry) }
       );
       if (!outcome.ok) {
         const patched = await patchExperiment(entry.id, { status: "error" });
@@ -362,7 +444,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     const outcome = await requestJson<{ status: ClaimStatus; result: ProtocolResult }>(
       `/api/jobs/${jobId}/experiments/verify-protocol`,
       "POST",
-      { domain: entry.domain, claim: entry.claim, linkedContext: getLinkedContext(entry) }
+      { domain: entry.domain, claim: entry.claim, sessionContext: getSessionContext(entry) }
     );
     if (!outcome.ok) {
       const patched = await patchExperiment(entry.id, { status: "error" });
@@ -393,7 +475,7 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
       claim: entry.claim,
       priorLeanCode: mathResult?.leanCode,
       priorDiagnostics: mathResult?.diagnostics,
-      linkedContext: getLinkedContext(entry),
+      sessionContext: getSessionContext(entry),
     });
     if (!outcome.ok) {
       const patched = await patchExperiment(entry.id, { status: "error" });
@@ -417,31 +499,6 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     setExperiments((prev) => prev.filter((e) => e.id !== id));
     if (activeId === id) setActiveId(null);
     await requestJson(`/api/jobs/${jobId}/experiments/${id}`, "DELETE");
-  }
-
-  async function handleLink(targetId: string) {
-    if (!active) return;
-    const outcome = await requestJson<{ experiments: ExperimentRecord[] }>(
-      `/api/jobs/${jobId}/experiments/${active.id}/link`,
-      "POST",
-      { targetId }
-    );
-    if (outcome.ok) {
-      setExperiments((prev) => {
-        const byId = new Map(prev.map((e) => [e.id, e]));
-        for (const e of outcome.data.experiments) byId.set(e.id, e);
-        return Array.from(byId.values());
-      });
-    }
-    setLinkPickerOpen(false);
-  }
-
-  async function handleUnlink(id: string) {
-    const outcome = await requestJson<{ experiment: ExperimentRecord }>(
-      `/api/jobs/${jobId}/experiments/${id}/link`,
-      "DELETE"
-    );
-    if (outcome.ok) upsert(outcome.data.experiment);
   }
 
   const style = DOMAIN_STYLE[domain];
@@ -549,65 +606,64 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
         </div>
       </div>
 
-      {/* Right: linked sessions sidebar */}
+      {/* Right: sessions sidebar — scoped to the active domain only, so a
+          math conversation and a drug-discovery conversation can never
+          appear side by side as if they were related. */}
       <div className="hidden lg:flex w-64 flex-shrink-0 flex-col border-l border-gray-100 h-full">
         <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Linked sessions</span>
-          {active && (
-            <button
-              onClick={() => setLinkPickerOpen((v) => !v)}
-              className={`text-[10px] font-semibold ${style.accentText} hover:brightness-90`}
-            >
-              + Link
-            </button>
-          )}
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+            {style.icon} {EXPERIMENT_DOMAINS.find((d) => d.id === domain)?.label} sessions
+          </span>
+          <button
+            onClick={() => createSession()}
+            className={`text-[10px] font-semibold ${style.accentText} hover:brightness-90`}
+          >
+            + New
+          </button>
         </div>
 
-        {!active ? (
-          <p className="text-[11px] text-gray-400 px-4 py-4">Select a session to see or add links.</p>
-        ) : linkPickerOpen ? (
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {linkable.length === 0 && <p className="text-[11px] text-gray-400 px-2 py-2">No other sessions to link yet.</p>}
-            {linkable.map((e) => (
-              <button
-                key={e.id}
-                onClick={() => handleLink(e.id)}
-                className="w-full text-left rounded-xl px-3 py-2 border border-transparent hover:bg-gray-50 hover:border-gray-200"
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {loaded && domainSessions.length === 0 && (
+            <p className="text-[11px] text-gray-400 px-3 py-4 text-center">
+              No {EXPERIMENT_DOMAINS.find((d) => d.id === domain)?.label.toLowerCase()} sessions yet — one starts
+              automatically the moment you send a claim below.
+            </p>
+          )}
+          {domainSessions.map((s) => {
+            const count = experiments.filter((e) => e.sessionId === s.id).length;
+            return (
+              <div
+                key={s.id}
+                className={`rounded-xl px-3 py-2 border transition-colors ${
+                  s.id === activeSessionId ? `${style.accentBg} border-transparent` : "border-transparent hover:bg-gray-50"
+                }`}
               >
-                <p className="text-[11px] text-gray-700 line-clamp-2">{e.claim}</p>
-                <span className="text-[10px] text-gray-400">
-                  {DOMAIN_STYLE[e.domain].icon} {EXPERIMENT_DOMAINS.find((d) => d.id === e.domain)?.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-            {linkedSessions.length === 0 && (
-              <p className="text-[11px] text-gray-400 px-3 py-4 text-center">
-                Not linked to anything. Link this session to related claims to browse them together.
-              </p>
-            )}
-            {linkedSessions.map((e) => (
-              <div key={e.id} className="rounded-xl border border-gray-100 px-3 py-2">
-                <button onClick={() => setActiveId(e.id)} className="w-full text-left">
-                  <p className="text-[11px] text-gray-700 line-clamp-2">
-                    {DOMAIN_STYLE[e.domain].icon} {e.claim}
+                <button onClick={() => { setActiveSessionId(s.id); setActiveId(null); }} className="w-full text-left">
+                  <p className="text-[11px] text-gray-700 line-clamp-2 font-medium">
+                    {s.title ?? "Untitled session"}
                   </p>
-                  <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[e.status]}`}>
-                    {STATUS_LABEL[e.status]}
+                  <span className="text-[10px] text-gray-400">
+                    {count} claim{count === 1 ? "" : "s"}
                   </span>
                 </button>
-                <button
-                  onClick={() => handleUnlink(e.id)}
-                  className="text-[10px] text-gray-400 hover:text-red-500 mt-1"
-                >
-                  Unlink
-                </button>
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    onClick={() => handleRenameSession(s)}
+                    className="text-[10px] text-gray-400 hover:text-gray-600"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={() => handleDeleteSession(s)}
+                    className="text-[10px] text-gray-400 hover:text-red-500"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -662,11 +718,6 @@ function FeedItem({
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLE[entry.status]}`}>
                 {STATUS_LABEL[entry.status]}
               </span>
-              {entry.groupId && (
-                <span className="text-[10px] text-gray-400" title="Linked to other sessions">
-                  🔗
-                </span>
-              )}
               <span className="text-xs text-gray-600 truncate">{summaryLine(entry)}</span>
               <span className={`ml-auto text-[10px] ${style.accentText}`}>{expanded ? "hide details ▲" : "details ▼"}</span>
             </div>

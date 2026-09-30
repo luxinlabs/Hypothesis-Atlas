@@ -37,10 +37,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     )
   }
 
-  const { domain, claim, linkedContext } = (await request.json().catch(() => ({}))) as {
+  const { domain, claim, sessionContext } = (await request.json().catch(() => ({}))) as {
     domain?: string
     claim?: string
-    linkedContext?: string
+    sessionContext?: string
   }
   if (!domain || !PROTOCOL_DOMAINS.has(domain)) {
     return NextResponse.json({ error: `Domain must be one of: ${[...PROTOCOL_DOMAINS].join(', ')}` }, { status: 400 })
@@ -49,6 +49,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: 'No claim provided' }, { status: 400 })
   }
 
-  const result = await verifyProtocolClaim(domain as 'chemistry' | 'biology' | 'drug_discovery', claim, linkedContext)
+  const result = await verifyProtocolClaim(domain as 'chemistry' | 'biology' | 'drug_discovery', claim, sessionContext)
   return NextResponse.json({ result, status: statusFor(result) })
 }

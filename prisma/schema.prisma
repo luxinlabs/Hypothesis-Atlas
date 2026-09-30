@@ -165,25 +165,45 @@ model Top3Ideas {
 
 // V3 — Experiments module (persisted claim sessions, domain-routed verification)
 
+// A session is scoped to exactly one domain by construction — a claim's
+// session determines its domain, so a math claim and a drug-discovery claim
+// can never end up sharing context. This replaces the earlier groupId-based
+// "linking" (see git history), which had no domain check and let any two
+// claims in any two domains be linked together.
+model ExperimentSession {
+  id        String   @id @default(cuid())
+  jobId     String // provenance only, like Experiment.jobId below — not an enforced FK
+  domain    String // 'math' | 'physics' | 'chemistry' | 'biology' | 'drug_discovery'
+  title     String? // user-editable; defaults to a snippet of the first claim if unset
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([domain])
+}
+
 // jobId is a provenance field only (like GraphEntity.jobId above), not an
 // enforced foreign key: the standalone /experiments page uses a fixed
 // pseudo-session id that isn't backed by a real Job row (see its page.tsx),
 // so a hard FK would break that flow. Experiments made inside a real
 // research job still get a real Job cuid here — it's just not constrained.
+// sessionId is similarly provenance-style (not a hard FK) for consistency,
+// but every claim's domain must match its session's domain — enforced at
+// the API layer, not the database.
 model Experiment {
   id          String   @id @default(cuid())
   jobId       String
+  sessionId   String
   domain      String   // 'math' | 'physics' | 'chemistry' | 'biology' | 'drug_discovery'
   claim       String   @db.Text
   status      String   @default("draft") // 'draft' | 'ready' | 'formalizing' | 'verifying' | 'verified' | 'failed' | 'incomplete' | 'flagged' | 'error'
-  resultJson  String?  @db.Text // domain-specific payload: Lean code/diagnostics for math, unit-check detail for physics, protocol flags for chem/bio/drug_discovery
-  groupId     String?  // sessions sharing a groupId are "linked" together and browsed as one set; null = not linked to anything
+  resultJson  String?  @db.Text // domain-specific payload: Lean code/diagnostics for math, unit-check detail for physics, protocol flags/drug-likeness for chem/bio/drug_discovery
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([jobId])
+  @@index([sessionId])
   @@index([domain])
-  @@index([groupId])
 }
 
 model PaperSubscription {

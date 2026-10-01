@@ -8,6 +8,11 @@ import type { ClaimStatus, PhysicsResult } from '@/lib/experiments/types'
 function statusFor(result: PhysicsResult): ClaimStatus {
   if (result.unitsOk === null) return 'incomplete'
   if (result.unitsOk === false) return 'failed'
+  // A physical-plausibility violation (faster than light, below absolute
+  // zero, negative mass) is a real correctness error, same tier as a
+  // numeric mismatch — not a soft prediction like drug_discovery's Lipinski
+  // check, so it fails rather than merely flags.
+  if ((result.plausibilityFlags ?? []).length > 0) return 'failed'
   if (result.numericOk === null) return 'incomplete'
   return result.numericOk ? 'verified' : 'failed'
 }

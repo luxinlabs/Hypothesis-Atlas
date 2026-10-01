@@ -35,9 +35,11 @@ const EXAMPLE_CLAIMS: Record<ExperimentDomain, { label: string; value: string }[
   chemistry: [
     { label: "Molarity", value: "Dissolving 0.5 mol NaCl in 2 L of water gives a 0.25 mol/L solution." },
     { label: "Stoichiometry", value: "Reacting 2 mol of H2 with 1 mol of O2 produces 2 mol of water, a yield of 36.03 g." },
+    { label: "Equation balance", value: "The combustion reaction 2 H2 + O2 -> 2 H2O is a balanced chemical equation." },
   ],
   biology: [
     { label: "Dilution series", value: "A 1:10 serial dilution repeated 3 times from a 10^6 cells/mL stock gives 10^3 cells/mL." },
+    { label: "Sample size", value: "Using n=2 biological replicates per group, we observed a significant difference (p<0.05) in gene expression." },
   ],
   drug_discovery: [
     { label: "Dose conversion", value: "A 70 kg patient dosed at 5 mg/kg receives 350 mg total." },
@@ -184,6 +186,7 @@ function summaryLine(entry: ExperimentRecord): string {
   if (kind === "physics") {
     const r = entry.result as PhysicsResult | null;
     if (!r) return STATUS_LABEL[entry.status];
+    if (r.plausibilityFlags && r.plausibilityFlags.length > 0) return "physically impossible";
     const parts: string[] = [];
     if (r.unitsOk !== null) parts.push(`units ${r.unitsOk ? "consistent" : "mismatch"}`);
     if (r.numericOk !== null) parts.push(`numeric ${r.numericOk ? "matches" : "mismatch"}`);
@@ -194,6 +197,7 @@ function summaryLine(entry: ExperimentRecord): string {
   const checked = r.numericChecks.filter((c) => c.ok !== null).length;
   const failed = r.numericChecks.filter((c) => c.ok === false).length;
   const parts: string[] = [];
+  if (r.equationBalance) parts.push(r.equationBalance.balanced ? "equation balanced" : "equation NOT balanced");
   if (checked > 0) parts.push(`${checked - failed}/${checked} checks passed`);
   if (r.flags.length > 0) parts.push(`${r.flags.length} flag${r.flags.length > 1 ? "s" : ""}`);
   return parts.length > 0 ? parts.join(" · ") : STATUS_LABEL[entry.status];
@@ -875,6 +879,15 @@ function PhysicsWorkspace({ entry }: { entry: ExperimentRecord }) {
           </p>
           {result.computed !== null && <p>computed: {result.computed}</p>}
           {result.unitError && <p className="text-red-500">{result.unitError}</p>}
+          {result.plausibilityFlags && result.plausibilityFlags.length > 0 && (
+            <div className="not-italic font-sans space-y-0.5 pt-1">
+              {result.plausibilityFlags.map((f, i) => (
+                <p key={i} className="text-red-600">
+                  ⚠ {f}
+                </p>
+              ))}
+            </div>
+          )}
           {result.note && <p className="text-gray-400 italic">{result.note}</p>}
         </div>
       )}
@@ -951,6 +964,27 @@ function ProtocolWorkspace({ entry }: { entry: ExperimentRecord }) {
                   <span className="text-gray-400 ml-1">({f.source})</span>
                 </p>
               ))}
+            </div>
+          )}
+          {result.equationBalance && (
+            <div
+              className={`rounded-lg border px-3 py-2 space-y-1 ${
+                result.equationBalance.balanced ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"
+              }`}
+            >
+              <p
+                className={`text-[9px] font-bold uppercase tracking-wide ${
+                  result.equationBalance.balanced ? "text-emerald-600" : "text-red-600"
+                }`}
+              >
+                Equation balance {result.equationBalance.balanced ? "— balanced" : "— NOT balanced"}
+              </p>
+              {!result.equationBalance.balanced &&
+                result.equationBalance.mismatches.map((m, i) => (
+                  <p key={i} className="text-[11px] text-red-600 font-mono">
+                    {m}
+                  </p>
+                ))}
             </div>
           )}
           {result.drugLikeness && result.drugLikeness.length > 0 && (

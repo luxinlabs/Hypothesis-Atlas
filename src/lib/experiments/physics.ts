@@ -89,6 +89,46 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'Unit/expression error'
 }
 
+const SPEED_OF_LIGHT_M_PER_S = 299_792_458
+
+/**
+ * Checks a computed quantity against a small set of real physical
+ * constraints — this is what makes physics verification more than relabeled
+ * arithmetic: a numerically "correct" equation can still describe something
+ * physically impossible (a faster-than-light velocity, a temperature below
+ * absolute zero, negative mass), and dimensional analysis alone doesn't
+ * catch that. Only checks quantities whose unit is recognizably a velocity,
+ * absolute temperature, or mass — anything else is left alone rather than
+ * guessed at.
+ */
+function checkPhysicalPlausibility(value: unknown): string[] {
+  if (!value || typeof (value as { equalBase?: unknown }).equalBase !== 'function') return []
+  const unit = value as { equalBase: (u: unknown) => boolean; toSI: () => { toNumber: () => number } }
+  const flags: string[] = []
+  try {
+    if (unit.equalBase(math.unit('1 m/s'))) {
+      const si = Math.abs(unit.toSI().toNumber())
+      if (si > SPEED_OF_LIGHT_M_PER_S) {
+        flags.push(`Computed velocity (${si.toExponential(3)} m/s) exceeds the speed of light — physically impossible.`)
+      }
+    } else if (unit.equalBase(math.unit('1 K'))) {
+      const si = unit.toSI().toNumber()
+      if (si < 0) {
+        flags.push(`Computed temperature (${si} K) is below absolute zero — physically impossible.`)
+      }
+    } else if (unit.equalBase(math.unit('1 kg'))) {
+      const si = unit.toSI().toNumber()
+      if (si < 0) {
+        flags.push(`Computed mass (${si} kg) is negative — physically impossible.`)
+      }
+    }
+  } catch {
+    // Not a unit-bearing value, or units.equalBase threw on an unusual
+    // combination — nothing to flag either way.
+  }
+  return flags
+}
+
 /**
  * Verifies a physics claim via dimensional analysis + a numeric check —
  * distinct failure modes from math's Lean path (no proof assistant here) and
@@ -132,6 +172,7 @@ export async function verifyPhysicsClaim(claim: string, sessionContext?: string)
     }
   }
   const computed = toPlainNumber(computedValue)
+  const plausibilityFlags = checkPhysicalPlausibility(computedValue)
 
   if (!expected) {
     return {
@@ -140,6 +181,7 @@ export async function verifyPhysicsClaim(claim: string, sessionContext?: string)
       computed,
       unitsOk: true,
       numericOk: null,
+      ...(plausibilityFlags.length > 0 ? { plausibilityFlags } : {}),
       note: 'Expression is dimensionally valid; no expected value was given to compare against.',
     }
   }
@@ -188,6 +230,7 @@ export async function verifyPhysicsClaim(claim: string, sessionContext?: string)
     computed,
     unitsOk: true,
     numericOk,
+    ...(plausibilityFlags.length > 0 ? { plausibilityFlags } : {}),
     note: numericOk
       ? 'Units are dimensionally consistent and the numeric value matches.'
       : 'Units are dimensionally consistent, but the numeric value does not match.',

@@ -69,6 +69,8 @@ export interface PhysicsResult {
   unitsOk: boolean | null;
   numericOk: boolean | null;
   unitError?: string;
+  /** Physical-constraint violations (e.g. a velocity exceeding light speed) — a real physics check, not arithmetic. */
+  plausibilityFlags?: string[];
   note?: string;
 }
 
@@ -95,6 +97,13 @@ export interface DrugLikeness {
   source: string;
 }
 
+export interface EquationBalance {
+  balanced: boolean;
+  leftCounts: Record<string, number>;
+  rightCounts: Record<string, number>;
+  mismatches: string[];
+}
+
 export interface ProtocolResult {
   numericChecks: {
     label: string;
@@ -108,6 +117,8 @@ export interface ProtocolResult {
   groundedFacts?: GroundedFact[];
   /** drug_discovery only: Lipinski's Rule of Five, evaluated against real PubChem descriptors — a genuine pharmacology check, not arithmetic. */
   drugLikeness?: DrugLikeness[];
+  /** chemistry only: deterministic atom-conservation check on a stated reaction — a real chemistry concept, not arithmetic. */
+  equationBalance?: EquationBalance;
   note?: string;
 }
 

@@ -253,6 +253,14 @@ export default function ProveClaimPanel({ jobId }: ProveClaimPanelProps) {
     feedEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [domainEntries.length, activeSessionId]);
 
+  // A draft claim belongs to the session it was being composed for — it
+  // should never survive a switch to a different session (via the sidebar,
+  // a domain change, or creating a new session) and get sent there instead.
+  useEffect(() => {
+    setNewClaim("");
+    setError("");
+  }, [activeSessionId]);
+
   // Runs on domain change and once the initial fetch completes — lands on
   // that domain's most recently active session (or none, if it has none
   // yet). Switching domains should never leave a stale session from a

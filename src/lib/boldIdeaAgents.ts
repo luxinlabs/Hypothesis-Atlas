@@ -5,25 +5,40 @@ import { anthropic, ANTHROPIC_MODEL } from './anthropic'
 import { fetchTopicPapers, type FetchedPaper } from './fetchTopicPapers'
 
 /**
- * Bold Idea's multi-agent pipeline — see issue "Bold Idea: multi-agent
- * exploration + cross-model verification" for the design and the research
- * it's based on (Google's AI Co-Scientist's Generation/Reflection split,
- * heterogeneous-model debate findings that cross-model critique surfaces
- * more genuine disagreement than same-model self-critique, and agentic
- * literature search as a multi-step process rather than one search call).
+ * Bold Idea's multi-agent pipeline — see the "Bold Idea: multi-agent
+ * exploration + cross-model verification" issue for the design and the
+ * research it's based on (Google's AI Co-Scientist's Generation/Reflection
+ * split, heterogeneous-model debate findings that cross-model critique
+ * surfaces more genuine disagreement than same-model self-critique, and
+ * agentic literature search as a multi-step process rather than one search
+ * call).
+ *
+ * No evidence-mapping Job is created here — this pipeline is Bold Idea's
+ * own, lightweight result: candidate directions, the papers found for them
+ * (each with a per-paper method/summary/gap extraction, not a full
+ * Knowledge Tree node), and an overall summary/gaps/next-steps synthesis.
  *
  * Three agents, two model providers, one bounded pass (v0 — no tournament
  * ranking, no iterative evolution, no multi-round debate):
  *   1. Explorer (Groq)     — idea exploration: 2-4 candidate directions.
  *   2. Literature Agent    — searching: grounds each candidate in real
- *      papers via the *existing* fetchTopicPapers (OpenAlex + PubMed),
- *      not a new retrieval pipeline.
+ *      papers via the *existing* fetchTopicPapers (OpenAlex + PubMed).
  *   3. Critic (Anthropic)  — validating: a genuinely different model from
- *      the Explorer reviews each grounded candidate and gives a verdict.
+ *      the Explorer gives a verdict per candidate, plus an overall
+ *      summary/gaps/next-steps synthesis in the same call.
+ *   4. Paper Analyzer (Groq) — a per-paper method/summary/gap extraction
+ *      from each paper's abstract, for the hover-card UI (not chat text).
  *
  * This is a confidence signal from LLM-as-judge machinery, not a proof —
- * stated explicitly in the synthesis, the same way this app's other
+ * the chat synthesis says so explicitly, the same way this app's other
  * verification features (math/physics/chemistry) state their own limits.
+ *
+ * Chat text is plain prose, not Markdown: AssistantChat renders message
+ * content through MathText, which only handles LaTeX — it does not parse
+ * Markdown links/headings/bold. An earlier version of this pipeline wrote
+ * "[title](url)"/"### heading" into the chat text, which rendered as
+ * literal punctuation. Paper titles/links now live in real React (the
+ * hover cards), not interpolated into prose.
  */
 
 export interface AgentCandidate {
@@ -31,27 +46,41 @@ export interface AgentCandidate {
   rationale: string
 }
 
-export interface GroundedCandidate extends AgentCandidate {
-  papers: { title: string; url: string; year: string }[]
+interface GroundedCandidate extends AgentCandidate {
+  papers: FetchedPaper[]
 }
 
 export type CriticVerdict = 'well-supported' | 'speculative' | 'contradicted'
 
-export interface CritiquedCandidate extends GroundedCandidate {
+export interface CandidateVerdict {
+  title: string
+  rationale: string
   verdict: CriticVerdict
   critique: string
 }
 
+export interface PaperAnalysis {
+  title: string
+  url: string
+  year: string
+  method: string
+  summary: string
+  gap: string
+}
+
 export interface BoldIdeaAgentTrace {
-  explorer: AgentCandidate[]
-  literature: GroundedCandidate[]
-  critic: CritiquedCandidate[]
-  /** Rendered once, from the three stages above — what the chat actually shows. */
-  synthesisMarkdown: string
+  candidates: CandidateVerdict[]
+  papers: PaperAnalysis[]
+  overallSummary: string
+  gaps: string
+  nextSteps: string
+  /** Plain-text synthesis built from the three fields above, for the chat's opening message. */
+  chatSummary: string
 }
 
 const MAX_CANDIDATES = 4
 const PAPERS_PER_CANDIDATE = 3
+const MAX_PAPERS_TO_ANALYZE = 10
 
 /** Explorer agent (Groq): idea exploration — candidate research directions, not literature-grounded yet. */
 async function explore(text: string, tags: string[]): Promise<AgentCandidate[]> {
@@ -95,96 +124,209 @@ async function ground(candidates: AgentCandidate[]): Promise<GroundedCandidate[]
       } catch {
         papers = []
       }
-      return {
-        ...candidate,
-        papers: papers.map((p) => ({ title: p.title, url: p.url, year: p.year })),
-      }
+      return { ...candidate, papers }
     })
   )
+}
+
+interface CriticResponse {
+  verdicts?: { index: number; verdict: string; critique: string }[]
+  overallSummary?: string
+  gaps?: string
+  nextSteps?: string
 }
 
 /**
  * Critic agent (Anthropic — deliberately the *other* model provider from
  * the Explorer's Groq call): validating — reviews each grounded candidate
- * and gives a verdict. Runs as one call covering all candidates (not one
- * call per candidate) to keep this a single bounded pass, not an
- * open-ended multi-round debate.
+ * and gives a verdict, plus one overall summary/gaps/next-steps synthesis
+ * covering the exploration as a whole. One call for everything, not one
+ * call per candidate and a separate synthesis call — keeps this a single
+ * bounded pass, not an open-ended multi-round debate.
  */
-async function critique(candidates: GroundedCandidate[]): Promise<CritiquedCandidate[]> {
-  if (!anthropic || candidates.length === 0) {
-    return candidates.map((c) => ({ ...c, verdict: 'speculative' as const, critique: 'Critic model unavailable.' }))
+async function critique(candidates: GroundedCandidate[], ideaText: string): Promise<{
+  verdicts: CandidateVerdict[]
+  overallSummary: string
+  gaps: string
+  nextSteps: string
+}> {
+  const fallback = {
+    verdicts: candidates.map((c) => ({ ...c, verdict: 'speculative' as const, critique: 'Critic unavailable.' })),
+    overallSummary: `Explored "${ideaText}" across ${candidates.length} direction(s).`,
+    gaps: 'Critic model unavailable — gaps could not be assessed.',
+    nextSteps: 'Try again once the critic model is reachable.',
   }
+  if (!anthropic || candidates.length === 0) return fallback
+
   try {
     const candidateBlock = candidates
       .map(
         (c, i) =>
           `${i + 1}. "${c.title}" — ${c.rationale}\n   Papers found: ${
-            c.papers.length > 0 ? c.papers.map((p) => `"${p.title}" (${p.year})`).join('; ') : 'none'
+            c.papers.length > 0
+              ? c.papers.map((p) => `"${p.title}" (${p.year}): ${(p.abstract ?? '').slice(0, 200)}`).join(' | ')
+              : 'none'
           }`
       )
       .join('\n')
     const message = await anthropic.messages.create({
       model: ANTHROPIC_MODEL,
-      max_tokens: 1000,
+      max_tokens: 1200,
       system:
-        'You are an independent research critic reviewing candidate research directions proposed by ' +
-        'another model, each with papers found for it by a separate search step. For each candidate, ' +
-        'give a verdict — "well-supported" (the papers genuinely back the direction), "speculative" (no ' +
-        'strong papers either way, not unreasonable), or "contradicted" (the papers found undercut or ' +
-        'contradict the premise) — plus one sentence of critique. Be skeptical: a paper merely sharing ' +
-        'keywords with the candidate is not support. Respond with ONLY JSON: {"verdicts":[{"index":1,' +
-        '"verdict":"well-supported","critique":"..."}]}.',
+        `You are an independent research critic reviewing candidate directions for the idea "${ideaText}", ` +
+        'each proposed by another model and each with papers found for it by a separate search step. ' +
+        'Be skeptical: a paper merely sharing keywords with a candidate is not support. ' +
+        'Do two things: ' +
+        '(1) For each candidate, give a verdict — "well-supported" (the papers genuinely back the ' +
+        'direction), "speculative" (no strong papers either way, not unreasonable), or "contradicted" ' +
+        '(the papers undercut the premise) — plus one sentence of critique. ' +
+        '(2) Write a short overall synthesis of the exploration as a whole: a 2-3 sentence summary, a ' +
+        '1-2 sentence statement of the biggest gap(s) across the directions (what is under-evidenced or ' +
+        'missing), and 1-2 sentences of concrete next steps that could close that gap (e.g. a narrower ' +
+        'search, a specific study design, a different database). ' +
+        'Respond with ONLY JSON: {"verdicts":[{"index":1,"verdict":"well-supported","critique":"..."}],' +
+        '"overallSummary":"...","gaps":"...","nextSteps":"..."}.',
       messages: [{ role: 'user', content: candidateBlock }],
     })
     const block = message.content.find((b) => b.type === 'text')
     const text = block && block.type === 'text' ? block.text : ''
     const match = text.match(/\{[\s\S]*\}/)
-    const parsed = match ? (JSON.parse(match[0]) as { verdicts?: { index: number; verdict: string; critique: string }[] }) : null
-    const byIndex = new Map((parsed?.verdicts ?? []).map((v) => [v.index, v]))
-    return candidates.map((c, i) => {
+    const parsed: CriticResponse | null = match ? JSON.parse(match[0]) : null
+    if (!parsed) return fallback
+
+    const byIndex = new Map((parsed.verdicts ?? []).map((v) => [v.index, v]))
+    const verdicts: CandidateVerdict[] = candidates.map((c, i) => {
       const v = byIndex.get(i + 1)
       const verdict: CriticVerdict =
         v?.verdict === 'well-supported' || v?.verdict === 'contradicted' ? v.verdict : 'speculative'
-      return { ...c, verdict, critique: v?.critique ?? 'No critique returned.' }
+      return { title: c.title, rationale: c.rationale, verdict, critique: v?.critique ?? 'No critique returned.' }
+    })
+    return {
+      verdicts,
+      overallSummary: parsed.overallSummary ?? fallback.overallSummary,
+      gaps: parsed.gaps ?? fallback.gaps,
+      nextSteps: parsed.nextSteps ?? fallback.nextSteps,
+    }
+  } catch {
+    return fallback
+  }
+}
+
+/**
+ * Paper Analyzer (Groq): a lightweight per-paper method/summary/gap
+ * extraction from each paper's abstract — this is what the hover cards
+ * show, deliberately not a full Knowledge Tree node (no evidence-mapping
+ * Job is created for a bold idea). Deduplicated by URL and capped before
+ * calling the model, since the same paper can surface under more than one
+ * candidate's search.
+ */
+async function analyzePapers(candidates: GroundedCandidate[]): Promise<PaperAnalysis[]> {
+  const byUrl = new Map<string, FetchedPaper>()
+  for (const c of candidates) {
+    for (const p of c.papers) {
+      if (p.url && !byUrl.has(p.url)) byUrl.set(p.url, p)
+    }
+  }
+  const papers = Array.from(byUrl.values()).slice(0, MAX_PAPERS_TO_ANALYZE)
+  if (papers.length === 0) return []
+  if (!groq) {
+    return papers.map((p) => ({
+      title: p.title,
+      url: p.url,
+      year: p.year,
+      method: 'Unavailable',
+      summary: p.abstract?.slice(0, 200) ?? 'No abstract available.',
+      gap: 'Unavailable',
+    }))
+  }
+
+  try {
+    const paperBlock = papers
+      .map((p, i) => `${i + 1}. "${p.title}" (${p.year})\nAbstract: ${(p.abstract ?? 'No abstract available.').slice(0, 600)}`)
+      .join('\n\n')
+    const completion = await groq.chat.completions.create({
+      model: 'openai/gpt-oss-120b',
+      temperature: 0.1,
+      max_tokens: 1500,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'For each paper below, extract from its abstract: "method" (the approach/technique used, one ' +
+            'short phrase), "summary" (1 sentence, the main finding), and "gap" (1 sentence, what this ' +
+            "paper does NOT address or leaves open — its own stated limitation if given, otherwise what's " +
+            'missing relative to a broader research question). If the abstract is missing or uninformative, ' +
+            'say so plainly rather than guessing. Respond with ONLY JSON: {"analyses":[{"index":1,' +
+            '"method":"...","summary":"...","gap":"..."}]}.',
+        },
+        { role: 'user', content: paperBlock },
+      ],
+    })
+    const raw = completion.choices[0]?.message?.content ?? ''
+    const match = raw.match(/\{[\s\S]*\}/)
+    const parsed = match ? (JSON.parse(match[0]) as { analyses?: { index: number; method: string; summary: string; gap: string }[] }) : null
+    const byIndex = new Map((parsed?.analyses ?? []).map((a) => [a.index, a]))
+    return papers.map((p, i) => {
+      const a = byIndex.get(i + 1)
+      return {
+        title: p.title,
+        url: p.url,
+        year: p.year,
+        method: a?.method ?? 'Not extracted',
+        summary: a?.summary ?? p.abstract?.slice(0, 200) ?? 'No abstract available.',
+        gap: a?.gap ?? 'Not extracted',
+      }
     })
   } catch {
-    return candidates.map((c) => ({ ...c, verdict: 'speculative' as const, critique: 'Critic call failed.' }))
+    return papers.map((p) => ({
+      title: p.title,
+      url: p.url,
+      year: p.year,
+      method: 'Analysis failed',
+      summary: p.abstract?.slice(0, 200) ?? 'No abstract available.',
+      gap: 'Analysis failed',
+    }))
   }
 }
 
-const VERDICT_EMOJI: Record<CriticVerdict, string> = {
-  'well-supported': '✅',
-  speculative: '🤔',
-  contradicted: '⚠️',
+const VERDICT_LABEL: Record<CriticVerdict, string> = {
+  'well-supported': 'Well-supported',
+  speculative: 'Speculative',
+  contradicted: 'Contradicted by literature',
 }
 
-function renderSynthesis(text: string, critiqued: CritiquedCandidate[]): string {
-  if (critiqued.length === 0) {
-    return (
-      `I looked into **"${text}"** but couldn't generate candidate directions for it — the exploration ` +
-      `model may be unavailable right now. The research run below still covers the idea as a whole.`
-    )
-  }
-  const sections = critiqued
-    .map((c) => {
-      const papers =
-        c.papers.length > 0
-          ? c.papers.map((p) => `  - [${p.title}](${p.url}) (${p.year})`).join('\n')
-          : '  - No supporting papers found.'
-      return `### ${VERDICT_EMOJI[c.verdict]} ${c.title}\n${c.rationale}\n\n**Critic (${c.verdict}):** ${c.critique}\n\n${papers}`
-    })
-    .join('\n\n')
+function renderChatSummary(
+  verdicts: CandidateVerdict[],
+  overallSummary: string,
+  gaps: string,
+  nextSteps: string
+): string {
+  const candidateLines = verdicts
+    .map((v) => `- ${v.title} (${VERDICT_LABEL[v.verdict]}): ${v.critique}`)
+    .join('\n');
   return (
-    `I explored **"${text}"** across ${critiqued.length} directions — each one searched against real ` +
-    `literature and independently reviewed by a second model.\n\n${sections}\n\n` +
-    `_This is a confidence signal from model critique, not a proof — the research run below still goes ` +
-    `ahead regardless of verdict; use these as a starting point for what to dig into first._`
+    `Summary: ${overallSummary}\n\n` +
+    `Directions explored:\n${candidateLines}\n\n` +
+    `Gap: ${gaps}\n\n` +
+    `What we can still do: ${nextSteps}\n\n` +
+    `(This is a confidence signal from a second model's critique, not a proof — see the papers panel for ` +
+    `what was actually found, and use this as a starting point for what to dig into first.)`
   )
 }
 
 export async function runBoldIdeaAgents(text: string, tags: string[]): Promise<BoldIdeaAgentTrace> {
-  const explorer = await explore(text, tags)
-  const literature = await ground(explorer)
-  const critic = await critique(literature)
-  return { explorer, literature, critic, synthesisMarkdown: renderSynthesis(text, critic) }
+  const explored = await explore(text, tags)
+  const grounded = await ground(explored)
+  const [{ verdicts, overallSummary, gaps, nextSteps }, papers] = await Promise.all([
+    critique(grounded, text),
+    analyzePapers(grounded),
+  ])
+  return {
+    candidates: verdicts,
+    papers,
+    overallSummary,
+    gaps,
+    nextSteps,
+    chatSummary: renderChatSummary(verdicts, overallSummary, gaps, nextSteps),
+  }
 }

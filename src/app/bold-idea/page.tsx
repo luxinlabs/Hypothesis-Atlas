@@ -9,12 +9,13 @@ const EXAMPLE =
   "I want to have more knowledge and research about the new drug for Type 2 Diabetes.";
 
 /**
- * "Try Something Bold" — an unconstrained free-text on-ramp into the same
- * evidence-mapping pipeline the word-cloud flow uses. No topic list, no
- * domain picker — just type the idea in your own words. A small tag/refine
- * step (see /api/bold-ideas) categorizes it before handing it to the
- * existing pipeline, and it shows up under its own "Bold Idea" tab on My
- * Research, tags and all.
+ * "Try Something Bold" — an unconstrained free-text entry point with its
+ * own self-contained multi-agent exploration (see /api/bold-ideas and
+ * lib/boldIdeaAgents.ts): no topic list, no domain picker, and no
+ * evidence-mapping Job/Knowledge-Tree pipeline. POST awaits the full
+ * pipeline (tagging, exploration, literature search, cross-model critique,
+ * per-paper analysis) before responding, so the wait is one request, not a
+ * background job to poll for.
  */
 export default function BoldIdeaPage() {
   const router = useRouter();
@@ -34,13 +35,12 @@ export default function BoldIdeaPage() {
         body: JSON.stringify({ text: trimmed }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.jobId) {
+      if (!res.ok || !data.ideaId) {
         setError(data.error ?? "Could not start this idea — try again.");
         setSubmitting(false);
         return;
       }
-      localStorage.setItem("lastJobId", data.jobId);
-      router.push(`/bold-idea/session/${data.jobId}`);
+      router.push(`/bold-idea/session/${data.ideaId}`);
     } catch {
       setError("Could not reach the server — is the dev server running?");
       setSubmitting(false);
@@ -96,7 +96,7 @@ export default function BoldIdeaPage() {
               {submitting ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  Categorizing…
+                  Exploring with multiple agents, searching literature, cross-checking…
                 </>
               ) : (
                 "Explore this idea →"

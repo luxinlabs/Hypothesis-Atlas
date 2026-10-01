@@ -17,9 +17,8 @@ interface BoldIdea {
   id: string;
   text: string;
   tags: string[];
-  jobId: string | null;
   createdAt: string;
-  job: { id: string; status: string; _count: { sources: number; nodes: number } } | null;
+  hasTrace: boolean;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -244,7 +243,6 @@ export default function JobsPage() {
           <div className="space-y-3">
             <p className="text-sm text-gray-500 mb-4">{ideas.length} bold idea{ideas.length !== 1 ? "s" : ""}</p>
             {ideas.map((idea) => {
-              const status = idea.job?.status ?? "pending";
               return (
                 <div
                   key={idea.id}
@@ -262,30 +260,25 @@ export default function JobsPage() {
                             {tag}
                           </span>
                         ))}
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}>
-                          {status === "processing" && (
-                            <span className="inline-block w-1.5 h-1.5 bg-blue-600 rounded-full mr-1 animate-ping align-middle" />
-                          )}
-                          {status}
-                        </span>
+                        {idea.hasTrace ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-800 border border-green-200">
+                            Ready
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                            Pending
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
                         <span>{timeAgo(idea.createdAt)}</span>
-                        {idea.job && (
-                          <>
-                            <span>·</span>
-                            <span>{idea.job._count.sources} sources</span>
-                            <span>·</span>
-                            <span>{idea.job._count.nodes} nodes</span>
-                          </>
-                        )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {idea.jobId && (
+                      {idea.hasTrace && (
                         <Link
-                          href={`/bold-idea/session/${idea.jobId}`}
+                          href={`/bold-idea/session/${idea.id}`}
                           className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors"
                         >
                           View Research

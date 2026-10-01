@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import type { BoldIdeaAgentTrace } from '@/lib/boldIdeaAgents'
 
-/** Fetches one bold idea, including its multi-agent trace once the background pipeline has finished. */
+/** Fetches one bold idea with its full multi-agent trace — used once by the session page on load (the pipeline runs synchronously in POST, so the trace is always already there by the time this is called). */
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const idea = await prisma.boldIdea.findUnique({ where: { id: params.id } })
   if (!idea) {
@@ -13,13 +13,16 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     id: idea.id,
     text: idea.text,
     tags: JSON.parse(idea.tagsJson) as string[],
-    jobId: idea.jobId,
     createdAt: idea.createdAt,
-    agentTrace: idea.agentTraceJson ? (JSON.parse(idea.agentTraceJson) as BoldIdeaAgentTrace) : null,
+    trace: idea.agentTraceJson ? (JSON.parse(idea.agentTraceJson) as BoldIdeaAgentTrace) : null,
   })
 }
 
-/** Deletes a bold idea and its underlying Job (same cleanup the regular My Research tab's delete button does for a job). */
+/**
+ * Deletes a bold idea. Also cleans up its Job if one exists — only
+ * relevant for ideas created before this pipeline stopped creating an
+ * evidence-mapping Job per idea; new ideas have no jobId.
+ */
 export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const idea = await prisma.boldIdea.findUnique({ where: { id: params.id }, select: { jobId: true } })

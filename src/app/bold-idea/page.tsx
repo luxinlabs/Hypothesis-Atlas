@@ -40,7 +40,7 @@ export default function BoldIdeaPage() {
         return;
       }
       localStorage.setItem("lastJobId", data.jobId);
-      router.push(`/job/${data.jobId}`);
+      router.push(`/bold-idea/session/${data.jobId}`);
     } catch {
       setError("Could not reach the server — is the dev server running?");
       setSubmitting(false);

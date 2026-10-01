@@ -168,11 +168,12 @@ model Top3Ideas {
 // is provenance only, not an enforced FK, matching Experiment.jobId's
 // pattern elsewhere in this schema.
 model BoldIdea {
-  id        String   @id @default(cuid())
-  text      String   @db.Text // the original freeform idea, verbatim
-  tagsJson  String   @db.Text // JSON array of subject tags from the tagger agent
-  jobId     String? // the Job this was turned into
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  text           String   @db.Text // the original freeform idea, verbatim
+  tagsJson       String   @db.Text // JSON array of subject tags from the tagger agent
+  jobId          String? // the Job this was turned into
+  agentTraceJson String?  @db.Text // full multi-agent trace (Explorer/Literature/Critic) — see lib/boldIdeaAgents.ts
+  createdAt      DateTime @default(now())
 
   @@index([createdAt])
 }

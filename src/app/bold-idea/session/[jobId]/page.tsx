@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AssistantChat from "@/components/AssistantChat";
+
+interface BoldIdeaWithTrace {
+  id: string;
+  jobId: string | null;
+  agentTrace: { synthesisMarkdown: string } | null;
+}
 
 /**
  * Bold Idea's split-screen session view: chat permanently on the left,
@@ -18,16 +24,42 @@ import AssistantChat from "@/components/AssistantChat";
  * for this session was explicit — try the bold idea, don't touch the
  * original workflow. An iframe gets the full existing page (every tab,
  * exactly as it already behaves) with zero risk of regressing it.
+ *
+ * The chat's opening message is the multi-agent trace (Explorer/Literature/
+ * Critic — see lib/boldIdeaAgents.ts), which runs in the background after
+ * the idea is submitted and is polled for here until it lands.
  */
 export default function BoldIdeaSessionPage({ params }: { params: { jobId: string } }) {
   const { jobId } = params;
   const [topicQuery, setTopicQuery] = useState<string | null>(null);
+  const [welcomeContent, setWelcomeContent] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetch(`/api/jobs/${jobId}`)
       .then((r) => r.json())
-      .then((d) => setTopicQuery(d.job?.topicQuery ?? null))
+      .then((d) => setTopicQuery(d.topicQuery ?? null))
       .catch(() => {});
+  }, [jobId]);
+
+  useEffect(() => {
+    const checkTrace = () => {
+      fetch(`/api/bold-ideas?limit=50`)
+        .then((r) => r.json())
+        .then((d) => {
+          const idea = (d.ideas ?? []).find((i: BoldIdeaWithTrace) => i.jobId === jobId);
+          if (idea?.agentTrace?.synthesisMarkdown) {
+            setWelcomeContent(idea.agentTrace.synthesisMarkdown);
+            if (pollRef.current) clearInterval(pollRef.current);
+          }
+        })
+        .catch(() => {});
+    };
+    checkTrace();
+    pollRef.current = setInterval(checkTrace, 4000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [jobId]);
 
   return (
@@ -55,9 +87,27 @@ export default function BoldIdeaSessionPage({ params }: { params: { jobId: strin
       </header>
 
       <div className="flex-1 flex min-h-0">
-        {/* Left: chat, always visible */}
+        {/* Left: chat, always visible — opens with the multi-agent synthesis once it's ready */}
         <div className="w-full lg:w-[38%] min-w-0 border-r border-gray-200 bg-white flex flex-col">
-          <AssistantChat jobId={jobId} storageKey={`bold-idea-chat:${jobId}`} />
+          {welcomeContent === null ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-3">
+              <div className="flex gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-orange-400 animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-2 h-2 rounded-full bg-pink-400 animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" />
+              </div>
+              <p className="text-sm text-gray-500">
+                Exploring this idea across multiple directions, searching literature, and cross-checking
+                with a second model…
+              </p>
+            </div>
+          ) : (
+            <AssistantChat
+              jobId={jobId}
+              storageKey={`bold-idea-chat:${jobId}`}
+              welcome={{ role: "assistant", content: welcomeContent }}
+            />
+          )}
         </div>
 
         {/* Right: the existing, unmodified research pages (all tabs) */}

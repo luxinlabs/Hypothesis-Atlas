@@ -131,6 +131,19 @@ const VERDICT_STYLE: Record<CriticVerdict, { idle: string; selected: string }> =
   },
 };
 
+/** The selected candidate's session card — outer card tint and the inner critique/empty-state callout box, both color-matched to the candidate's verdict instead of unstyled floating text. */
+const SESSION_CARD_STYLE: Record<CriticVerdict, string> = {
+  "well-supported": "border-emerald-200 bg-emerald-50/40",
+  speculative: "border-amber-200 bg-amber-50/40",
+  contradicted: "border-rose-200 bg-rose-50/40",
+};
+
+const CALLOUT_STYLE: Record<CriticVerdict, string> = {
+  "well-supported": "bg-emerald-100 border-emerald-200 text-emerald-800",
+  speculative: "bg-amber-100 border-amber-200 text-amber-800",
+  contradicted: "bg-rose-100 border-rose-200 text-rose-800",
+};
+
 /** Idea (root) -> candidate directions (children) -> each candidate's papers (grandchildren) — mirrors KnowledgeTree's parent/child pill-and-connector layout instead of a flat card grid. */
 function PaperTree({
   ideaText,
@@ -192,20 +205,31 @@ function PaperTree({
         </div>
       </div>
 
-      {/* Selected candidate's detail + its own papers (grandchild nodes) */}
+      {/* Selected candidate's session: a large, color-matched card holding its critique and its own papers (grandchild nodes) — not floating unstyled text below the tree */}
       <div className="mt-6 flex flex-col items-center">
         <div className="w-0.5 h-8 bg-gray-300" />
-        <p className="text-xs text-gray-500 text-center max-w-xl mb-6">{active.critique}</p>
-
-        {active.papers.length === 0 ? (
-          <p className="text-xs text-gray-400">No papers found for this direction.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-            {active.papers.map((paper) => (
-              <PaperNode key={paper.url || paper.title} paper={paper} />
-            ))}
+        <div className={`w-full rounded-2xl border-2 p-6 ${SESSION_CARD_STYLE[active.verdict]}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-base">{VERDICT_MARK[active.verdict]}</span>
+            <h3 className="text-sm font-bold text-gray-900">{active.title}</h3>
           </div>
-        )}
+
+          <div className={`text-xs rounded-lg border px-4 py-3 mb-5 leading-relaxed ${CALLOUT_STYLE[active.verdict]}`}>
+            {active.critique}
+          </div>
+
+          {active.papers.length === 0 ? (
+            <div className={`text-xs rounded-lg border px-4 py-3 leading-relaxed ${CALLOUT_STYLE[active.verdict]}`}>
+              No papers found for this direction.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {active.papers.map((paper) => (
+                <PaperNode key={paper.url || paper.title} paper={paper} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

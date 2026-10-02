@@ -163,6 +163,23 @@ model Top3Ideas {
   @@index([jobId])
 }
 
+// "Try Something Bold" — an unconstrained free-text on-ramp into the same
+// evidence-mapping pipeline the word-cloud flow uses (see /api/jobs). jobId
+// is provenance only, not an enforced FK, matching Experiment.jobId's
+// pattern elsewhere in this schema.
+model BoldIdea {
+  id             String   @id @default(cuid())
+  text           String   @db.Text // the original freeform idea, verbatim
+  tagsJson       String   @db.Text // JSON array of subject tags from the tagger agent
+  jobId          String? // the Job this was turned into
+  agentTraceJson String?  @db.Text // full multi-agent trace (Explorer/Literature/Critic) — see lib/boldIdeaAgents.ts
+  experimentJson String?  @db.Text // the second-phase experiment design for one chosen candidate direction — see lib/boldIdeaAgents.ts generateExperiment()
+  knowledgeJson  String?  @db.Text // JSON array of user-highlighted chat snippets saved as knowledge — see /api/bold-ideas/[id]/knowledge
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model PaperSubscription {
   id           String   @id @default(cuid())
   email        String

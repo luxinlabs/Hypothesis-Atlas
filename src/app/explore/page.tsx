@@ -366,15 +366,26 @@ export default function ExplorePage() {
         </nav>
 
         {/* Page identity */}
-        <div className="mb-8">
-          <div className={t.headingPlate}>
-            <h1 className={`text-4xl font-bold ${t.heading}`}>Topic Explorer</h1>
+        <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <div className={t.headingPlate}>
+              <h1 className={`text-4xl font-bold ${t.heading}`}>Topic Explorer</h1>
+            </div>
+            <p className={`${t.subText} mt-3`}>
+              {exploreMode
+                ? "Explore mode: click a topic to subscribe to weekly papers."
+                : "Click a topic to launch an evidence-mapping run."}
+            </p>
           </div>
-          <p className={`${t.subText} mt-3`}>
-            {exploreMode
-              ? "Explore mode: click a topic to subscribe to weekly papers."
-              : "Click a topic to launch an evidence-mapping run."}
-          </p>
+          <Link
+            href="/bold-idea"
+            className="flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
+            title="Type any research idea, in your own words — no word cloud required"
+          >
+            <span>✨</span>
+            Try Something Bold
+          </Link>
         </div>
 
         <div className={`rounded-3xl p-8 backdrop-blur-sm shadow-xl ${t.panel}`}>

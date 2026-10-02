@@ -94,6 +94,7 @@ export default function JobPage() {
   const jobId = params.id as string;
 
   const [job, setJob] = useState<Job | null>(null);
+  const [jobError, setJobError] = useState<string | null>(null);
   const [events, setEvents] = useState<ProgressEvent[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"knowledge" | "notebook" | "papermap" | "notes">(
@@ -121,8 +122,21 @@ export default function JobPage() {
   useEffect(() => {
     const fetchJob = () => {
       fetch(`/api/jobs/${jobId}`)
-        .then((res) => res.json())
-        .then((data) => {
+        .then(async (res) => {
+          const data = await res.json().catch(() => null);
+          // The API returns { error } with a non-2xx status (e.g. 404 for a
+          // deleted/invalid job id) — that object is truthy, so without this
+          // check it used to pass straight through to setJob() and crash
+          // later on job.id.slice() with no id on the error shape.
+          if (!res.ok || !data?.id) {
+            setJobError(data?.error ?? "Job not found");
+            return;
+          }
+          // Clear a stale error from an earlier transient failure — this
+          // poll succeeded, so a prior non-2xx response (e.g. a race right
+          // after job creation) shouldn't permanently lock the page into
+          // the error view.
+          setJobError(null);
           setJob(data);
           // Only set selectedNodeId if it hasn't been set yet
           if (data.rootNodeId && selectedNodeId === null) {
@@ -153,6 +167,27 @@ export default function JobPage() {
       eventSource.close();
     };
   }, [jobId, selectedNodeId]);
+
+  if (jobError) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${t.page}`}
+      >
+        <div className="text-center max-w-sm px-6">
+          <p className="text-lg font-semibold text-gray-700">{jobError}</p>
+          <p className="text-sm text-gray-500 mt-2">
+            This research job may have been deleted, or the link is incorrect.
+          </p>
+          <Link
+            href="/jobs"
+            className="inline-block mt-5 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700"
+          >
+            ← Back to My Research
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!job) {
     return (

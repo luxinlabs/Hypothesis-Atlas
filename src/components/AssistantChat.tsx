@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { appendNote } from "@/lib/notes";
-import MathText from "./MathText";
+import ChatMarkdown from "./ChatMarkdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -24,6 +24,12 @@ interface AssistantChatProps {
   welcome?: Message;
   storageKey?: string;
   onMessagesChange?: (messages: Message[]) => void;
+  /** Chat endpoint to POST to. Defaults to `/api/jobs/${jobId}/assistant-chat` — pass a different one for sessions (e.g. Bold Idea) that aren't backed by a real Job row, so the request doesn't 404 against that endpoint's `prisma.job.findUnique`. */
+  endpoint?: string;
+  /** Whether "Save to notes" / the auto 📝 note feature is available. Both are backed by the per-Job research graph (`/api/jobs/${jobId}/notes`) — default true, but Bold Idea sessions (no Job row) must pass false or every save throws a 404. */
+  enableNotes?: boolean;
+  /** Called with the selected text when the user highlights something in a message and clicks the "Save" popover that appears. Omit to disable highlighting entirely (no popover is shown). */
+  onHighlight?: (text: string) => void;
 }
 
 const WELCOME: Message = {
@@ -66,6 +72,9 @@ export default function AssistantChat({
   welcome,
   storageKey,
   onMessagesChange,
+  endpoint,
+  enableNotes = true,
+  onHighlight,
 }: AssistantChatProps) {
   const effectiveWelcome = welcome ?? WELCOME;
   const cacheKey = storageKey ?? makeCacheKey(jobId);
@@ -74,7 +83,42 @@ export default function AssistantChat({
   const [streaming, setStreaming] = useState(false);
   const [noKey, setNoKey] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
+  const [highlightPopup, setHighlightPopup] = useState<{ text: string; x: number; y: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss the highlight popup if the page scrolls out from under it —
+  // it's positioned fixed to the selection's viewport rect, not the
+  // scrolling messages container, so it would otherwise go stale.
+  useEffect(() => {
+    if (!onHighlight) return;
+    const clear = () => setHighlightPopup(null);
+    window.addEventListener("scroll", clear, true);
+    return () => window.removeEventListener("scroll", clear, true);
+  }, [onHighlight]);
+
+  const handleSelectionChange = () => {
+    if (!onHighlight) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !messagesRef.current || !sel.anchorNode || !messagesRef.current.contains(sel.anchorNode)) {
+      setHighlightPopup(null);
+      return;
+    }
+    const text = sel.toString().trim();
+    if (!text) {
+      setHighlightPopup(null);
+      return;
+    }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    setHighlightPopup({ text, x: rect.left + rect.width / 2, y: rect.top });
+  };
+
+  const handleSaveHighlight = () => {
+    if (!highlightPopup) return;
+    onHighlight?.(highlightPopup.text);
+    window.getSelection()?.removeAllRanges();
+    setHighlightPopup(null);
+  };
 
   useEffect(() => {
     const cached = loadSession(cacheKey);
@@ -101,7 +145,7 @@ export default function AssistantChat({
     setStreaming(true);
 
     try {
-      const res = await fetch(`/api/jobs/${jobId}/assistant-chat`, {
+      const res = await fetch(endpoint ?? `/api/jobs/${jobId}/assistant-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -119,6 +163,15 @@ export default function AssistantChat({
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: err.error },
+        ]);
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `Request failed (${res.status}).` }));
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: err.error ?? `Request failed (${res.status}).` },
         ]);
         return;
       }
@@ -146,14 +199,22 @@ export default function AssistantChat({
         });
       }
 
-      // Auto-note: if the model ended with a 📝 line, save it to notes
+      // Auto-note: if the model ended with a 📝 line, strip it from the
+      // displayed text regardless of enableNotes (it's never meant to be
+      // shown verbatim) and save it to notes only when that's available.
       const { text, note } = extractAutoNote(accumulated);
       if (note) {
-        appendNote(jobId, {
-          type: "insight",
-          title: `From Assistant — ${userText.slice(0, 60)}`,
-          content: note,
-        });
+        if (enableNotes) {
+          try {
+            await appendNote(jobId, {
+              type: "insight",
+              title: `From Assistant — ${userText.slice(0, 60)}`,
+              content: note,
+            });
+          } catch (err) {
+            console.error("Failed to save auto-note:", err);
+          }
+        }
         setMessages((prev) => {
           const updated = [...prev];
           if (updated[assistantIndex]) {
@@ -242,8 +303,19 @@ export default function AssistantChat({
         </div>
       )}
 
+      {/* Highlight-to-knowledge popover — follows the current text selection, fixed to viewport coords */}
+      {highlightPopup && (
+        <button
+          onClick={handleSaveHighlight}
+          style={{ position: "fixed", left: highlightPopup.x, top: highlightPopup.y - 40, transform: "translateX(-50%)" }}
+          className="z-50 flex items-center gap-1.5 bg-gray-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg hover:bg-gray-700 transition-colors"
+        >
+          ✨ Save to Knowledge
+        </button>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div ref={messagesRef} onMouseUp={handleSelectionChange} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             {msg.role === "assistant" && (
@@ -253,18 +325,18 @@ export default function AssistantChat({
             )}
             <div className="max-w-[80%]">
               <div
-                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-emerald-600 text-white rounded-tr-sm"
                     : "bg-gray-100 text-gray-800 rounded-tl-sm"
                 }`}
               >
-                <MathText text={msg.content} />
+                <ChatMarkdown text={msg.content} />
                 {streaming && i === messages.length - 1 && msg.role === "assistant" && (
                   <span className="inline-block w-1.5 h-4 bg-emerald-400 ml-0.5 animate-pulse rounded-sm align-middle" />
                 )}
               </div>
-              {msg.role === "assistant" && i > 0 && msg.content && !streaming && (
+              {enableNotes && msg.role === "assistant" && i > 0 && msg.content && !streaming && (
                 <div className="flex justify-end mt-1">
                   <button
                     onClick={() => handleSaveNote(i)}

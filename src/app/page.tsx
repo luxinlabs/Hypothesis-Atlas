@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 type Theme = "dark" | "light" | "vibrant";
 
@@ -89,36 +89,74 @@ const ThemeContext = createContext<{
   setTheme: () => {},
 });
 
+const THEME_DOT: Record<Theme, string> = {
+  dark: "bg-zinc-900",
+  light: "bg-blue-500",
+  vibrant: "bg-fuchsia-500",
+};
+
+const THEME_LABEL: Record<Theme, string> = {
+  dark: "Dark",
+  light: "Light",
+  vibrant: "Vibrant",
+};
+
+/** A single compact dropdown instead of three separate buttons — frees up enough width in the nav that the fixed top-right Sign In widget (src/components/AuthWidget.tsx) no longer overlaps it. */
 function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
 
   return (
-    <div
-      className={`flex items-center gap-1 p-1 rounded-lg backdrop-blur-sm ${
-        theme === "dark"
-          ? "bg-zinc-800/50"
-          : theme === "light"
-            ? "bg-white border border-zinc-200"
-            : "bg-white/10 border border-white/20"
-      }`}
-    >
-      {(["dark", "light", "vibrant"] as Theme[]).map((t) => (
-        <button
-          key={t}
-          onClick={() => setTheme(t)}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-            theme === t
-              ? t === "dark"
-                ? "bg-zinc-700 text-white"
-                : t === "light"
-                  ? "bg-zinc-200 text-zinc-900"
-                  : "bg-fuchsia-100 text-fuchsia-700"
-              : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium backdrop-blur-sm transition-colors ${
+          theme === "dark"
+            ? "bg-zinc-800/50 text-zinc-200 hover:bg-zinc-700/50"
+            : theme === "light"
+              ? "bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+              : "bg-white/10 border border-white/20 text-white hover:bg-white/20"
+        }`}
+      >
+        <span className={`w-2.5 h-2.5 rounded-full ${THEME_DOT[theme]}`} />
+        {THEME_LABEL[theme]}
+        <svg className={`w-3 h-3 opacity-60 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className={`absolute top-full right-0 mt-1.5 w-32 rounded-lg shadow-lg overflow-hidden z-20 ${
+            theme === "dark" ? "bg-zinc-800 border border-zinc-700" : "bg-white border border-zinc-200"
           }`}
         >
-          {t === "dark" ? "Dark" : t === "light" ? "Light" : "Vibrant"}
-        </button>
-      ))}
+          {(["dark", "light", "vibrant"] as Theme[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => { setTheme(t); setOpen(false); }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
+                theme === t
+                  ? theme === "dark" ? "bg-zinc-700 text-white" : "bg-zinc-100 text-zinc-900"
+                  : theme === "dark" ? "text-zinc-300 hover:bg-zinc-700/60" : "text-zinc-600 hover:bg-zinc-50"
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full ${THEME_DOT[t]}`} />
+              {THEME_LABEL[t]}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -187,27 +225,27 @@ export default function Home() {
       <main
         className={`min-h-screen ${t.bg} ${t.text} overflow-hidden transition-all duration-500`}
       >
-        {/* Nav */}
-        <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
+        {/* Nav — extra right padding reserves room for the fixed Sign In widget (src/components/AuthWidget.tsx) in the corner, so the theme dropdown never sits underneath it. Docs/Pricing hide below sm so the row doesn't overflow into that reserved space on narrow viewports. */}
+        <nav className="relative z-10 flex items-center justify-between px-4 sm:px-6 md:px-12 py-6 pr-20 sm:pr-24 md:pr-28">
           <span className="text-lg font-bold tracking-tight">
             Hypothesis Atlas
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <Link
               href="/docs"
-              className={`px-4 py-2 text-sm ${t.muted} hover:${t.text} transition-colors`}
+              className={`hidden sm:inline-block px-4 py-2 text-sm ${t.muted} hover:${t.text} transition-colors`}
             >
               Docs
             </Link>
             <Link
               href="/pricing"
-              className={`px-4 py-2 text-sm ${t.muted} hover:${t.text} transition-colors`}
+              className={`hidden sm:inline-block px-4 py-2 text-sm ${t.muted} hover:${t.text} transition-colors`}
             >
               Pricing
             </Link>
             <Link
               href="/explore"
-              className={`px-4 py-2 text-sm font-semibold ${t.buttonPrimary} rounded-lg transition-colors`}
+              className={`px-3 sm:px-4 py-2 text-sm font-semibold ${t.buttonPrimary} rounded-lg transition-colors whitespace-nowrap`}
             >
               Try Explorer
             </Link>

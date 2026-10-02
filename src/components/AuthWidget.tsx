@@ -37,7 +37,7 @@ export default function AuthWidget() {
 
   return (
     <>
-      <div className="fixed top-3 right-3 z-40" ref={menuRef}>
+      <div className="fixed top-4 right-4 z-40" ref={menuRef}>
         {session?.user ? (
           <div className="relative">
             <button

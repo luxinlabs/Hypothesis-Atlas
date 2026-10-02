@@ -159,13 +159,20 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
   };
 
   const handleDeleteHighlight = async (highlightId: string) => {
+    const previous = knowledge;
     setKnowledge((k) => k.filter((h) => h.id !== highlightId));
     try {
       const res = await fetch(`/api/bold-ideas/${ideaId}/knowledge/${highlightId}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.highlights) setKnowledge(data.highlights);
+      if (res.ok && data.highlights) {
+        setKnowledge(data.highlights);
+      } else {
+        // Roll back the optimistic removal — the server never actually deleted it.
+        setKnowledge(previous);
+      }
     } catch (err) {
       console.error("Failed to delete highlight:", err);
+      setKnowledge(previous);
     }
   };
 

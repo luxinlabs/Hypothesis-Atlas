@@ -16,10 +16,20 @@ function renderMath(tex: string, displayMode: boolean): string | null {
   }
 }
 
-/** Parses **bold** and $inline math$ together within a single line of text. No italics, no links — not needed by anything that feeds this component today, and skipping them keeps the tokenizer simple. */
+/**
+ * Parses **bold** and $inline math$ together within a single line of text.
+ * No italics, no links — not needed by anything that feeds this component
+ * today, and skipping them keeps the tokenizer simple.
+ *
+ * The math alternative requires non-whitespace right inside both `$`
+ * delimiters (Pandoc's tex_math_dollars heuristic) — without it, ordinary
+ * chat prose mentioning two dollar amounts on one line (e.g. "costs $500
+ * but insurance covers $200") gets its middle span fed to KaTeX as if it
+ * were TeX.
+ */
 function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
-  const regex = /\*\*([^*]+)\*\*|\$([^$\n]+)\$/g;
+  const regex = /\*\*([^*]+)\*\*|\$([^\s$](?:[^$\n]*[^\s$])?)\$/g;
   let last = 0;
   let i = 0;
   let m: RegExpExecArray | null;

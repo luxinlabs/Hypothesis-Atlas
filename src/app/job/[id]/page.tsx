@@ -132,6 +132,11 @@ export default function JobPage() {
             setJobError(data?.error ?? "Job not found");
             return;
           }
+          // Clear a stale error from an earlier transient failure — this
+          // poll succeeded, so a prior non-2xx response (e.g. a race right
+          // after job creation) shouldn't permanently lock the page into
+          // the error view.
+          setJobError(null);
           setJob(data);
           // Only set selectedNodeId if it hasn't been set yet
           if (data.rootNodeId && selectedNodeId === null) {

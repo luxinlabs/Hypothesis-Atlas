@@ -199,17 +199,21 @@ export default function AssistantChat({
         });
       }
 
-      // Auto-note: if the model ended with a 📝 line, save it to notes
+      // Auto-note: if the model ended with a 📝 line, strip it from the
+      // displayed text regardless of enableNotes (it's never meant to be
+      // shown verbatim) and save it to notes only when that's available.
       const { text, note } = extractAutoNote(accumulated);
-      if (note && enableNotes) {
-        try {
-          await appendNote(jobId, {
-            type: "insight",
-            title: `From Assistant — ${userText.slice(0, 60)}`,
-            content: note,
-          });
-        } catch (err) {
-          console.error("Failed to save auto-note:", err);
+      if (note) {
+        if (enableNotes) {
+          try {
+            await appendNote(jobId, {
+              type: "insight",
+              title: `From Assistant — ${userText.slice(0, 60)}`,
+              content: note,
+            });
+          } catch (err) {
+            console.error("Failed to save auto-note:", err);
+          }
         }
         setMessages((prev) => {
           const updated = [...prev];

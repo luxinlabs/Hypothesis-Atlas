@@ -48,15 +48,19 @@ export default function JobsPage() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([
+    // Fetched independently, not Promise.all'd — a failure in one list
+    // (e.g. the newer bold-ideas endpoint) shouldn't blank out the other,
+    // previously-working one.
+    Promise.allSettled([
       fetch("/api/jobs?limit=50").then((r) => r.json()),
       fetch("/api/bold-ideas?limit=50").then((r) => r.json()),
     ])
-      .then(([jobsData, ideasData]) => {
-        setJobs(jobsData.jobs ?? []);
-        setIdeas(ideasData.ideas ?? []);
+      .then(([jobsResult, ideasResult]) => {
+        if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs ?? []);
+        else console.error(jobsResult.reason);
+        if (ideasResult.status === "fulfilled") setIdeas(ideasResult.value.ideas ?? []);
+        else console.error(ideasResult.reason);
       })
-      .catch(console.error)
       .finally(() => setLoading(false));
   };
 

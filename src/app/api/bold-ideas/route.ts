@@ -4,6 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { tagSubjects } from '@/lib/boldIdea'
 import { runBoldIdeaAgents } from '@/lib/boldIdeaAgents'
 
+// POST chains tag -> explore -> ground -> (critique + analyze) across Groq,
+// Anthropic, OpenAlex, and PubMed — longer than the 60s sibling routes
+// (jobs/upload, paper-review) use for a single call.
+export const maxDuration = 120
+
 /** Lists bold ideas for the "Bold Idea" tab on My Research, newest first. No per-paper detail here — that's fetched per-idea on its session page. */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -41,12 +46,17 @@ export async function POST(request: NextRequest) {
   }
 
   const trimmed = text.trim()
-  const tags = await tagSubjects(trimmed)
-  const trace = await runBoldIdeaAgents(trimmed, tags)
+  try {
+    const tags = await tagSubjects(trimmed)
+    const trace = await runBoldIdeaAgents(trimmed, tags)
 
-  const idea = await prisma.boldIdea.create({
-    data: { text: trimmed, tagsJson: JSON.stringify(tags), agentTraceJson: JSON.stringify(trace) },
-  })
+    const idea = await prisma.boldIdea.create({
+      data: { text: trimmed, tagsJson: JSON.stringify(tags), agentTraceJson: JSON.stringify(trace) },
+    })
 
-  return NextResponse.json({ ideaId: idea.id, tags, trace }, { status: 201 })
+    return NextResponse.json({ ideaId: idea.id, tags, trace }, { status: 201 })
+  } catch (error) {
+    console.error('Error creating bold idea:', error)
+    return NextResponse.json({ error: 'Failed to explore this idea' }, { status: 500 })
+  }
 }

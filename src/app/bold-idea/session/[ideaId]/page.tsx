@@ -159,7 +159,10 @@ function PaperTree({
     );
   }
 
-  const active = candidates[selected];
+  // Older ideas were created before CandidateVerdict carried a `papers` field
+  // (their agentTraceJson was serialized under the old shape) — default to
+  // an empty list rather than let `active.papers` be undefined.
+  const active = { ...candidates[selected], papers: candidates[selected]?.papers ?? [] };
 
   return (
     <div className="p-8 max-w-4xl mx-auto">

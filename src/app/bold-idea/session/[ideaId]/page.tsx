@@ -83,6 +83,8 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
           ) : (
             <AssistantChat
               jobId={ideaId}
+              endpoint={`/api/bold-ideas/${ideaId}/chat`}
+              enableNotes={false}
               storageKey={`bold-idea-chat:${ideaId}`}
               welcome={{
                 role: "assistant",

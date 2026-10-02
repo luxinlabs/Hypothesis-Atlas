@@ -24,6 +24,10 @@ interface AssistantChatProps {
   welcome?: Message;
   storageKey?: string;
   onMessagesChange?: (messages: Message[]) => void;
+  /** Chat endpoint to POST to. Defaults to `/api/jobs/${jobId}/assistant-chat` — pass a different one for sessions (e.g. Bold Idea) that aren't backed by a real Job row, so the request doesn't 404 against that endpoint's `prisma.job.findUnique`. */
+  endpoint?: string;
+  /** Whether "Save to notes" / the auto 📝 note feature is available. Both are backed by the per-Job research graph (`/api/jobs/${jobId}/notes`) — default true, but Bold Idea sessions (no Job row) must pass false or every save throws a 404. */
+  enableNotes?: boolean;
 }
 
 const WELCOME: Message = {
@@ -66,6 +70,8 @@ export default function AssistantChat({
   welcome,
   storageKey,
   onMessagesChange,
+  endpoint,
+  enableNotes = true,
 }: AssistantChatProps) {
   const effectiveWelcome = welcome ?? WELCOME;
   const cacheKey = storageKey ?? makeCacheKey(jobId);
@@ -101,7 +107,7 @@ export default function AssistantChat({
     setStreaming(true);
 
     try {
-      const res = await fetch(`/api/jobs/${jobId}/assistant-chat`, {
+      const res = await fetch(endpoint ?? `/api/jobs/${jobId}/assistant-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -119,6 +125,15 @@ export default function AssistantChat({
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: err.error },
+        ]);
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `Request failed (${res.status}).` }));
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: err.error ?? `Request failed (${res.status}).` },
         ]);
         return;
       }
@@ -148,12 +163,16 @@ export default function AssistantChat({
 
       // Auto-note: if the model ended with a 📝 line, save it to notes
       const { text, note } = extractAutoNote(accumulated);
-      if (note) {
-        appendNote(jobId, {
-          type: "insight",
-          title: `From Assistant — ${userText.slice(0, 60)}`,
-          content: note,
-        });
+      if (note && enableNotes) {
+        try {
+          await appendNote(jobId, {
+            type: "insight",
+            title: `From Assistant — ${userText.slice(0, 60)}`,
+            content: note,
+          });
+        } catch (err) {
+          console.error("Failed to save auto-note:", err);
+        }
         setMessages((prev) => {
           const updated = [...prev];
           if (updated[assistantIndex]) {
@@ -264,7 +283,7 @@ export default function AssistantChat({
                   <span className="inline-block w-1.5 h-4 bg-emerald-400 ml-0.5 animate-pulse rounded-sm align-middle" />
                 )}
               </div>
-              {msg.role === "assistant" && i > 0 && msg.content && !streaming && (
+              {enableNotes && msg.role === "assistant" && i > 0 && msg.content && !streaming && (
                 <div className="flex justify-end mt-1">
                   <button
                     onClick={() => handleSaveNote(i)}

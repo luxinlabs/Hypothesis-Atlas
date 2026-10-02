@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { tagSubjects } from '@/lib/boldIdea'
 import { runBoldIdeaAgents } from '@/lib/boldIdeaAgents'
+import { authOptions } from '@/lib/auth'
 
 // POST chains tag -> explore -> ground -> (critique + analyze) across Groq,
 // Anthropic, OpenAlex, and PubMed — longer than the 60s sibling routes
@@ -47,11 +49,19 @@ export async function POST(request: NextRequest) {
 
   const trimmed = text.trim()
   try {
+    // #36/V3.6 phase 2: same treatment as Job.userId — stamped when a
+    // session exists, not required, not read for access control anywhere.
+    const session = await getServerSession(authOptions)
     const tags = await tagSubjects(trimmed)
     const trace = await runBoldIdeaAgents(trimmed, tags)
 
     const idea = await prisma.boldIdea.create({
-      data: { text: trimmed, tagsJson: JSON.stringify(tags), agentTraceJson: JSON.stringify(trace) },
+      data: {
+        text: trimmed,
+        tagsJson: JSON.stringify(tags),
+        agentTraceJson: JSON.stringify(trace),
+        userId: session?.user?.id ?? null,
+      },
     })
 
     return NextResponse.json({ ideaId: idea.id, tags, trace }, { status: 201 })

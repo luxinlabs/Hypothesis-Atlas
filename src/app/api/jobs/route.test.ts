@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const { prismaMock, addEvidenceMappingJobMock } = vi.hoisted(() => ({
+const { prismaMock, addEvidenceMappingJobMock, getServerSessionMock } = vi.hoisted(() => ({
   prismaMock: {
     job: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
   },
   addEvidenceMappingJobMock: vi.fn(),
+  getServerSessionMock: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
 vi.mock('@/lib/queue', () => ({ addEvidenceMappingJob: addEvidenceMappingJobMock }))
+vi.mock('next-auth', () => ({ getServerSession: getServerSessionMock }))
+vi.mock('@/lib/auth', () => ({ authOptions: {} }))
 
 import { GET, POST } from './route'
 
@@ -16,6 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.spyOn(console, 'log').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  getServerSessionMock.mockResolvedValue(null)
 })
 
 describe('GET /api/jobs', () => {
@@ -69,8 +73,22 @@ describe('POST /api/jobs', () => {
 
     expect(res.status).toBe(200)
     expect(body).toEqual({ jobId: 'job-1' })
-    expect(prismaMock.job.create).toHaveBeenCalledWith({ data: { topicQuery: 'autonomous vehicles', status: 'pending' } })
+    expect(prismaMock.job.create).toHaveBeenCalledWith({
+      data: { topicQuery: 'autonomous vehicles', status: 'pending', userId: null },
+    })
     expect(addEvidenceMappingJobMock).toHaveBeenCalledWith('job-1', 'autonomous vehicles')
+  })
+
+  it('stamps userId from the session when the user is signed in', async () => {
+    getServerSessionMock.mockResolvedValue({ user: { id: 'user-42' } })
+    prismaMock.job.create.mockResolvedValue({ id: 'job-1' })
+    addEvidenceMappingJobMock.mockResolvedValue(undefined)
+
+    await POST(postRequest({ topicQuery: 'autonomous vehicles' }))
+
+    expect(prismaMock.job.create).toHaveBeenCalledWith({
+      data: { topicQuery: 'autonomous vehicles', status: 'pending', userId: 'user-42' },
+    })
   })
 
   it('rejects a missing topicQuery', async () => {

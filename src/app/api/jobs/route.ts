@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { addEvidenceMappingJob } from '@/lib/queue'
+import { authOptions } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,11 +60,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // #36/V3.6 phase 2: stamp the owner when a session exists. Still fully
+    // anonymous-creatable — no auth-required gate (phase 3) and nothing
+    // reads this for access control yet (phase 4) — this just records who
+    // made it, for whenever ownership enforcement lands.
+    const session = await getServerSession(authOptions)
+
     console.log('Creating job for topic:', topicQuery)
     const job = await prisma.job.create({
       data: {
         topicQuery,
         status: 'pending',
+        userId: session?.user?.id ?? null,
       },
     })
     console.log('Job created:', job.id)

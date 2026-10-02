@@ -87,11 +87,19 @@ export default function AuthModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in my-auto max-h-full overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      {/*
+        Structural fix, not just "add scrolling": the submit button and the
+        mode-switch links live in a footer OUTSIDE the scrollable area, so
+        they're always on screen no matter the viewport height, zoom level,
+        or how many fields are showing — not reliant on anyone noticing a
+        scrollbar. The footer's button targets the form by id (the `form`
+        attribute) since it's no longer a DOM descendant of the <form>.
+      */}
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative animate-fade-in flex flex-col max-h-[calc(100vh-2rem)]">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
         >
           <svg
             className="w-6 h-6"
@@ -108,79 +116,86 @@ export default function AuthModal({
           </svg>
         </button>
 
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            {mode === "login" && "Welcome Back"}
-            {mode === "signup" && "Create Account"}
-            {mode === "forgot" && "Reset Password"}
-          </h2>
-          <p className="text-gray-600">
-            {mode === "login" && "Sign in to access your research"}
-            {mode === "signup" && "Start mapping evidence today"}
-            {mode === "forgot" && "We'll send you a reset link"}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === "signup" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="John Doe"
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="you@example.com"
-            />
+        <div className="overflow-y-auto px-8 pt-8 flex-1 min-h-0">
+          <div className="mb-6">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              {mode === "login" && "Welcome Back"}
+              {mode === "signup" && "Create Account"}
+              {mode === "forgot" && "Reset Password"}
+            </h2>
+            <p className="text-gray-600">
+              {mode === "login" && "Sign in to access your research"}
+              {mode === "signup" && "Start mapping evidence today"}
+              {mode === "forgot" && "We'll send you a reset link"}
+            </p>
           </div>
 
-          {mode !== "forgot" && (
+          <form id="auth-modal-form" onSubmit={handleSubmit} className="space-y-4">
+            {mode === "signup" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="John Doe"
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
+                Email Address
               </label>
               <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="you@example.com"
               />
             </div>
-          )}
 
+            {mode !== "forgot" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
+
+          </form>
+        </div>
+
+        {/* Error/success feedback lives here, not inside the scrollable area above — it needs to appear right next to the button the user just pressed, not somewhere they'd have to scroll back up to see. */}
+        <div className="flex-shrink-0 px-8 pb-8 pt-4">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+            <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
               {error}
             </div>
           )}
 
           {message && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+            <div className="p-3 mb-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
               {message}
             </div>
           )}
 
           <button
+            form="auth-modal-form"
             type="submit"
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -213,52 +228,52 @@ export default function AuthModal({
               </>
             )}
           </button>
-        </form>
 
-        <div className="mt-6 text-center text-sm">
-          {mode === "login" && (
-            <>
-              <button
-                onClick={() => switchMode("forgot")}
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Forgot password?
-              </button>
-              <p className="mt-2 text-gray-600">
-                Don't have an account?{" "}
+          <div className="mt-6 text-center text-sm">
+            {mode === "login" && (
+              <>
                 <button
-                  onClick={() => switchMode("signup")}
+                  onClick={() => switchMode("forgot")}
                   className="text-blue-600 hover:text-blue-700 font-medium"
                 >
-                  Sign up
+                  Forgot password?
+                </button>
+                <p className="mt-2 text-gray-600">
+                  Don't have an account?{" "}
+                  <button
+                    onClick={() => switchMode("signup")}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Sign up
+                  </button>
+                </p>
+              </>
+            )}
+
+            {mode === "signup" && (
+              <p className="text-gray-600">
+                Already have an account?{" "}
+                <button
+                  onClick={() => switchMode("login")}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Sign in
                 </button>
               </p>
-            </>
-          )}
+            )}
 
-          {mode === "signup" && (
-            <p className="text-gray-600">
-              Already have an account?{" "}
-              <button
-                onClick={() => switchMode("login")}
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Sign in
-              </button>
-            </p>
-          )}
-
-          {mode === "forgot" && (
-            <p className="text-gray-600">
-              Remember your password?{" "}
-              <button
-                onClick={() => switchMode("login")}
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Sign in
-              </button>
-            </p>
-          )}
+            {mode === "forgot" && (
+              <p className="text-gray-600">
+                Remember your password?{" "}
+                <button
+                  onClick={() => switchMode("login")}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Sign in
+                </button>
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

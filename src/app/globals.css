@@ -64,3 +64,20 @@ body {
 .delay-300 { animation-delay: 300ms; }
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
+
+/*
+ * Chrome/Safari paint autofilled inputs with their own internal blue/yellow
+ * tint via the :-webkit-autofill pseudo-class — a regular `background`
+ * declaration on the input can't override it, only this inset-box-shadow
+ * trick can (the shadow paints over the browser's own autofill background).
+ * Without it, an autofilled email/password field looks tinted even though
+ * our own CSS asks for a plain white input — see AuthModal.tsx.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0px 1000px white inset !important;
+  -webkit-text-fill-color: #111827 !important; /* text-gray-900, to match the rest of the form */
+  transition: background-color 9999s ease-in-out 0s; /* delays the browser's own repaint indefinitely so it never flashes back in */
+}

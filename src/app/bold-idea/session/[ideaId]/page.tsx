@@ -15,6 +15,7 @@ interface BoldIdeaDetail {
   trace: BoldIdeaAgentTrace | null;
   experiment: ExperimentDesign | null;
   knowledge: Highlight[];
+  canClaim?: boolean;
 }
 
 /**
@@ -61,6 +62,19 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
   const [generatingExperiment, setGeneratingExperiment] = useState(false);
   const [knowledge, setKnowledge] = useState<Highlight[]>([]);
   const [collapsed, setCollapsed] = useState({ info: false, experiment: false, knowledge: false });
+  const [claiming, setClaiming] = useState(false);
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    try {
+      const res = await fetch(`/api/bold-ideas/${ideaId}/claim`, { method: "POST" });
+      if (res.ok) {
+        setIdea((prev) => (prev ? { ...prev, canClaim: false } : prev));
+      }
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   useEffect(() => {
     fetch(`/api/bold-ideas/${ideaId}`)
@@ -191,13 +205,25 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
             ✨ {idea?.text ?? "Bold Idea session"}
           </span>
         </div>
-        <Link
-          href="/bold-idea"
-          className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex-shrink-0"
-          style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
-        >
-          + New Bold Idea
-        </Link>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {idea?.canClaim && (
+            <button
+              onClick={handleClaim}
+              disabled={claiming}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              title="This idea was created anonymously — claim it to attach it to your account"
+            >
+              {claiming ? "Claiming…" : "Claim this idea"}
+            </button>
+          )}
+          <Link
+            href="/bold-idea"
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
+            style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
+          >
+            + New Bold Idea
+          </Link>
+        </div>
       </header>
 
       <div ref={containerRef} className="flex-1 flex min-h-0">

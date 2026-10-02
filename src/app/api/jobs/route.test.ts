@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const { prismaMock, addEvidenceMappingJobMock, getServerSessionMock } = vi.hoisted(() => ({
@@ -88,6 +88,27 @@ describe('POST /api/jobs', () => {
 
     expect(prismaMock.job.create).toHaveBeenCalledWith({
       data: { topicQuery: 'autonomous vehicles', status: 'pending', userId: 'user-42' },
+    })
+  })
+
+  describe('REQUIRE_AUTH=true (hosted deployment)', () => {
+    const original = process.env.REQUIRE_AUTH
+    beforeEach(() => { process.env.REQUIRE_AUTH = 'true' })
+    afterEach(() => { process.env.REQUIRE_AUTH = original })
+
+    it('rejects an anonymous request', async () => {
+      const res = await POST(postRequest({ topicQuery: 'autonomous vehicles' }))
+      expect(res.status).toBe(401)
+      expect(prismaMock.job.create).not.toHaveBeenCalled()
+    })
+
+    it('allows a signed-in request', async () => {
+      getServerSessionMock.mockResolvedValue({ user: { id: 'user-42' } })
+      prismaMock.job.create.mockResolvedValue({ id: 'job-1' })
+      addEvidenceMappingJobMock.mockResolvedValue(undefined)
+
+      const res = await POST(postRequest({ topicQuery: 'autonomous vehicles' }))
+      expect(res.status).toBe(200)
     })
   })
 

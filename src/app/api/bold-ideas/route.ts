@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { tagSubjects } from '@/lib/boldIdea'
 import { runBoldIdeaAgents } from '@/lib/boldIdeaAgents'
 import { authOptions } from '@/lib/auth'
+import { isAuthRequired } from '@/lib/authConfig'
 
 // POST chains tag -> explore -> ground -> (critique + analyze) across Groq,
 // Anthropic, OpenAlex, and PubMed — longer than the 60s sibling routes
@@ -49,9 +50,12 @@ export async function POST(request: NextRequest) {
 
   const trimmed = text.trim()
   try {
-    // #36/V3.6 phase 2: same treatment as Job.userId — stamped when a
-    // session exists, not required, not read for access control anywhere.
+    // #36/V3.6 phase 2/3: same treatment as /api/jobs — stamp the owner,
+    // require one only when this deployment opts in (REQUIRE_AUTH=true).
     const session = await getServerSession(authOptions)
+    if (isAuthRequired() && !session?.user?.id) {
+      return NextResponse.json({ error: 'Sign in to explore a bold idea.' }, { status: 401 })
+    }
     const tags = await tagSubjects(trimmed)
     const trace = await runBoldIdeaAgents(trimmed, tags)
 

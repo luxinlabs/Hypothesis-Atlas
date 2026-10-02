@@ -17,6 +17,7 @@ interface Job {
   topicQuery: string;
   status: string;
   rootNodeId: string | null;
+  canClaim?: boolean;
 }
 
 interface ProgressEvent {
@@ -101,6 +102,19 @@ export default function JobPage() {
     "knowledge",
   );
   const [theme, setTheme] = useState<Theme>("light");
+  const [claiming, setClaiming] = useState(false);
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/claim`, { method: "POST" });
+      if (res.ok) {
+        setJob((prev) => (prev ? { ...prev, canClaim: false } : prev));
+      }
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -239,6 +253,16 @@ export default function JobPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {job.canClaim && (
+              <button
+                onClick={handleClaim}
+                disabled={claiming}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                title="This research was created anonymously — claim it to attach it to your account"
+              >
+                {claiming ? "Claiming…" : "Claim this research"}
+              </button>
+            )}
             <Link
               href="/jobs"
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${t.backToExploreButton}`}

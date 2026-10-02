@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { addEvidenceMappingJob } from '@/lib/queue'
 import { authOptions } from '@/lib/auth'
+import { isAuthRequired } from '@/lib/authConfig'
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,11 +61,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // #36/V3.6 phase 2: stamp the owner when a session exists. Still fully
-    // anonymous-creatable — no auth-required gate (phase 3) and nothing
-    // reads this for access control yet (phase 4) — this just records who
-    // made it, for whenever ownership enforcement lands.
+    // #36/V3.6 phase 2/3: stamp the owner when a session exists; require one
+    // at all only on deployments that opt into it (REQUIRE_AUTH=true — the
+    // hosted tier, not self-hosted). See lib/authConfig.ts.
     const session = await getServerSession(authOptions)
+    if (isAuthRequired() && !session?.user?.id) {
+      return NextResponse.json({ error: 'Sign in to start new research.' }, { status: 401 })
+    }
 
     console.log('Creating job for topic:', topicQuery)
     const job = await prisma.job.create({

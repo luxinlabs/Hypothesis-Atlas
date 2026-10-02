@@ -168,12 +168,12 @@ function PaperTree({
     <div className="p-8 max-w-4xl mx-auto">
       {/* Root node: the idea itself */}
       <div className="flex flex-col items-center">
-        <div className="px-6 py-3 rounded-lg bg-gray-900 text-white text-sm font-semibold shadow-md text-center max-w-lg line-clamp-2">
+        <div className="px-6 py-3 rounded-lg bg-gray-900 text-white text-sm font-semibold shadow-md text-center max-w-2xl leading-snug">
           {ideaText}
         </div>
         <div className="w-0.5 h-8 bg-gray-300 my-3" />
 
-        {/* Child nodes: candidate directions */}
+        {/* Child nodes: candidate directions — sized to fit their full title, not truncated */}
         <div className="flex flex-wrap justify-center gap-3">
           {candidates.map((c, i) => {
             const style = VERDICT_STYLE[c.verdict];
@@ -181,13 +181,11 @@ function PaperTree({
               <button
                 key={c.title}
                 onClick={() => setSelected(i)}
-                className={`px-4 py-2.5 rounded-lg border-2 text-xs font-medium transition-all max-w-[220px] ${
+                className={`px-4 py-2.5 rounded-lg border-2 text-xs font-medium text-left leading-snug transition-all max-w-xs sm:max-w-sm ${
                   i === selected ? style.selected : style.idle
                 }`}
               >
-                <span className="block truncate">
-                  {VERDICT_MARK[c.verdict]} {c.title}
-                </span>
+                {VERDICT_MARK[c.verdict]} {c.title}
               </button>
             );
           })}

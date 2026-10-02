@@ -34,15 +34,13 @@ import { fetchTopicPapers, type FetchedPaper } from './fetchTopicPapers'
  * chemistry), just not restated in every chat message (kept terse by
  * request — it's read in a chat window, not a report).
  *
- * Chat text is plain prose with emoji section marks, not Markdown:
- * AssistantChat renders message content through MathText, which only
- * handles LaTeX — it does not parse Markdown links/headings/bold. An
- * earlier version of this pipeline wrote "[title](url)"/"### heading" into
- * the chat text, which rendered as literal punctuation; "📋 SUMMARY"-style
- * marks and a "──────" divider are this file's stand-in for headings since
- * then. Paper titles/links live in real React (the session page's tree of
- * candidate -> paper nodes, mirroring KnowledgeTree's parent/child layout),
- * not interpolated into prose.
+ * Chat text is real Markdown: AssistantChat renders message content through
+ * ChatMarkdown (headings, bold, bullet lists, "---" rules, plus KaTeX for
+ * $math$), not the plain-prose-with-emoji workaround an earlier version of
+ * this file used back when the chat only rendered LaTeX. Paper titles/links
+ * still live in real React (the session page's tree of candidate -> paper
+ * nodes, mirroring KnowledgeTree's parent/child layout) rather than being
+ * interpolated into the chat text as Markdown links.
  */
 
 export interface AgentCandidate {
@@ -312,11 +310,12 @@ const VERDICT_MARK: Record<CriticVerdict, string> = {
 }
 
 /**
- * Plain-text, not Markdown — AssistantChat only renders LaTeX (see the file
- * header). Emoji section marks and a divider stand in for headings/bold so
- * the sections stay visually distinct and easy to scan without a Markdown
- * renderer. Kept short on purpose: this is a landing point for the session,
- * not the full result — the papers tree on the right carries the detail.
+ * Real Markdown — AssistantChat renders it through ChatMarkdown
+ * (src/components/ChatMarkdown.tsx): headings, bold, bullet lists, and
+ * "---" rules, so each section reads as its own clearly separated block
+ * instead of a wall of prose. Kept short on purpose: this is a landing
+ * point for the session, not the full result — the candidate/paper tree
+ * on the right carries the detail.
  */
 function renderChatSummary(
   verdicts: CandidateVerdict[],
@@ -325,16 +324,16 @@ function renderChatSummary(
   nextSteps: string
 ): string {
   const candidateLines = verdicts
-    .map((v) => `${VERDICT_MARK[v.verdict]} ${v.title} — ${v.critique}`)
+    .map((v) => `- ${VERDICT_MARK[v.verdict]} **${v.title}** — ${v.critique}`)
     .join('\n')
   return (
-    `📋 SUMMARY\n${overallSummary}\n\n` +
-    `──────────\n\n` +
-    `🧭 DIRECTIONS EXPLORED\n${candidateLines}\n\n` +
-    `──────────\n\n` +
-    `⚠️ GAP\n${gaps}\n\n` +
-    `──────────\n\n` +
-    `🛠️ WHAT YOU CAN STILL DO\n${nextSteps}`
+    `## Summary\n${overallSummary}\n\n` +
+    `---\n\n` +
+    `## Directions explored\n${candidateLines}\n\n` +
+    `---\n\n` +
+    `## Gap\n${gaps}\n\n` +
+    `---\n\n` +
+    `## What you can still do\n${nextSteps}`
   )
 }
 

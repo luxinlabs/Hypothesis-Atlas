@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { appendNote } from "@/lib/notes";
-import MathText from "./MathText";
+import ChatMarkdown from "./ChatMarkdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -272,13 +272,13 @@ export default function AssistantChat({
             )}
             <div className="max-w-[80%]">
               <div
-                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-emerald-600 text-white rounded-tr-sm"
                     : "bg-gray-100 text-gray-800 rounded-tl-sm"
                 }`}
               >
-                <MathText text={msg.content} />
+                <ChatMarkdown text={msg.content} />
                 {streaming && i === messages.length - 1 && msg.role === "assistant" && (
                   <span className="inline-block w-1.5 h-4 bg-emerald-400 ml-0.5 animate-pulse rounded-sm align-middle" />
                 )}

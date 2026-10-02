@@ -173,6 +173,7 @@ model BoldIdea {
   tagsJson       String   @db.Text // JSON array of subject tags from the tagger agent
   jobId          String? // the Job this was turned into
   agentTraceJson String?  @db.Text // full multi-agent trace (Explorer/Literature/Critic) — see lib/boldIdeaAgents.ts
+  experimentJson String?  @db.Text // the second-phase experiment design for one chosen candidate direction — see lib/boldIdeaAgents.ts generateExperiment()
   createdAt      DateTime @default(now())
 
   @@index([createdAt])

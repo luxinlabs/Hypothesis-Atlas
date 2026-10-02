@@ -360,3 +360,76 @@ export async function runBoldIdeaAgents(text: string, tags: string[]): Promise<B
     chatSummary: renderChatSummary(candidates, overallSummary, gaps, nextSteps),
   }
 }
+
+export interface ExperimentDesign {
+  /** Which candidate direction this was designed for — the session page keys its "Experiment" card off this, not a separate id. */
+  candidateTitle: string
+  /** Real Markdown (## headings, **bold**, lists) — rendered the same way as chatSummary, via ChatMarkdown. */
+  markdown: string
+}
+
+/**
+ * Second-phase generation: once the researcher has picked a direction out
+ * of the information-finding phase (the candidate/paper tree), design a
+ * concrete experiment for it. One bounded Groq call, grounded in the
+ * candidate's own rationale, critique, and papers — not a restatement of
+ * the information-finding step, a distinct next phase the session page
+ * surfaces as its own collapsible "Experiment" card once requested.
+ *
+ * Mirrors the experiment-persona system prompt already used by the regular
+ * Job pipeline's assistant chat (see /api/jobs/[id]/assistant-chat's
+ * `isExperiment` branch) — same structure (Hypothesis/Variables/Method/
+ * Baselines/Metrics/Expected results), adapted to ground in a Bold Idea's
+ * own candidate + papers instead of a Job's stored sources/ideas.
+ */
+export async function generateExperiment(ideaText: string, candidate: CandidateVerdict): Promise<ExperimentDesign> {
+  const fallbackMarkdown =
+    `## Hypothesis\nExperiment design is unavailable right now (Groq is unreachable). Try again shortly.`
+  if (!groq) return { candidateTitle: candidate.title, markdown: fallbackMarkdown }
+
+  try {
+    // Candidates from before CandidateVerdict carried a `papers` field (see
+    // the session page's same fallback) may still have it undefined here.
+    const papers = candidate.papers ?? []
+    const paperBlock =
+      papers.length > 0
+        ? papers.map((p) => `- "${p.title}" (${p.year}) — Method: ${p.method}; Gap: ${p.gap}`).join('\n')
+        : 'None found during information-finding.'
+
+    const completion = await groq.chat.completions.create({
+      model: 'openai/gpt-oss-120b',
+      temperature: 0.3,
+      max_tokens: 1500,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are an experiment designer. Given a research idea, one candidate direction chosen out of a ' +
+            "prior literature-exploration phase, that direction's critique from an independent reviewer, and " +
+            'the papers found for it, design a concrete, runnable experiment. Ground every suggestion in the ' +
+            'papers given — cite them by name — rather than inventing unrelated methods. Respond with ONLY ' +
+            'Markdown (no commentary before or after), structured as:\n' +
+            '## Hypothesis\nThe precise, falsifiable claim being tested (1-2 sentences).\n\n' +
+            '## Variables\nIndependent, dependent, and controlled, as a bullet list with concrete values.\n\n' +
+            '## Method\nThe concrete procedure, grounded in the papers above where possible.\n\n' +
+            '## Baselines\nComparison methods from the papers, as a bullet list, with the numbers they report ' +
+            'if given.\n\n' +
+            '## Metrics\nWhat to measure and why — bullet list.\n\n' +
+            '## Expected results\n1-2 concrete, quantitative predictions, or an honest statement that the ' +
+            'papers found do not support a quantitative prediction. Be terse throughout — this is read in a ' +
+            'chat-adjacent panel, not a full report.',
+        },
+        {
+          role: 'user',
+          content:
+            `Idea: ${ideaText}\n\nChosen direction: "${candidate.title}" — ${candidate.rationale}\n\n` +
+            `Reviewer critique (${candidate.verdict}): ${candidate.critique}\n\nPapers found:\n${paperBlock}`,
+        },
+      ],
+    })
+    const markdown = completion.choices[0]?.message?.content?.trim()
+    return { candidateTitle: candidate.title, markdown: markdown || fallbackMarkdown }
+  } catch {
+    return { candidateTitle: candidate.title, markdown: fallbackMarkdown }
+  }
+}

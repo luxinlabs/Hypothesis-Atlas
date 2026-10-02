@@ -1,27 +1,36 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import AssistantChat from "@/components/AssistantChat";
-import type { CandidateVerdict, CriticVerdict, PaperAnalysis, BoldIdeaAgentTrace } from "@/lib/boldIdeaAgents";
+import ChatMarkdown from "@/components/ChatMarkdown";
+import type { CandidateVerdict, CriticVerdict, ExperimentDesign, PaperAnalysis, BoldIdeaAgentTrace } from "@/lib/boldIdeaAgents";
 
 interface BoldIdeaDetail {
   id: string;
   text: string;
   tags: string[];
   trace: BoldIdeaAgentTrace | null;
+  experiment: ExperimentDesign | null;
 }
 
 /**
  * Bold Idea's split-screen session view: chat on the left (opens with the
  * multi-agent synthesis — Summary / Gap / What we can still do), and a
- * parent/child node tree on the right — same layout language as
- * KnowledgeTree (src/components/KnowledgeTree.tsx): the idea as the root,
- * its candidate directions as child nodes, and each candidate's own papers
- * as grandchild nodes, hoverable for Method / Summary / Gap. No embedded
- * /job/[id] iframe and no Write Paper tab here — a bold idea is a
- * self-contained exploration, not an on-ramp into the Knowledge Tree
+ * canvas of collapsible phase sessions on the right:
+ *   1. Information Finding — the idea/candidate/paper node tree, same
+ *      layout language as KnowledgeTree (src/components/KnowledgeTree.tsx).
+ *   2. Experiment — a concrete experiment design for whichever candidate
+ *      direction the researcher picks, generated on demand (see
+ *      lib/boldIdeaAgents.ts generateExperiment()).
+ * Each session can be folded/unfolded independently, and "Move to
+ * Experiment" folds Information Finding and reveals Experiment — but
+ * neither is ever removed, so the researcher can always go back and forth
+ * between phases rather than losing the earlier one.
+ *
+ * No embedded /job/[id] iframe and no Write Paper tab here — a bold idea is
+ * a self-contained exploration, not an on-ramp into the Knowledge Tree
  * pipeline (it just borrows that pipeline's node-tree visual language).
  *
  * POST /api/bold-ideas now runs the whole multi-agent pipeline
@@ -41,13 +50,28 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
   const draggingRef = useRef(false);
   const [leftPct, setLeftPct] = useState(38);
 
+  // Which candidate is selected in the Information Finding tree — lifted up
+  // here (rather than kept inside PaperTree) because "Move to Experiment"
+  // needs to know which direction to design for.
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [experiment, setExperiment] = useState<ExperimentDesign | null>(null);
+  const [experimentRequested, setExperimentRequested] = useState(false);
+  const [generatingExperiment, setGeneratingExperiment] = useState(false);
+  const [collapsed, setCollapsed] = useState({ info: false, experiment: false });
+
   useEffect(() => {
     fetch(`/api/bold-ideas/${ideaId}`)
       .then((r) => {
         if (!r.ok) throw new Error("not found");
         return r.json();
       })
-      .then((d) => setIdea(d))
+      .then((d: BoldIdeaDetail) => {
+        setIdea(d);
+        if (d.experiment) {
+          setExperiment(d.experiment);
+          setExperimentRequested(true);
+        }
+      })
       .catch(() => setNotFound(true));
   }, [ideaId]);
 
@@ -90,6 +114,30 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
     draggingRef.current = true;
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
+  };
+
+  const candidates = idea?.trace?.candidates ?? [];
+  const selectedCandidate = candidates[selectedIndex];
+
+  const toggleCollapsed = (section: "info" | "experiment") =>
+    setCollapsed((c) => ({ ...c, [section]: !c[section] }));
+
+  const handleGenerateExperiment = async () => {
+    if (!selectedCandidate) return;
+    setExperimentRequested(true);
+    setCollapsed({ info: true, experiment: false });
+    setGeneratingExperiment(true);
+    try {
+      const res = await fetch(`/api/bold-ideas/${ideaId}/experiment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateTitle: selectedCandidate.title }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.experiment) setExperiment(data.experiment);
+    } finally {
+      setGeneratingExperiment(false);
+    }
   };
 
   return (
@@ -158,15 +206,122 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
           <div className="absolute w-1 h-10 rounded-full bg-gray-300 group-hover:bg-purple-400 transition-colors" />
         </div>
 
-        {/* Right: idea -> candidate -> paper node tree, same layout language as KnowledgeTree */}
-        <div className="hidden lg:block flex-1 min-w-0 overflow-y-auto bg-gray-50 border-l border-gray-200">
-          <PaperTree
-            ideaText={idea?.text ?? ""}
-            candidates={idea?.trace?.candidates ?? []}
-            loading={idea === null && !notFound}
-          />
+        {/* Right: a canvas of foldable phase sessions — Information Finding, then Experiment once requested */}
+        <div className="hidden lg:flex lg:flex-col flex-1 min-w-0 overflow-y-auto bg-gray-50 border-l border-gray-200">
+          <SessionSection
+            icon="🔎"
+            title="Information Finding"
+            subtitle={candidates.length > 0 ? `${candidates.length} directions` : undefined}
+            collapsed={collapsed.info}
+            onToggle={() => toggleCollapsed("info")}
+          >
+            <PaperTree
+              ideaText={idea?.text ?? ""}
+              candidates={candidates}
+              loading={idea === null && !notFound}
+              selected={selectedIndex}
+              onSelect={setSelectedIndex}
+            />
+            {candidates.length > 0 && (
+              <div className="max-w-4xl mx-auto px-8 pb-8 flex justify-end">
+                <button
+                  onClick={handleGenerateExperiment}
+                  disabled={generatingExperiment}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, #8b5cf6, #ec4899)" }}
+                >
+                  🧪 Move to Experiment →
+                </button>
+              </div>
+            )}
+          </SessionSection>
+
+          {experimentRequested && (
+            <SessionSection
+              icon="🧪"
+              title="Experiment"
+              subtitle={experiment ? `for ${experiment.candidateTitle}` : undefined}
+              collapsed={collapsed.experiment}
+              onToggle={() => toggleCollapsed("experiment")}
+            >
+              <div className="max-w-4xl mx-auto px-8 pb-8">
+                {generatingExperiment ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-purple-500" />
+                    <p className="text-xs text-gray-400">Designing an experiment for "{selectedCandidate?.title}"…</p>
+                  </div>
+                ) : experiment ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <p className="text-xs text-gray-500">
+                        Designed for: <span className="font-semibold text-gray-700">{experiment.candidateTitle}</span>
+                      </p>
+                      <button
+                        onClick={handleGenerateExperiment}
+                        disabled={!selectedCandidate}
+                        className="flex-shrink-0 text-xs font-semibold text-purple-600 hover:text-purple-800 disabled:opacity-40 transition-colors"
+                      >
+                        ↻ Regenerate for selected direction
+                      </button>
+                    </div>
+                    {selectedCandidate && experiment.candidateTitle !== selectedCandidate.title && (
+                      <div className="text-xs rounded-lg border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 mb-4">
+                        This was designed for a different direction than the one currently selected in Information
+                        Finding ("{selectedCandidate.title}"). Click regenerate to redesign for it.
+                      </div>
+                    )}
+                    <div className="bg-white border border-gray-200 rounded-xl p-5">
+                      <ChatMarkdown text={experiment.markdown} className="text-xs text-gray-800 leading-relaxed" />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-rose-500">Something went wrong generating this experiment. Try again.</p>
+                )}
+              </div>
+            </SessionSection>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SessionSection({
+  icon,
+  title,
+  subtitle,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex-shrink-0 border-b border-gray-200 bg-gray-50">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 px-8 py-4 text-left hover:bg-gray-100/60 transition-colors sticky top-0 bg-gray-50 z-[1]"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="text-base flex-shrink-0">{icon}</span>
+          <span className="text-sm font-bold text-gray-900 truncate">{title}</span>
+          {subtitle && <span className="text-xs text-gray-400 flex-shrink-0">· {subtitle}</span>}
+        </span>
+        <svg
+          className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {!collapsed && children}
     </div>
   );
 }
@@ -217,18 +372,20 @@ const CALLOUT_STYLE: Record<CriticVerdict, string> = {
   contradicted: "bg-rose-100 border-rose-200 text-rose-800",
 };
 
-/** Idea (root) -> candidate directions (children) -> each candidate's papers (grandchildren) — mirrors KnowledgeTree's parent/child pill-and-connector layout instead of a flat card grid. */
+/** Idea (root) -> candidate directions (children) -> each candidate's papers (grandchildren) — mirrors KnowledgeTree's parent/child pill-and-connector layout instead of a flat card grid. Selection is owned by the parent page (not local state) because "Move to Experiment" needs to know which candidate is picked. */
 function PaperTree({
   ideaText,
   candidates,
   loading,
+  selected,
+  onSelect,
 }: {
   ideaText: string;
   candidates: CandidateVerdict[];
   loading: boolean;
+  selected: number;
+  onSelect: (index: number) => void;
 }) {
-  const [selected, setSelected] = useState(0);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -267,7 +424,7 @@ function PaperTree({
             return (
               <button
                 key={c.title}
-                onClick={() => setSelected(i)}
+                onClick={() => onSelect(i)}
                 aria-pressed={isSelected}
                 className={`flex flex-col items-start gap-1.5 w-full h-full px-4 py-3 rounded-xl border-2 text-left transition-all ${
                   isSelected ? style.selected : style.idle

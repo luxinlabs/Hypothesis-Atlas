@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import type { BoldIdeaAgentTrace } from '@/lib/boldIdeaAgents'
+import type { BoldIdeaAgentTrace, ExperimentDesign } from '@/lib/boldIdeaAgents'
 
-/** Fetches one bold idea with its full multi-agent trace — used once by the session page on load (the pipeline runs synchronously in POST, so the trace is always already there by the time this is called). */
+/** Fetches one bold idea with its full multi-agent trace (information-finding phase) and, once generated, its experiment design (second phase) — used once by the session page on load (both phases run synchronously in their respective POSTs, so whichever already exist are there by the time this is called). */
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const idea = await prisma.boldIdea.findUnique({ where: { id: params.id } })
   if (!idea) {
@@ -15,6 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     tags: JSON.parse(idea.tagsJson) as string[],
     createdAt: idea.createdAt,
     trace: idea.agentTraceJson ? (JSON.parse(idea.agentTraceJson) as BoldIdeaAgentTrace) : null,
+    experiment: idea.experimentJson ? (JSON.parse(idea.experimentJson) as ExperimentDesign) : null,
   })
 }
 

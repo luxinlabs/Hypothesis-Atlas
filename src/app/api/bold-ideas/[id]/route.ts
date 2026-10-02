@@ -2,8 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import type { BoldIdeaAgentTrace, ExperimentDesign } from '@/lib/boldIdeaAgents'
+import type { Highlight } from '@/lib/boldIdeaKnowledge'
 
-/** Fetches one bold idea with its full multi-agent trace (information-finding phase) and, once generated, its experiment design (second phase) — used once by the session page on load (both phases run synchronously in their respective POSTs, so whichever already exist are there by the time this is called). */
+/** Fetches one bold idea with its full multi-agent trace (information-finding phase), its experiment design (second phase) once generated, and any saved knowledge highlights — used once by the session page on load. */
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const idea = await prisma.boldIdea.findUnique({ where: { id: params.id } })
   if (!idea) {
@@ -16,6 +17,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     createdAt: idea.createdAt,
     trace: idea.agentTraceJson ? (JSON.parse(idea.agentTraceJson) as BoldIdeaAgentTrace) : null,
     experiment: idea.experimentJson ? (JSON.parse(idea.experimentJson) as ExperimentDesign) : null,
+    knowledge: idea.knowledgeJson ? (JSON.parse(idea.knowledgeJson) as Highlight[]) : [],
   })
 }
 

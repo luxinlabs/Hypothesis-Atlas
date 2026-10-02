@@ -6,6 +6,7 @@ import Link from "next/link";
 import AssistantChat from "@/components/AssistantChat";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import type { CandidateVerdict, CriticVerdict, ExperimentDesign, PaperAnalysis, BoldIdeaAgentTrace } from "@/lib/boldIdeaAgents";
+import type { Highlight } from "@/lib/boldIdeaKnowledge";
 
 interface BoldIdeaDetail {
   id: string;
@@ -13,6 +14,7 @@ interface BoldIdeaDetail {
   tags: string[];
   trace: BoldIdeaAgentTrace | null;
   experiment: ExperimentDesign | null;
+  knowledge: Highlight[];
 }
 
 /**
@@ -57,7 +59,8 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
   const [experiment, setExperiment] = useState<ExperimentDesign | null>(null);
   const [experimentRequested, setExperimentRequested] = useState(false);
   const [generatingExperiment, setGeneratingExperiment] = useState(false);
-  const [collapsed, setCollapsed] = useState({ info: false, experiment: false });
+  const [knowledge, setKnowledge] = useState<Highlight[]>([]);
+  const [collapsed, setCollapsed] = useState({ info: false, experiment: false, knowledge: false });
 
   useEffect(() => {
     fetch(`/api/bold-ideas/${ideaId}`)
@@ -71,6 +74,7 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
           setExperiment(d.experiment);
           setExperimentRequested(true);
         }
+        setKnowledge(d.knowledge ?? []);
       })
       .catch(() => setNotFound(true));
   }, [ideaId]);
@@ -119,13 +123,13 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
   const candidates = idea?.trace?.candidates ?? [];
   const selectedCandidate = candidates[selectedIndex];
 
-  const toggleCollapsed = (section: "info" | "experiment") =>
+  const toggleCollapsed = (section: "info" | "experiment" | "knowledge") =>
     setCollapsed((c) => ({ ...c, [section]: !c[section] }));
 
   const handleGenerateExperiment = async () => {
     if (!selectedCandidate) return;
     setExperimentRequested(true);
-    setCollapsed({ info: true, experiment: false });
+    setCollapsed((c) => ({ ...c, info: true, experiment: false }));
     setGeneratingExperiment(true);
     try {
       const res = await fetch(`/api/bold-ideas/${ideaId}/experiment`, {
@@ -137,6 +141,31 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
       if (res.ok && data.experiment) setExperiment(data.experiment);
     } finally {
       setGeneratingExperiment(false);
+    }
+  };
+
+  const handleSaveHighlight = async (text: string) => {
+    try {
+      const res = await fetch(`/api/bold-ideas/${ideaId}/knowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.highlights) setKnowledge(data.highlights);
+    } catch (err) {
+      console.error("Failed to save highlight:", err);
+    }
+  };
+
+  const handleDeleteHighlight = async (highlightId: string) => {
+    setKnowledge((k) => k.filter((h) => h.id !== highlightId));
+    try {
+      const res = await fetch(`/api/bold-ideas/${ideaId}/knowledge/${highlightId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.highlights) setKnowledge(data.highlights);
+    } catch (err) {
+      console.error("Failed to delete highlight:", err);
     }
   };
 
@@ -188,6 +217,7 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
               jobId={ideaId}
               endpoint={`/api/bold-ideas/${ideaId}/chat`}
               enableNotes={false}
+              onHighlight={handleSaveHighlight}
               storageKey={`bold-idea-chat:${ideaId}`}
               welcome={{
                 role: "assistant",
@@ -280,6 +310,44 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
               </div>
             </SessionSection>
           )}
+
+          <SessionSection
+            icon="📌"
+            title="Knowledge"
+            subtitle={knowledge.length > 0 ? `${knowledge.length} saved` : undefined}
+            collapsed={collapsed.knowledge}
+            onToggle={() => toggleCollapsed("knowledge")}
+          >
+            <div className="max-w-4xl mx-auto px-8 pb-8">
+              {knowledge.length === 0 ? (
+                <p className="text-xs text-gray-400">
+                  Nothing saved yet — highlight any text in the chat on the left and click "Save to Knowledge" to
+                  keep it here.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {knowledge.map((h) => (
+                    <div
+                      key={h.id}
+                      className="flex items-start gap-3 bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                    >
+                      <span className="text-gray-300 text-lg leading-none flex-shrink-0">"</span>
+                      <p className="flex-1 text-xs text-gray-700 leading-relaxed">{h.text}</p>
+                      <button
+                        onClick={() => handleDeleteHighlight(h.id)}
+                        className="flex-shrink-0 text-gray-300 hover:text-rose-500 transition-colors"
+                        title="Remove"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </SessionSection>
         </div>
       </div>
     </div>

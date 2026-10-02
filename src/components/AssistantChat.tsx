@@ -28,6 +28,8 @@ interface AssistantChatProps {
   endpoint?: string;
   /** Whether "Save to notes" / the auto 📝 note feature is available. Both are backed by the per-Job research graph (`/api/jobs/${jobId}/notes`) — default true, but Bold Idea sessions (no Job row) must pass false or every save throws a 404. */
   enableNotes?: boolean;
+  /** Called with the selected text when the user highlights something in a message and clicks the "Save" popover that appears. Omit to disable highlighting entirely (no popover is shown). */
+  onHighlight?: (text: string) => void;
 }
 
 const WELCOME: Message = {
@@ -72,6 +74,7 @@ export default function AssistantChat({
   onMessagesChange,
   endpoint,
   enableNotes = true,
+  onHighlight,
 }: AssistantChatProps) {
   const effectiveWelcome = welcome ?? WELCOME;
   const cacheKey = storageKey ?? makeCacheKey(jobId);
@@ -80,7 +83,42 @@ export default function AssistantChat({
   const [streaming, setStreaming] = useState(false);
   const [noKey, setNoKey] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
+  const [highlightPopup, setHighlightPopup] = useState<{ text: string; x: number; y: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss the highlight popup if the page scrolls out from under it —
+  // it's positioned fixed to the selection's viewport rect, not the
+  // scrolling messages container, so it would otherwise go stale.
+  useEffect(() => {
+    if (!onHighlight) return;
+    const clear = () => setHighlightPopup(null);
+    window.addEventListener("scroll", clear, true);
+    return () => window.removeEventListener("scroll", clear, true);
+  }, [onHighlight]);
+
+  const handleSelectionChange = () => {
+    if (!onHighlight) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !messagesRef.current || !sel.anchorNode || !messagesRef.current.contains(sel.anchorNode)) {
+      setHighlightPopup(null);
+      return;
+    }
+    const text = sel.toString().trim();
+    if (!text) {
+      setHighlightPopup(null);
+      return;
+    }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    setHighlightPopup({ text, x: rect.left + rect.width / 2, y: rect.top });
+  };
+
+  const handleSaveHighlight = () => {
+    if (!highlightPopup) return;
+    onHighlight?.(highlightPopup.text);
+    window.getSelection()?.removeAllRanges();
+    setHighlightPopup(null);
+  };
 
   useEffect(() => {
     const cached = loadSession(cacheKey);
@@ -261,8 +299,19 @@ export default function AssistantChat({
         </div>
       )}
 
+      {/* Highlight-to-knowledge popover — follows the current text selection, fixed to viewport coords */}
+      {highlightPopup && (
+        <button
+          onClick={handleSaveHighlight}
+          style={{ position: "fixed", left: highlightPopup.x, top: highlightPopup.y - 40, transform: "translateX(-50%)" }}
+          className="z-50 flex items-center gap-1.5 bg-gray-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg hover:bg-gray-700 transition-colors"
+        >
+          ✨ Save to Knowledge
+        </button>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div ref={messagesRef} onMouseUp={handleSelectionChange} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             {msg.role === "assistant" && (

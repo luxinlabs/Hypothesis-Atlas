@@ -9,15 +9,20 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const job = await prisma.job.findUnique({
-      where: { id: params.id },
-      include: {
-        nodes: {
-          where: { parentId: null },
-          take: 1,
+    // Independent of each other — run together rather than paying both
+    // latencies sequentially on every job fetch.
+    const [job, session] = await Promise.all([
+      prisma.job.findUnique({
+        where: { id: params.id },
+        include: {
+          nodes: {
+            where: { parentId: null },
+            take: 1,
+          },
         },
-      },
-    })
+      }),
+      getServerSession(authOptions),
+    ])
 
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
@@ -26,7 +31,6 @@ export async function GET(
     // #36/V3.6 phase 4: a no-op for unowned jobs (anonymous/self-hosted
     // usage, unchanged) — only denies access to a job someone else's
     // account actually owns. See lib/ownership.ts.
-    const session = await getServerSession(authOptions)
     if (!canAccessResource(job.userId, session?.user?.id)) {
       return NextResponse.json({ error: 'Not authorized to view this job' }, { status: 403 })
     }
@@ -55,12 +59,14 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const job = await prisma.job.findUnique({ where: { id: params.id }, select: { userId: true } })
+    const [job, session] = await Promise.all([
+      prisma.job.findUnique({ where: { id: params.id }, select: { userId: true } }),
+      getServerSession(authOptions),
+    ])
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    const session = await getServerSession(authOptions)
     if (!canAccessResource(job.userId, session?.user?.id)) {
       return NextResponse.json({ error: 'Not authorized to delete this job' }, { status: 403 })
     }

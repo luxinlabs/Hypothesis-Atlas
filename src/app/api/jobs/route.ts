@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { addEvidenceMappingJob } from '@/lib/queue'
 import { authOptions } from '@/lib/auth'
 import { isAuthRequired } from '@/lib/authConfig'
+import { visibleToUserWhere } from '@/lib/ownership'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,8 +12,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
+    // #36/V3.6 phase 4: the list route must agree with the single-job
+    // route about what's visible, or an owned job is "private" when
+    // fetched by id but still shows up here for everyone.
+    const session = await getServerSession(authOptions)
+    const where = visibleToUserWhere(session?.user?.id)
+
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({
+        where,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
@@ -31,7 +39,7 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
-      prisma.job.count(),
+      prisma.job.count({ where }),
     ])
 
     return NextResponse.json({

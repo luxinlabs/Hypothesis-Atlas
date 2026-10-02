@@ -6,6 +6,7 @@ import { tagSubjects } from '@/lib/boldIdea'
 import { runBoldIdeaAgents } from '@/lib/boldIdeaAgents'
 import { authOptions } from '@/lib/auth'
 import { isAuthRequired } from '@/lib/authConfig'
+import { visibleToUserWhere } from '@/lib/ownership'
 
 // POST chains tag -> explore -> ground -> (critique + analyze) across Groq,
 // Anthropic, OpenAlex, and PubMed — longer than the 60s sibling routes
@@ -17,7 +18,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const limit = parseInt(searchParams.get('limit') || '50')
 
+  // #36/V3.6 phase 4: must agree with the single-idea route about what's
+  // visible — see the identical note in jobs/route.ts.
+  const session = await getServerSession(authOptions)
   const ideas = await prisma.boldIdea.findMany({
+    where: visibleToUserWhere(session?.user?.id),
     orderBy: { createdAt: 'desc' },
     take: limit,
   })

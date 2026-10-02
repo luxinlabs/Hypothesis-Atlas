@@ -9,13 +9,15 @@ import type { Highlight } from '@/lib/boldIdeaKnowledge'
 
 /** Fetches one bold idea with its full multi-agent trace (information-finding phase), its experiment design (second phase) once generated, and any saved knowledge highlights — used once by the session page on load. */
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
-  const idea = await prisma.boldIdea.findUnique({ where: { id: params.id } })
+  const [idea, session] = await Promise.all([
+    prisma.boldIdea.findUnique({ where: { id: params.id } }),
+    getServerSession(authOptions),
+  ])
   if (!idea) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
   // #36/V3.6 phase 4 — same rule as jobs/[id]: no-op for unowned ideas.
-  const session = await getServerSession(authOptions)
   if (!canAccessResource(idea.userId, session?.user?.id)) {
     return NextResponse.json({ error: 'Not authorized to view this idea' }, { status: 403 })
   }
@@ -40,12 +42,14 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
  */
 export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const idea = await prisma.boldIdea.findUnique({ where: { id: params.id }, select: { jobId: true, userId: true } })
+    const [idea, session] = await Promise.all([
+      prisma.boldIdea.findUnique({ where: { id: params.id }, select: { jobId: true, userId: true } }),
+      getServerSession(authOptions),
+    ])
     if (!idea) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const session = await getServerSession(authOptions)
     if (!canAccessResource(idea.userId, session?.user?.id)) {
       return NextResponse.json({ error: 'Not authorized to delete this idea' }, { status: 403 })
     }

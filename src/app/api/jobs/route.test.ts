@@ -53,6 +53,28 @@ describe('GET /api/jobs', () => {
     const res = await GET(new NextRequest('http://localhost/api/jobs'))
     expect(res.status).toBe(500)
   })
+
+  it('only shows unowned jobs to an anonymous request', async () => {
+    prismaMock.job.findMany.mockResolvedValue([])
+    prismaMock.job.count.mockResolvedValue(0)
+
+    await GET(new NextRequest('http://localhost/api/jobs'))
+
+    expect(prismaMock.job.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: null } }))
+    expect(prismaMock.job.count).toHaveBeenCalledWith({ where: { userId: null } })
+  })
+
+  it('shows unowned jobs plus the signed-in user\'s own', async () => {
+    getServerSessionMock.mockResolvedValue({ user: { id: 'user-1' } })
+    prismaMock.job.findMany.mockResolvedValue([])
+    prismaMock.job.count.mockResolvedValue(0)
+
+    await GET(new NextRequest('http://localhost/api/jobs'))
+
+    expect(prismaMock.job.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { OR: [{ userId: null }, { userId: 'user-1' }] } })
+    )
+  })
 })
 
 describe('POST /api/jobs', () => {

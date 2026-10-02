@@ -21,3 +21,15 @@ export function canAccessResource(resourceUserId: string | null, sessionUserId: 
   if (!resourceUserId) return true
   return resourceUserId === sessionUserId
 }
+
+/**
+ * The same rule as `canAccessResource`, as a Prisma `where` filter for list
+ * endpoints — "show me what I can see" rather than "can I see this one
+ * thing". Without this, a list route can return other accounts' owned
+ * resources even though the single-resource route correctly 403s them
+ * (exactly this mismatch was a real gap: GET /api/jobs returned every job
+ * in the database regardless of owner).
+ */
+export function visibleToUserWhere(sessionUserId: string | undefined | null) {
+  return sessionUserId ? { OR: [{ userId: null }, { userId: sessionUserId }] } : { userId: null }
+}

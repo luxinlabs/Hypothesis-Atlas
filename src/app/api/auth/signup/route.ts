@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { validateSignupInput } from '@/lib/authValidation'
@@ -22,6 +23,11 @@ export async function POST(request: NextRequest) {
   }
   const { name, email, password } = result.data
 
+  // This existence check is an early-exit for the common case, not the real
+  // guard — two concurrent signups for the same email can both pass it
+  // before either creates a row (TOCTOU). The unique constraint on
+  // User.email is the actual guard; the catch below turns its violation
+  // into the same 409 instead of a confusing generic 500.
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) {
     return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 })
@@ -35,6 +41,9 @@ export async function POST(request: NextRequest) {
     })
     return NextResponse.json({ user }, { status: 201 })
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 })
+    }
     console.error('Error creating user:', error)
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }

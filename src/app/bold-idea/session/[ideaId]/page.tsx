@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import AssistantChat from "@/components/AssistantChat";
 import type { CandidateVerdict, CriticVerdict, PaperAnalysis, BoldIdeaAgentTrace } from "@/lib/boldIdeaAgents";
@@ -28,10 +28,18 @@ interface BoldIdeaDetail {
  * synchronously, so the trace already exists by the time this page loads —
  * a single fetch on mount, no polling.
  */
+const SPLIT_STORAGE_KEY = "bold-idea-split-pct";
+const SPLIT_MIN = 24;
+const SPLIT_MAX = 65;
+
 export default function BoldIdeaSessionPage({ params }: { params: { ideaId: string } }) {
   const { ideaId } = params;
   const [idea, setIdea] = useState<BoldIdeaDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const [leftPct, setLeftPct] = useState(38);
 
   useEffect(() => {
     fetch(`/api/bold-ideas/${ideaId}`)
@@ -42,6 +50,47 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
       .then((d) => setIdea(d))
       .catch(() => setNotFound(true));
   }, [ideaId]);
+
+  // Restore a previously chosen split so the layout stays how the user left it.
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(SPLIT_STORAGE_KEY));
+      if (saved && saved >= SPLIT_MIN && saved <= SPLIT_MAX) setLeftPct(saved);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setLeftPct(Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, pct)));
+    };
+    const onUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setLeftPct((pct) => {
+        try {
+          localStorage.setItem(SPLIT_STORAGE_KEY, String(pct));
+        } catch {}
+        return pct;
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const startDrag = () => {
+    draggingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -67,9 +116,12 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
         </Link>
       </header>
 
-      <div className="flex-1 flex min-h-0">
+      <div ref={containerRef} className="flex-1 flex min-h-0">
         {/* Left: chat, opens with the multi-agent synthesis */}
-        <div className="w-full lg:w-[38%] min-w-0 border-r border-gray-200 bg-white flex flex-col">
+        <div
+          className="w-full lg:w-[var(--left-width)] min-w-0 bg-white flex flex-col"
+          style={{ "--left-width": `${leftPct}%` } as CSSProperties}
+        >
           {notFound ? (
             <div className="flex-1 flex items-center justify-center text-center px-8">
               <p className="text-sm text-gray-500">This bold idea could not be found.</p>
@@ -97,8 +149,17 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
           )}
         </div>
 
+        {/* Drag to resize the split — desktop only, the right panel is hidden below lg anyway */}
+        <div
+          onMouseDown={startDrag}
+          className="hidden lg:flex relative flex-shrink-0 w-2.5 cursor-col-resize items-center justify-center group"
+        >
+          <div className="w-px h-full bg-gray-200 group-hover:bg-purple-300 transition-colors" />
+          <div className="absolute w-1 h-10 rounded-full bg-gray-300 group-hover:bg-purple-400 transition-colors" />
+        </div>
+
         {/* Right: idea -> candidate -> paper node tree, same layout language as KnowledgeTree */}
-        <div className="hidden lg:block flex-1 min-w-0 overflow-y-auto bg-gray-50">
+        <div className="hidden lg:block flex-1 min-w-0 overflow-y-auto bg-gray-50 border-l border-gray-200">
           <PaperTree
             ideaText={idea?.text ?? ""}
             candidates={idea?.trace?.candidates ?? []}
@@ -116,18 +177,30 @@ const VERDICT_MARK: Record<CriticVerdict, string> = {
   contradicted: "❌",
 };
 
-const VERDICT_STYLE: Record<CriticVerdict, { idle: string; selected: string }> = {
+const VERDICT_LABEL: Record<CriticVerdict, string> = {
+  "well-supported": "Well-supported",
+  speculative: "Speculative",
+  contradicted: "Contradicted",
+};
+
+const VERDICT_STYLE: Record<CriticVerdict, { idle: string; idleBadge: string; selected: string; selectedBadge: string }> = {
   "well-supported": {
-    idle: "bg-white text-emerald-700 border-emerald-300 hover:border-emerald-400",
-    selected: "bg-emerald-600 text-white border-emerald-600 shadow-lg scale-105",
+    idle: "bg-white border-gray-200 hover:border-emerald-300",
+    idleBadge: "bg-emerald-50 text-emerald-700",
+    selected: "bg-emerald-600 border-emerald-600 shadow-md",
+    selectedBadge: "bg-emerald-700/40 text-white",
   },
   speculative: {
-    idle: "bg-white text-amber-700 border-amber-300 hover:border-amber-400",
-    selected: "bg-amber-500 text-white border-amber-500 shadow-lg scale-105",
+    idle: "bg-white border-gray-200 hover:border-amber-300",
+    idleBadge: "bg-amber-50 text-amber-700",
+    selected: "bg-amber-500 border-amber-500 shadow-md",
+    selectedBadge: "bg-amber-600/40 text-white",
   },
   contradicted: {
-    idle: "bg-white text-rose-700 border-rose-300 hover:border-rose-400",
-    selected: "bg-rose-600 text-white border-rose-600 shadow-lg scale-105",
+    idle: "bg-white border-gray-200 hover:border-rose-300",
+    idleBadge: "bg-rose-50 text-rose-700",
+    selected: "bg-rose-600 border-rose-600 shadow-md",
+    selectedBadge: "bg-rose-700/40 text-white",
   },
 };
 
@@ -186,19 +259,32 @@ function PaperTree({
         </div>
         <div className="w-0.5 h-8 bg-gray-300 my-3" />
 
-        {/* Child nodes: candidate directions — sized to fit their full title, not truncated */}
-        <div className="flex flex-wrap justify-center gap-3">
+        {/* Child nodes: candidate directions — an even grid so different-length titles still line up, instead of flex-wrap's mismatched pill widths */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
           {candidates.map((c, i) => {
             const style = VERDICT_STYLE[c.verdict];
+            const isSelected = i === selected;
             return (
               <button
                 key={c.title}
                 onClick={() => setSelected(i)}
-                className={`px-4 py-2.5 rounded-lg border-2 text-xs font-medium text-left leading-snug transition-all max-w-xs sm:max-w-sm ${
-                  i === selected ? style.selected : style.idle
+                aria-pressed={isSelected}
+                className={`flex flex-col items-start gap-1.5 w-full h-full px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                  isSelected ? style.selected : style.idle
                 }`}
               >
-                {VERDICT_MARK[c.verdict]} {c.title}
+                <span
+                  className={`text-sm font-semibold leading-snug ${isSelected ? "text-white" : "text-gray-900"}`}
+                >
+                  {c.title}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                    isSelected ? style.selectedBadge : style.idleBadge
+                  }`}
+                >
+                  {VERDICT_MARK[c.verdict]} {VERDICT_LABEL[c.verdict]}
+                </span>
               </button>
             );
           })}
@@ -209,14 +295,24 @@ function PaperTree({
       <div className="mt-6 flex flex-col items-center">
         <div className="w-0.5 h-8 bg-gray-300" />
         <div className={`w-full rounded-2xl border-2 p-6 ${SESSION_CARD_STYLE[active.verdict]}`}>
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-base">{VERDICT_MARK[active.verdict]}</span>
-            <h3 className="text-sm font-bold text-gray-900">{active.title}</h3>
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <h3 className="text-sm font-bold text-gray-900 leading-snug">{active.title}</h3>
+            <span
+              className={`flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full ${CALLOUT_STYLE[active.verdict]}`}
+            >
+              {VERDICT_MARK[active.verdict]} {VERDICT_LABEL[active.verdict]}
+            </span>
           </div>
 
           <div className={`text-xs rounded-lg border px-4 py-3 mb-5 leading-relaxed ${CALLOUT_STYLE[active.verdict]}`}>
             {active.critique}
           </div>
+
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2.5">
+            {active.papers.length === 0
+              ? "Papers"
+              : `${active.papers.length} paper${active.papers.length === 1 ? "" : "s"} found`}
+          </p>
 
           {active.papers.length === 0 ? (
             <div className={`text-xs rounded-lg border px-4 py-3 leading-relaxed ${CALLOUT_STYLE[active.verdict]}`}>
@@ -240,7 +336,7 @@ function PaperNode({ paper }: { paper: PaperAnalysis }) {
 
   return (
     <div
-      className="bg-white border border-gray-200 rounded-lg p-3.5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-default"
+      className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-default"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}

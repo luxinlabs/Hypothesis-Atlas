@@ -257,8 +257,7 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
                 <button
                   onClick={handleGenerateExperiment}
                   disabled={generatingExperiment}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg text-white shadow-sm hover:shadow-md transition-all disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, #8b5cf6, #ec4899)" }}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg text-white bg-gray-900 hover:bg-gray-800 shadow-sm transition-colors disabled:opacity-50"
                 >
                   🧪 Move to Experiment →
                 </button>

@@ -30,15 +30,19 @@ import { fetchTopicPapers, type FetchedPaper } from './fetchTopicPapers'
  *      from each paper's abstract, for the hover-card UI (not chat text).
  *
  * This is a confidence signal from LLM-as-judge machinery, not a proof —
- * the chat synthesis says so explicitly, the same way this app's other
- * verification features (math/physics/chemistry) state their own limits.
+ * same caveat as this app's other verification features (math/physics/
+ * chemistry), just not restated in every chat message (kept terse by
+ * request — it's read in a chat window, not a report).
  *
- * Chat text is plain prose, not Markdown: AssistantChat renders message
- * content through MathText, which only handles LaTeX — it does not parse
- * Markdown links/headings/bold. An earlier version of this pipeline wrote
- * "[title](url)"/"### heading" into the chat text, which rendered as
- * literal punctuation. Paper titles/links now live in real React (the
- * hover cards), not interpolated into prose.
+ * Chat text is plain prose with emoji section marks, not Markdown:
+ * AssistantChat renders message content through MathText, which only
+ * handles LaTeX — it does not parse Markdown links/headings/bold. An
+ * earlier version of this pipeline wrote "[title](url)"/"### heading" into
+ * the chat text, which rendered as literal punctuation; "📋 SUMMARY"-style
+ * marks and a "──────" divider are this file's stand-in for headings since
+ * then. Paper titles/links live in real React (the session page's tree of
+ * candidate -> paper nodes, mirroring KnowledgeTree's parent/child layout),
+ * not interpolated into prose.
  */
 
 export interface AgentCandidate {
@@ -52,13 +56,6 @@ interface GroundedCandidate extends AgentCandidate {
 
 export type CriticVerdict = 'well-supported' | 'speculative' | 'contradicted'
 
-export interface CandidateVerdict {
-  title: string
-  rationale: string
-  verdict: CriticVerdict
-  critique: string
-}
-
 export interface PaperAnalysis {
   title: string
   url: string
@@ -68,8 +65,18 @@ export interface PaperAnalysis {
   gap: string
 }
 
+export interface CandidateVerdict {
+  title: string
+  rationale: string
+  verdict: CriticVerdict
+  critique: string
+  /** This candidate's own papers, analyzed — the tree's child nodes under this candidate (see the session page's PaperTree, which mirrors KnowledgeTree's parent/child node layout). Looked up from the single deduplicated analyzePapers() pass below, not a second LLM call per candidate. */
+  papers: PaperAnalysis[]
+}
+
 export interface BoldIdeaAgentTrace {
   candidates: CandidateVerdict[]
+  /** All analyzed papers, deduplicated across candidates — used to ground the session chat; the UI tree renders papers per-candidate via candidates[].papers instead. */
   papers: PaperAnalysis[]
   overallSummary: string
   gaps: string
@@ -144,14 +151,21 @@ interface CriticResponse {
  * call per candidate and a separate synthesis call — keeps this a single
  * bounded pass, not an open-ended multi-round debate.
  */
+type VerdictOnly = Omit<CandidateVerdict, 'papers'>
+
 async function critique(candidates: GroundedCandidate[], ideaText: string): Promise<{
-  verdicts: CandidateVerdict[]
+  verdicts: VerdictOnly[]
   overallSummary: string
   gaps: string
   nextSteps: string
 }> {
   const fallback = {
-    verdicts: candidates.map((c) => ({ ...c, verdict: 'speculative' as const, critique: 'Critic unavailable.' })),
+    verdicts: candidates.map((c) => ({
+      title: c.title,
+      rationale: c.rationale,
+      verdict: 'speculative' as const,
+      critique: 'Critic unavailable.',
+    })),
     overallSummary: `Explored "${ideaText}" across ${candidates.length} direction(s).`,
     gaps: 'Critic model unavailable — gaps could not be assessed.',
     nextSteps: 'Try again once the critic model is reachable.',
@@ -179,11 +193,12 @@ async function critique(candidates: GroundedCandidate[], ideaText: string): Prom
         'Do two things: ' +
         '(1) For each candidate, give a verdict — "well-supported" (the papers genuinely back the ' +
         'direction), "speculative" (no strong papers either way, not unreasonable), or "contradicted" ' +
-        '(the papers undercut the premise) — plus one sentence of critique. ' +
-        '(2) Write a short overall synthesis of the exploration as a whole: a 2-3 sentence summary, a ' +
-        '1-2 sentence statement of the biggest gap(s) across the directions (what is under-evidenced or ' +
-        'missing), and 1-2 sentences of concrete next steps that could close that gap (e.g. a narrower ' +
-        'search, a specific study design, a different database). ' +
+        '(the papers undercut the premise) — plus a critique of no more than 15 words. ' +
+        '(2) Write a short overall synthesis of the exploration as a whole: a 1-2 sentence summary, a ' +
+        'single sentence naming the biggest gap across the directions (what is under-evidenced or ' +
+        'missing), and 1-2 short concrete next steps that could close that gap (e.g. a narrower ' +
+        'search, a specific study design, a different database). Be terse throughout — this is read in a ' +
+        'chat window, not a report. ' +
         'Respond with ONLY JSON: {"verdicts":[{"index":1,"verdict":"well-supported","critique":"..."}],' +
         '"overallSummary":"...","gaps":"...","nextSteps":"..."}.',
       messages: [{ role: 'user', content: candidateBlock }],
@@ -195,7 +210,7 @@ async function critique(candidates: GroundedCandidate[], ideaText: string): Prom
     if (!parsed) return fallback
 
     const byIndex = new Map((parsed.verdicts ?? []).map((v) => [v.index, v]))
-    const verdicts: CandidateVerdict[] = candidates.map((c, i) => {
+    const verdicts: VerdictOnly[] = candidates.map((c, i) => {
       const v = byIndex.get(i + 1)
       const verdict: CriticVerdict =
         v?.verdict === 'well-supported' || v?.verdict === 'contradicted' ? v.verdict : 'speculative'
@@ -239,6 +254,7 @@ async function analyzePapers(candidates: GroundedCandidate[]): Promise<PaperAnal
       gap: 'Unavailable',
     }))
   }
+
 
   try {
     const paperBlock = papers
@@ -289,12 +305,19 @@ async function analyzePapers(candidates: GroundedCandidate[]): Promise<PaperAnal
   }
 }
 
-const VERDICT_LABEL: Record<CriticVerdict, string> = {
-  'well-supported': 'Well-supported',
-  speculative: 'Speculative',
-  contradicted: 'Contradicted by literature',
+const VERDICT_MARK: Record<CriticVerdict, string> = {
+  'well-supported': '✅',
+  speculative: '🤔',
+  contradicted: '❌',
 }
 
+/**
+ * Plain-text, not Markdown — AssistantChat only renders LaTeX (see the file
+ * header). Emoji section marks and a divider stand in for headings/bold so
+ * the sections stay visually distinct and easy to scan without a Markdown
+ * renderer. Kept short on purpose: this is a landing point for the session,
+ * not the full result — the papers tree on the right carries the detail.
+ */
 function renderChatSummary(
   verdicts: CandidateVerdict[],
   overallSummary: string,
@@ -302,15 +325,16 @@ function renderChatSummary(
   nextSteps: string
 ): string {
   const candidateLines = verdicts
-    .map((v) => `- ${v.title} (${VERDICT_LABEL[v.verdict]}): ${v.critique}`)
-    .join('\n');
+    .map((v) => `${VERDICT_MARK[v.verdict]} ${v.title} — ${v.critique}`)
+    .join('\n')
   return (
-    `Summary: ${overallSummary}\n\n` +
-    `Directions explored:\n${candidateLines}\n\n` +
-    `Gap: ${gaps}\n\n` +
-    `What we can still do: ${nextSteps}\n\n` +
-    `(This is a confidence signal from a second model's critique, not a proof — see the papers panel for ` +
-    `what was actually found, and use this as a starting point for what to dig into first.)`
+    `📋 SUMMARY\n${overallSummary}\n\n` +
+    `──────────\n\n` +
+    `🧭 DIRECTIONS EXPLORED\n${candidateLines}\n\n` +
+    `──────────\n\n` +
+    `⚠️ GAP\n${gaps}\n\n` +
+    `──────────\n\n` +
+    `🛠️ WHAT YOU CAN STILL DO\n${nextSteps}`
   )
 }
 
@@ -321,12 +345,19 @@ export async function runBoldIdeaAgents(text: string, tags: string[]): Promise<B
     critique(grounded, text),
     analyzePapers(grounded),
   ])
+
+  const paperByUrl = new Map(papers.map((p) => [p.url, p]))
+  const candidates: CandidateVerdict[] = verdicts.map((v, i) => ({
+    ...v,
+    papers: grounded[i].papers.map((p) => paperByUrl.get(p.url)).filter((p): p is PaperAnalysis => !!p),
+  }))
+
   return {
-    candidates: verdicts,
+    candidates,
     papers,
     overallSummary,
     gaps,
     nextSteps,
-    chatSummary: renderChatSummary(verdicts, overallSummary, gaps, nextSteps),
+    chatSummary: renderChatSummary(candidates, overallSummary, gaps, nextSteps),
   }
 }

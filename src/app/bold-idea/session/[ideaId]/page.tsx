@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AssistantChat from "@/components/AssistantChat";
-import type { PaperAnalysis, BoldIdeaAgentTrace } from "@/lib/boldIdeaAgents";
+import type { CandidateVerdict, CriticVerdict, PaperAnalysis, BoldIdeaAgentTrace } from "@/lib/boldIdeaAgents";
 
 interface BoldIdeaDetail {
   id: string;
@@ -16,10 +16,13 @@ interface BoldIdeaDetail {
 /**
  * Bold Idea's split-screen session view: chat on the left (opens with the
  * multi-agent synthesis — Summary / Gap / What we can still do), and a
- * lightweight papers panel on the right where hovering a paper reveals its
- * Method / Summary / Gap. No embedded /job/[id] iframe and no Write Paper
- * tab here — a bold idea is a self-contained exploration, not an on-ramp
- * into the Knowledge Tree pipeline.
+ * parent/child node tree on the right — same layout language as
+ * KnowledgeTree (src/components/KnowledgeTree.tsx): the idea as the root,
+ * its candidate directions as child nodes, and each candidate's own papers
+ * as grandchild nodes, hoverable for Method / Summary / Gap. No embedded
+ * /job/[id] iframe and no Write Paper tab here — a bold idea is a
+ * self-contained exploration, not an on-ramp into the Knowledge Tree
+ * pipeline (it just borrows that pipeline's node-tree visual language).
  *
  * POST /api/bold-ideas now runs the whole multi-agent pipeline
  * synchronously, so the trace already exists by the time this page loads —
@@ -94,47 +97,125 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
           )}
         </div>
 
-        {/* Right: papers found during exploration — hover for method/summary/gap */}
+        {/* Right: idea -> candidate -> paper node tree, same layout language as KnowledgeTree */}
         <div className="hidden lg:block flex-1 min-w-0 overflow-y-auto bg-gray-50">
-          <PapersPanel papers={idea?.trace?.papers ?? []} loading={idea === null && !notFound} />
+          <PaperTree
+            ideaText={idea?.text ?? ""}
+            candidates={idea?.trace?.candidates ?? []}
+            loading={idea === null && !notFound}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-function PapersPanel({ papers, loading }: { papers: PaperAnalysis[]; loading: boolean }) {
+const VERDICT_MARK: Record<CriticVerdict, string> = {
+  "well-supported": "✅",
+  speculative: "🤔",
+  contradicted: "❌",
+};
+
+const VERDICT_STYLE: Record<CriticVerdict, { idle: string; selected: string }> = {
+  "well-supported": {
+    idle: "bg-white text-emerald-700 border-emerald-300 hover:border-emerald-400",
+    selected: "bg-emerald-600 text-white border-emerald-600 shadow-lg scale-105",
+  },
+  speculative: {
+    idle: "bg-white text-amber-700 border-amber-300 hover:border-amber-400",
+    selected: "bg-amber-500 text-white border-amber-500 shadow-lg scale-105",
+  },
+  contradicted: {
+    idle: "bg-white text-rose-700 border-rose-300 hover:border-rose-400",
+    selected: "bg-rose-600 text-white border-rose-600 shadow-lg scale-105",
+  },
+};
+
+/** Idea (root) -> candidate directions (children) -> each candidate's papers (grandchildren) — mirrors KnowledgeTree's parent/child pill-and-connector layout instead of a flat card grid. */
+function PaperTree({
+  ideaText,
+  candidates,
+  loading,
+}: {
+  ideaText: string;
+  candidates: CandidateVerdict[];
+  loading: boolean;
+}) {
+  const [selected, setSelected] = useState(0);
+
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center h-full">
-        <p className="text-sm text-gray-400">Loading papers…</p>
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-purple-500" />
       </div>
     );
   }
 
-  if (papers.length === 0) {
+  if (candidates.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center h-full px-8 text-center">
-        <p className="text-sm text-gray-400">No papers were found for this idea.</p>
+      <div className="flex items-center justify-center h-full px-8 text-center">
+        <p className="text-sm text-gray-400">No candidate directions were found for this idea.</p>
       </div>
     );
   }
+
+  const active = candidates[selected];
 
   return (
-    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {papers.map((paper) => (
-        <PaperCard key={paper.url || paper.title} paper={paper} />
-      ))}
+    <div className="p-8 max-w-4xl mx-auto">
+      {/* Root node: the idea itself */}
+      <div className="flex flex-col items-center">
+        <div className="px-6 py-3 rounded-lg bg-gray-900 text-white text-sm font-semibold shadow-md text-center max-w-lg line-clamp-2">
+          {ideaText}
+        </div>
+        <div className="w-0.5 h-8 bg-gray-300 my-3" />
+
+        {/* Child nodes: candidate directions */}
+        <div className="flex flex-wrap justify-center gap-3">
+          {candidates.map((c, i) => {
+            const style = VERDICT_STYLE[c.verdict];
+            return (
+              <button
+                key={c.title}
+                onClick={() => setSelected(i)}
+                className={`px-4 py-2.5 rounded-lg border-2 text-xs font-medium transition-all max-w-[220px] ${
+                  i === selected ? style.selected : style.idle
+                }`}
+              >
+                <span className="block truncate">
+                  {VERDICT_MARK[c.verdict]} {c.title}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected candidate's detail + its own papers (grandchild nodes) */}
+      <div className="mt-6 flex flex-col items-center">
+        <div className="w-0.5 h-8 bg-gray-300" />
+        <p className="text-xs text-gray-500 text-center max-w-xl mb-6">{active.critique}</p>
+
+        {active.papers.length === 0 ? (
+          <p className="text-xs text-gray-400">No papers found for this direction.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+            {active.papers.map((paper) => (
+              <PaperNode key={paper.url || paper.title} paper={paper} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function PaperCard({ paper }: { paper: PaperAnalysis }) {
+function PaperNode({ paper }: { paper: PaperAnalysis }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <div
-      className="group relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-default"
+      className="bg-white border border-gray-200 rounded-lg p-3.5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-default"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -145,18 +226,16 @@ function PaperCard({ paper }: { paper: PaperAnalysis }) {
         href={paper.url || undefined}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm font-semibold text-gray-900 hover:text-purple-700 hover:underline line-clamp-2"
+        className="text-xs font-semibold text-gray-900 hover:text-purple-700 hover:underline line-clamp-2"
       >
         {paper.title}
       </a>
-      <p className="text-xs text-gray-400 mt-1">{paper.year}</p>
+      <p className="text-[11px] text-gray-400 mt-1">{paper.year}</p>
 
-      {!hovered && (
-        <p className="text-xs text-gray-500 mt-2 line-clamp-2">{paper.summary}</p>
-      )}
-
-      {hovered && (
-        <div className="mt-2 space-y-2 text-xs">
+      {!hovered ? (
+        <p className="text-[11px] text-gray-500 mt-2 line-clamp-2">{paper.summary}</p>
+      ) : (
+        <div className="mt-2 space-y-1.5 text-[11px]">
           <div>
             <span className="font-semibold text-purple-700">Method: </span>
             <span className="text-gray-700">{paper.method}</span>

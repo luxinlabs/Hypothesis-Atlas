@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { groq } from './groq'
-import { anthropic, ANTHROPIC_MODEL } from './anthropic'
+import { openai, OPENAI_MODEL } from './openai'
 import { fetchTopicPapers, type FetchedPaper } from './fetchTopicPapers'
 
 /**
@@ -23,7 +23,7 @@ import { fetchTopicPapers, type FetchedPaper } from './fetchTopicPapers'
  *   1. Explorer (Groq)     — idea exploration: 2-4 candidate directions.
  *   2. Literature Agent    — searching: grounds each candidate in real
  *      papers via the *existing* fetchTopicPapers (OpenAlex + PubMed).
- *   3. Critic (Anthropic)  — validating: a genuinely different model from
+ *   3. Critic (OpenAI)     — validating: a genuinely different model from
  *      the Explorer gives a verdict per candidate, plus an overall
  *      summary/gaps/next-steps synthesis in the same call.
  *   4. Paper Analyzer (Groq) — a per-paper method/summary/gap extraction
@@ -142,7 +142,7 @@ interface CriticResponse {
 }
 
 /**
- * Critic agent (Anthropic — deliberately the *other* model provider from
+ * Critic agent (OpenAI — deliberately the *other* model provider from
  * the Explorer's Groq call): validating — reviews each grounded candidate
  * and gives a verdict, plus one overall summary/gaps/next-steps synthesis
  * covering the exploration as a whole. One call for everything, not one
@@ -168,7 +168,7 @@ async function critique(candidates: GroundedCandidate[], ideaText: string): Prom
     gaps: 'Critic model unavailable — gaps could not be assessed.',
     nextSteps: 'Try again once the critic model is reachable.',
   }
-  if (!anthropic || candidates.length === 0) return fallback
+  if (!openai || candidates.length === 0) return fallback
 
   try {
     const candidateBlock = candidates
@@ -181,28 +181,32 @@ async function critique(candidates: GroundedCandidate[], ideaText: string): Prom
           }`
       )
       .join('\n')
-    const message = await anthropic.messages.create({
-      model: ANTHROPIC_MODEL,
+    const completion = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
       max_tokens: 1200,
-      system:
-        `You are an independent research critic reviewing candidate directions for the idea "${ideaText}", ` +
-        'each proposed by another model and each with papers found for it by a separate search step. ' +
-        'Be skeptical: a paper merely sharing keywords with a candidate is not support. ' +
-        'Do two things: ' +
-        '(1) For each candidate, give a verdict — "well-supported" (the papers genuinely back the ' +
-        'direction), "speculative" (no strong papers either way, not unreasonable), or "contradicted" ' +
-        '(the papers undercut the premise) — plus a critique of no more than 15 words. ' +
-        '(2) Write a short overall synthesis of the exploration as a whole: a 1-2 sentence summary, a ' +
-        'single sentence naming the biggest gap across the directions (what is under-evidenced or ' +
-        'missing), and 1-2 short concrete next steps that could close that gap (e.g. a narrower ' +
-        'search, a specific study design, a different database). Be terse throughout — this is read in a ' +
-        'chat window, not a report. ' +
-        'Respond with ONLY JSON: {"verdicts":[{"index":1,"verdict":"well-supported","critique":"..."}],' +
-        '"overallSummary":"...","gaps":"...","nextSteps":"..."}.',
-      messages: [{ role: 'user', content: candidateBlock }],
+      messages: [
+        {
+          role: 'system',
+          content:
+            `You are an independent research critic reviewing candidate directions for the idea "${ideaText}", ` +
+            'each proposed by another model and each with papers found for it by a separate search step. ' +
+            'Be skeptical: a paper merely sharing keywords with a candidate is not support. ' +
+            'Do two things: ' +
+            '(1) For each candidate, give a verdict — "well-supported" (the papers genuinely back the ' +
+            'direction), "speculative" (no strong papers either way, not unreasonable), or "contradicted" ' +
+            '(the papers undercut the premise) — plus a critique of no more than 15 words. ' +
+            '(2) Write a short overall synthesis of the exploration as a whole: a 1-2 sentence summary, a ' +
+            'single sentence naming the biggest gap across the directions (what is under-evidenced or ' +
+            'missing), and 1-2 short concrete next steps that could close that gap (e.g. a narrower ' +
+            'search, a specific study design, a different database). Be terse throughout — this is read in a ' +
+            'chat window, not a report. ' +
+            'Respond with ONLY JSON: {"verdicts":[{"index":1,"verdict":"well-supported","critique":"..."}],' +
+            '"overallSummary":"...","gaps":"...","nextSteps":"..."}.',
+        },
+        { role: 'user', content: candidateBlock },
+      ],
     })
-    const block = message.content.find((b) => b.type === 'text')
-    const text = block && block.type === 'text' ? block.text : ''
+    const text = completion.choices[0]?.message?.content ?? ''
     const match = text.match(/\{[\s\S]*\}/)
     const parsed: CriticResponse | null = match ? JSON.parse(match[0]) : null
     if (!parsed) return fallback

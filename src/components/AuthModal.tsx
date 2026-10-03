@@ -194,11 +194,21 @@ export default function AuthModal({
             </div>
           )}
 
+          {/*
+            A solid color, not a gradient: this is the same bg-indigo-600
+            every other primary button in the app uses (AuthWidget's
+            dropdown, the Account page's Save/Change-password buttons,
+            etc.) — besides the consistency, a plain background-color is
+            far less likely to render wrong (invisible/washed-out) under a
+            browser dark-mode/forced-colors extension than a gradient, and
+            there's no ambiguity about whether the white text is readable
+            against it.
+          */}
           <button
             form="auth-modal-form"
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">

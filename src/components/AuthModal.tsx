@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -21,53 +22,73 @@ export default function AuthModal({
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   if (!isOpen) return null;
+
+  const switchMode = (next: "login" | "signup" | "forgot") => {
+    setMode(next);
+    setError("");
+    setMessage("");
+  };
+
+  const reset = () => {
+    setEmail("");
+    setPassword("");
+    setName("");
+    setMessage("");
+    setError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
+    setError("");
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
       if (mode === "forgot") {
-        setMessage("Password reset link sent to your email!");
-        setLoading(false);
-        setTimeout(() => {
-          onClose();
-          setEmail("");
-          setPassword("");
-          setName("");
-          setMessage("");
-        }, 1500);
-      } else {
-        setMessage(`${mode === "login" ? "Login" : "Sign up"} successful!`);
-        setLoading(false);
-
-        // Call onAuthSuccess with user data
-        const userData = {
-          name: mode === "signup" ? name : email.split("@")[0],
-          email: email,
-        };
-
-        setTimeout(() => {
-          if (onAuthSuccess) {
-            onAuthSuccess(userData);
-          }
-          onClose();
-          setEmail("");
-          setPassword("");
-          setName("");
-          setMessage("");
-        }, 1500);
+        // No password-reset flow exists yet (phase 1 of #36 is login/signup
+        // only) — say so plainly rather than faking a "link sent" success.
+        setError("Password reset isn't available yet. Please sign in with your existing password for now.");
+        return;
       }
-    }, 1000);
+
+      if (mode === "signup") {
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error ?? "Could not create your account.");
+          return;
+        }
+      }
+
+      const result = await signIn("credentials", { email, password, redirect: false });
+      if (result?.error) {
+        setError(mode === "signup" ? "Account created, but sign-in failed — try signing in." : "Incorrect email or password.");
+        return;
+      }
+
+      setMessage(mode === "login" ? "Signed in!" : "Account created!");
+      onAuthSuccess?.({ name: mode === "signup" ? name : email.split("@")[0], email });
+      setTimeout(() => {
+        onClose();
+        reset();
+      }, 800);
+    } catch {
+      setError("Could not reach the server — please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative animate-fade-in my-auto max-h-full overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -147,6 +168,12 @@ export default function AuthModal({
             </div>
           )}
 
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+              {error}
+            </div>
+          )}
+
           {message && (
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
               {message}
@@ -192,7 +219,7 @@ export default function AuthModal({
           {mode === "login" && (
             <>
               <button
-                onClick={() => setMode("forgot")}
+                onClick={() => switchMode("forgot")}
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 Forgot password?
@@ -200,7 +227,7 @@ export default function AuthModal({
               <p className="mt-2 text-gray-600">
                 Don't have an account?{" "}
                 <button
-                  onClick={() => setMode("signup")}
+                  onClick={() => switchMode("signup")}
                   className="text-blue-600 hover:text-blue-700 font-medium"
                 >
                   Sign up
@@ -213,7 +240,7 @@ export default function AuthModal({
             <p className="text-gray-600">
               Already have an account?{" "}
               <button
-                onClick={() => setMode("login")}
+                onClick={() => switchMode("login")}
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 Sign in
@@ -225,7 +252,7 @@ export default function AuthModal({
             <p className="text-gray-600">
               Remember your password?{" "}
               <button
-                onClick={() => setMode("login")}
+                onClick={() => switchMode("login")}
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 Sign in

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { addEvidenceMappingJob } from '@/lib/queue'
+import { authOptions } from '@/lib/auth'
+import { isAuthRequired } from '@/lib/authConfig'
+import { visibleToUserWhere } from '@/lib/ownership'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,8 +12,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
+    // #36/V3.6 phase 4: the list route must agree with the single-job
+    // route about what's visible, or an owned job is "private" when
+    // fetched by id but still shows up here for everyone.
+    const session = await getServerSession(authOptions)
+    const where = visibleToUserWhere(session?.user?.id)
+
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({
+        where,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
@@ -28,7 +39,7 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
-      prisma.job.count(),
+      prisma.job.count({ where }),
     ])
 
     return NextResponse.json({
@@ -58,11 +69,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // #36/V3.6 phase 2/3: stamp the owner when a session exists; require one
+    // at all only on deployments that opt into it (REQUIRE_AUTH=true — the
+    // hosted tier, not self-hosted). See lib/authConfig.ts.
+    const session = await getServerSession(authOptions)
+    if (isAuthRequired() && !session?.user?.id) {
+      return NextResponse.json({ error: 'Sign in to start new research.' }, { status: 401 })
+    }
+
     console.log('Creating job for topic:', topicQuery)
     const job = await prisma.job.create({
       data: {
         topicQuery,
         status: 'pending',
+        userId: session?.user?.id ?? null,
       },
     })
     console.log('Job created:', job.id)

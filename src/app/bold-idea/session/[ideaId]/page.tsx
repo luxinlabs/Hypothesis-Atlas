@@ -15,6 +15,7 @@ interface BoldIdeaDetail {
   trace: BoldIdeaAgentTrace | null;
   experiment: ExperimentDesign | null;
   knowledge: Highlight[];
+  canClaim?: boolean;
 }
 
 /**
@@ -61,6 +62,33 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
   const [generatingExperiment, setGeneratingExperiment] = useState(false);
   const [knowledge, setKnowledge] = useState<Highlight[]>([]);
   const [collapsed, setCollapsed] = useState({ info: false, experiment: false, knowledge: false });
+  const [claiming, setClaiming] = useState(false);
+
+  const [claimError, setClaimError] = useState<string | null>(null);
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    setClaimError(null);
+    try {
+      const res = await fetch(`/api/bold-ideas/${ideaId}/claim`, { method: "POST" });
+      if (res.ok) {
+        setIdea((prev) => (prev ? { ...prev, canClaim: false } : prev));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setClaimError(data.error ?? "Could not claim this idea.");
+      }
+    } catch {
+      setClaimError("Could not reach the server.");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!claimError) return;
+    const t = setTimeout(() => setClaimError(null), 5000);
+    return () => clearTimeout(t);
+  }, [claimError]);
 
   useEffect(() => {
     fetch(`/api/bold-ideas/${ideaId}`)
@@ -191,13 +219,32 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
             ✨ {idea?.text ?? "Bold Idea session"}
           </span>
         </div>
-        <Link
-          href="/bold-idea"
-          className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex-shrink-0"
-          style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
-        >
-          + New Bold Idea
-        </Link>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {idea?.canClaim && (
+            <div className="relative">
+              <button
+                onClick={handleClaim}
+                disabled={claiming}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                title="This idea was created anonymously — claim it to attach it to your account"
+              >
+                {claiming ? "Claiming…" : "Claim this idea"}
+              </button>
+              {claimError && (
+                <div className="absolute top-full right-0 mt-1.5 w-56 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 shadow-md z-20">
+                  {claimError}
+                </div>
+              )}
+            </div>
+          )}
+          <Link
+            href="/bold-idea"
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
+            style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
+          >
+            + New Bold Idea
+          </Link>
+        </div>
       </header>
 
       <div ref={containerRef} className="flex-1 flex min-h-0">

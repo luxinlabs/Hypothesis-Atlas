@@ -1,14 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const { prismaMock, addEvidenceMappingJobMock } = vi.hoisted(() => ({
+const { prismaMock, addEvidenceMappingJobMock, getServerSessionMock } = vi.hoisted(() => ({
   prismaMock: {
     job: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
   },
   addEvidenceMappingJobMock: vi.fn(),
+  getServerSessionMock: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
 vi.mock('@/lib/queue', () => ({ addEvidenceMappingJob: addEvidenceMappingJobMock }))
+vi.mock('next-auth', () => ({ getServerSession: getServerSessionMock }))
+vi.mock('@/lib/auth', () => ({ authOptions: {} }))
 
 import { GET, POST } from './route'
 
@@ -16,6 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.spyOn(console, 'log').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  getServerSessionMock.mockResolvedValue(null)
 })
 
 describe('GET /api/jobs', () => {
@@ -49,6 +53,28 @@ describe('GET /api/jobs', () => {
     const res = await GET(new NextRequest('http://localhost/api/jobs'))
     expect(res.status).toBe(500)
   })
+
+  it('only shows unowned jobs to an anonymous request', async () => {
+    prismaMock.job.findMany.mockResolvedValue([])
+    prismaMock.job.count.mockResolvedValue(0)
+
+    await GET(new NextRequest('http://localhost/api/jobs'))
+
+    expect(prismaMock.job.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: null } }))
+    expect(prismaMock.job.count).toHaveBeenCalledWith({ where: { userId: null } })
+  })
+
+  it('shows unowned jobs plus the signed-in user\'s own', async () => {
+    getServerSessionMock.mockResolvedValue({ user: { id: 'user-1' } })
+    prismaMock.job.findMany.mockResolvedValue([])
+    prismaMock.job.count.mockResolvedValue(0)
+
+    await GET(new NextRequest('http://localhost/api/jobs'))
+
+    expect(prismaMock.job.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { OR: [{ userId: null }, { userId: 'user-1' }] } })
+    )
+  })
 })
 
 describe('POST /api/jobs', () => {
@@ -69,8 +95,43 @@ describe('POST /api/jobs', () => {
 
     expect(res.status).toBe(200)
     expect(body).toEqual({ jobId: 'job-1' })
-    expect(prismaMock.job.create).toHaveBeenCalledWith({ data: { topicQuery: 'autonomous vehicles', status: 'pending' } })
+    expect(prismaMock.job.create).toHaveBeenCalledWith({
+      data: { topicQuery: 'autonomous vehicles', status: 'pending', userId: null },
+    })
     expect(addEvidenceMappingJobMock).toHaveBeenCalledWith('job-1', 'autonomous vehicles')
+  })
+
+  it('stamps userId from the session when the user is signed in', async () => {
+    getServerSessionMock.mockResolvedValue({ user: { id: 'user-42' } })
+    prismaMock.job.create.mockResolvedValue({ id: 'job-1' })
+    addEvidenceMappingJobMock.mockResolvedValue(undefined)
+
+    await POST(postRequest({ topicQuery: 'autonomous vehicles' }))
+
+    expect(prismaMock.job.create).toHaveBeenCalledWith({
+      data: { topicQuery: 'autonomous vehicles', status: 'pending', userId: 'user-42' },
+    })
+  })
+
+  describe('REQUIRE_AUTH=true (hosted deployment)', () => {
+    const original = process.env.REQUIRE_AUTH
+    beforeEach(() => { process.env.REQUIRE_AUTH = 'true' })
+    afterEach(() => { process.env.REQUIRE_AUTH = original })
+
+    it('rejects an anonymous request', async () => {
+      const res = await POST(postRequest({ topicQuery: 'autonomous vehicles' }))
+      expect(res.status).toBe(401)
+      expect(prismaMock.job.create).not.toHaveBeenCalled()
+    })
+
+    it('allows a signed-in request', async () => {
+      getServerSessionMock.mockResolvedValue({ user: { id: 'user-42' } })
+      prismaMock.job.create.mockResolvedValue({ id: 'job-1' })
+      addEvidenceMappingJobMock.mockResolvedValue(undefined)
+
+      const res = await POST(postRequest({ topicQuery: 'autonomous vehicles' }))
+      expect(res.status).toBe(200)
+    })
   })
 
   it('rejects a missing topicQuery', async () => {

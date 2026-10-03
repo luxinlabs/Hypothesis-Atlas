@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { tagSubjects } from '@/lib/boldIdea'
 import { runBoldIdeaAgents } from '@/lib/boldIdeaAgents'
+import { authOptions } from '@/lib/auth'
+import { isAuthRequired } from '@/lib/authConfig'
+import { visibleToUserWhere } from '@/lib/ownership'
 
 // POST chains tag -> explore -> ground -> (critique + analyze) across Groq,
 // Anthropic, OpenAlex, and PubMed — longer than the 60s sibling routes
@@ -14,7 +18,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const limit = parseInt(searchParams.get('limit') || '50')
 
+  // #36/V3.6 phase 4: must agree with the single-idea route about what's
+  // visible — see the identical note in jobs/route.ts.
+  const session = await getServerSession(authOptions)
   const ideas = await prisma.boldIdea.findMany({
+    where: visibleToUserWhere(session?.user?.id),
     orderBy: { createdAt: 'desc' },
     take: limit,
   })
@@ -47,11 +55,22 @@ export async function POST(request: NextRequest) {
 
   const trimmed = text.trim()
   try {
+    // #36/V3.6 phase 2/3: same treatment as /api/jobs — stamp the owner,
+    // require one only when this deployment opts in (REQUIRE_AUTH=true).
+    const session = await getServerSession(authOptions)
+    if (isAuthRequired() && !session?.user?.id) {
+      return NextResponse.json({ error: 'Sign in to explore a bold idea.' }, { status: 401 })
+    }
     const tags = await tagSubjects(trimmed)
     const trace = await runBoldIdeaAgents(trimmed, tags)
 
     const idea = await prisma.boldIdea.create({
-      data: { text: trimmed, tagsJson: JSON.stringify(tags), agentTraceJson: JSON.stringify(trace) },
+      data: {
+        text: trimmed,
+        tagsJson: JSON.stringify(tags),
+        agentTraceJson: JSON.stringify(trace),
+        userId: session?.user?.id ?? null,
+      },
     })
 
     return NextResponse.json({ ideaId: idea.id, tags, trace }, { status: 201 })

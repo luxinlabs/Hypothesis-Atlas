@@ -17,6 +17,7 @@ interface Job {
   topicQuery: string;
   status: string;
   rootNodeId: string | null;
+  canClaim?: boolean;
 }
 
 interface ProgressEvent {
@@ -101,6 +102,32 @@ export default function JobPage() {
     "knowledge",
   );
   const [theme, setTheme] = useState<Theme>("light");
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    setClaimError(null);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/claim`, { method: "POST" });
+      if (res.ok) {
+        setJob((prev) => (prev ? { ...prev, canClaim: false } : prev));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setClaimError(data.error ?? "Could not claim this research.");
+      }
+    } catch {
+      setClaimError("Could not reach the server.");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!claimError) return;
+    const t = setTimeout(() => setClaimError(null), 5000);
+    return () => clearTimeout(t);
+  }, [claimError]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -239,6 +266,23 @@ export default function JobPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {job.canClaim && (
+              <div className="relative">
+                <button
+                  onClick={handleClaim}
+                  disabled={claiming}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  title="This research was created anonymously — claim it to attach it to your account"
+                >
+                  {claiming ? "Claiming…" : "Claim this research"}
+                </button>
+                {claimError && (
+                  <div className="absolute top-full right-0 mt-1.5 w-56 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 shadow-md z-20">
+                    {claimError}
+                  </div>
+                )}
+              </div>
+            )}
             <Link
               href="/jobs"
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${t.backToExploreButton}`}

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
           rootNodeId: true,
           createdAt: true,
           updatedAt: true,
+          userId: true,
           _count: {
             select: {
               sources: true,
@@ -42,8 +43,17 @@ export async function GET(request: NextRequest) {
       prisma.job.count({ where }),
     ])
 
+    // #43/V3.2 ownership display: derived here so the client gets "is this
+    // mine / is it unclaimed" without ever receiving another account's id.
+    const viewerId = session?.user?.id
+    const jobsWithOwnership = jobs.map(({ userId, ...job }) => ({
+      ...job,
+      isMine: !!viewerId && userId === viewerId,
+      isUnclaimed: !!viewerId && userId === null,
+    }))
+
     return NextResponse.json({
-      jobs,
+      jobs: jobsWithOwnership,
       total,
       limit,
       offset,

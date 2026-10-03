@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     take: limit,
   })
 
+  // #43/V3.2 ownership display — see the note in api/jobs/route.ts.
+  const viewerId = session?.user?.id
   return NextResponse.json({
     ideas: ideas.map((idea) => ({
       id: idea.id,
@@ -34,6 +36,8 @@ export async function GET(request: NextRequest) {
       tags: JSON.parse(idea.tagsJson) as string[],
       createdAt: idea.createdAt,
       hasTrace: !!idea.agentTraceJson,
+      isMine: !!viewerId && idea.userId === viewerId,
+      isUnclaimed: !!viewerId && idea.userId === null,
     })),
   })
 }

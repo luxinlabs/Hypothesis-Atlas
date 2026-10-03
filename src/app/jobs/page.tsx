@@ -11,6 +11,8 @@ interface Job {
   createdAt: string;
   updatedAt: string;
   _count: { sources: number; nodes: number };
+  isMine?: boolean;
+  isUnclaimed?: boolean;
 }
 
 interface BoldIdea {
@@ -19,6 +21,19 @@ interface BoldIdea {
   tags: string[];
   createdAt: string;
   hasTrace: boolean;
+  isMine?: boolean;
+  isUnclaimed?: boolean;
+}
+
+/** #43/V3.2 ownership display: "Yours" for the signed-in user's own items, "Unclaimed" for anonymous work they could claim. Nothing is shown to signed-out viewers — ownership only means something once there's an account to compare against. */
+function OwnershipBadge({ isMine, isUnclaimed }: { isMine?: boolean; isUnclaimed?: boolean }) {
+  if (isMine) {
+    return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 flex-shrink-0">Yours</span>;
+  }
+  if (isUnclaimed) {
+    return <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">Unclaimed</span>;
+  }
+  return null;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -175,6 +190,7 @@ export default function JobsPage() {
                         <h2 className="font-semibold text-gray-900 text-base truncate">
                           {job.topicQuery}
                         </h2>
+                        <OwnershipBadge isMine={job.isMine} isUnclaimed={job.isUnclaimed} />
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_STYLES[job.status] ?? STATUS_STYLES.pending}`}>
                           {job.status === "processing" && (
                             <span className="inline-block w-1.5 h-1.5 bg-blue-600 rounded-full mr-1 animate-ping align-middle" />
@@ -254,6 +270,9 @@ export default function JobsPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <OwnershipBadge isMine={idea.isMine} isUnclaimed={idea.isUnclaimed} />
+                      </div>
                       <p className="text-gray-900 text-sm leading-relaxed">{idea.text}</p>
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
                         {idea.tags.map((tag) => (

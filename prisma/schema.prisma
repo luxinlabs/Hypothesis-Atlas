@@ -313,6 +313,11 @@ model User {
   emailVerified DateTime?
   image         String?
   passwordHash  String? // Credentials-provider auth; null for an OAuth-only user
+  // #43/V3.2: not wired to any real billing flow yet (no Stripe/payment
+  // integration exists) — a plain stored field so the Billing & Usage page
+  // can show a real value instead of a hardcoded UI string, ready for #34's
+  // $19/month hosted tier to flip it when that lands.
+  planTier      String    @default("free")
   createdAt     DateTime  @default(now())
 
   accounts  Account[]

@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { groq } from '@/lib/groq'
 import { populateNeo4jGraph } from '@/lib/neo4j-paper-graph'
 import { syncJobGraph } from '@/lib/research-graph'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { isAuthRequired } from '@/lib/authConfig'
 
 export const maxDuration = 60
 
@@ -100,6 +103,13 @@ ${text.slice(0, MAX_CHARS)}${text.length > MAX_CHARS ? '\n… [truncated]' : ''}
 }
 
 export async function POST(request: NextRequest) {
+  // #36/V3.6: same gate and owner stamp as POST /api/jobs. Checked before
+  // parsing the upload so an anonymous request never reaches the LLM call.
+  const session = await getServerSession(authOptions)
+  if (isAuthRequired() && !session?.user?.id) {
+    return NextResponse.json({ error: 'Sign in to start new research.' }, { status: 401 })
+  }
+
   let form: FormData
   try {
     form = await request.formData()
@@ -157,7 +167,7 @@ export async function POST(request: NextRequest) {
   const now = () => Date.now()
 
   const job = await prisma.job.create({
-    data: { topicQuery: insight.title, status: 'processing' },
+    data: { topicQuery: insight.title, status: 'processing', userId: session?.user?.id ?? null },
   })
 
   const skipped = 'Skipped — paper provided directly'

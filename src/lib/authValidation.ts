@@ -14,7 +14,7 @@ export interface ValidatedSignup {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const MIN_PASSWORD_LENGTH = 8
+export const MIN_PASSWORD_LENGTH = 8
 
 export function validateSignupInput(input: SignupInput): { ok: true; data: ValidatedSignup } | { ok: false; error: string } {
   const name = typeof input.name === 'string' ? input.name.trim() : ''

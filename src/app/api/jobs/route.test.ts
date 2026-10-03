@@ -31,7 +31,7 @@ describe('GET /api/jobs', () => {
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body).toEqual({ jobs: [{ id: 'job-1', topicQuery: 'topic', status: 'pending' }], total: 1, limit: 50, offset: 0 })
+    expect(body).toEqual({ jobs: [{ id: 'job-1', topicQuery: 'topic', status: 'pending', isMine: false, isUnclaimed: false }], total: 1, limit: 50, offset: 0 })
     expect(prismaMock.job.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 50, skip: 0 })
     )
@@ -52,6 +52,21 @@ describe('GET /api/jobs', () => {
 
     const res = await GET(new NextRequest('http://localhost/api/jobs'))
     expect(res.status).toBe(500)
+  })
+
+  it('flags the viewer\'s own and unclaimed jobs, without exposing other ids', async () => {
+    getServerSessionMock.mockResolvedValue({ user: { id: 'user-1' } })
+    prismaMock.job.findMany.mockResolvedValue([
+      { id: 'mine', topicQuery: 'a', status: 'pending', createdAt: new Date(), updatedAt: new Date(), userId: 'user-1', _count: { sources: 0, nodes: 0 } },
+      { id: 'anon', topicQuery: 'b', status: 'pending', createdAt: new Date(), updatedAt: new Date(), userId: null, _count: { sources: 0, nodes: 0 } },
+    ])
+    prismaMock.job.count.mockResolvedValue(2)
+
+    const body = await (await GET(new NextRequest('http://localhost/api/jobs'))).json()
+
+    expect(body.jobs[0]).toMatchObject({ id: 'mine', isMine: true, isUnclaimed: false })
+    expect(body.jobs[1]).toMatchObject({ id: 'anon', isMine: false, isUnclaimed: true })
+    expect(JSON.stringify(body)).not.toContain('user-1')
   })
 
   it('only shows unowned jobs to an anonymous request', async () => {

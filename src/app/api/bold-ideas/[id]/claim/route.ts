@@ -23,6 +23,17 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: 'This idea is already owned by another account.' }, { status: 409 })
   }
 
-  await prisma.boldIdea.update({ where: { id: params.id }, data: { userId: session.user.id } })
+  // Conditional write: only claims if it's still unowned. Two concurrent
+  // claims can both pass the findUnique check above; without this guard the
+  // second write silently overwrites the first and both report success.
+  const result = await prisma.boldIdea.updateMany({
+    where: { id: params.id, userId: null },
+    data: { userId: session.user.id },
+  })
+  if (result.count === 0) {
+    const now = await prisma.boldIdea.findUnique({ where: { id: params.id }, select: { userId: true } })
+    if (now?.userId === session.user.id) return NextResponse.json({ ok: true, alreadyOwned: true })
+    return NextResponse.json({ error: 'This idea was just claimed by another account.' }, { status: 409 })
+  }
   return NextResponse.json({ ok: true })
 }

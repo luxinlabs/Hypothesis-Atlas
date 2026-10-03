@@ -24,6 +24,14 @@ export default function AuthWidget() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Lets any page open the sign-in modal without owning its state — the
+  // landing page uses this to gate "Try Explorer" behind an account.
+  useEffect(() => {
+    const openSignIn = () => setModalOpen(true);
+    window.addEventListener("atlas:open-signin", openSignIn);
+    return () => window.removeEventListener("atlas:open-signin", openSignIn);
+  }, []);
+
   useEffect(() => {
     if (!menuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {

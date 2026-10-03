@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 
 type Theme = "dark" | "light" | "vibrant";
 
@@ -206,6 +207,16 @@ const steps = [
 
 export default function Home() {
   const [theme, setTheme] = useState<Theme>("light");
+  const { status: authStatus } = useSession();
+
+  // Every "Explorer" entry point on the landing page requires an account.
+  // Signed out → cancel the navigation and open the sign-in modal (AuthWidget
+  // listens for this event) instead of letting the link through to /explore.
+  const requireSignInForExplorer = (e: React.MouseEvent) => {
+    if (authStatus === "authenticated") return;
+    e.preventDefault();
+    window.dispatchEvent(new Event("atlas:open-signin"));
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") as Theme;
@@ -245,6 +256,7 @@ export default function Home() {
             </Link>
             <Link
               href="/explore"
+              onClick={requireSignInForExplorer}
               className={`px-3 sm:px-4 py-2 text-sm font-semibold ${t.buttonPrimary} rounded-lg transition-colors whitespace-nowrap`}
             >
               Try Explorer
@@ -292,6 +304,7 @@ export default function Home() {
             <div className="animate-slide-up delay-300 mt-10 flex items-center justify-center gap-4 flex-wrap">
               <Link
                 href="/explore"
+              onClick={requireSignInForExplorer}
                 className={`group px-6 py-3 ${t.buttonPrimary} font-semibold rounded-xl transition-all shadow-lg ${theme === "dark" ? "shadow-white/10" : "shadow-zinc-900/10"} flex items-center gap-2`}
               >
                 Open Explorer
@@ -453,6 +466,7 @@ export default function Home() {
               </Link>
               <Link
                 href="/explore"
+              onClick={requireSignInForExplorer}
                 className={`${t.footerText} hover:${t.text} transition-colors`}
               >
                 Explorer

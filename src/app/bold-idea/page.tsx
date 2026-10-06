@@ -62,7 +62,7 @@ export default function BoldIdeaPage() {
         </Link>
 
         <div className="text-center mb-8">
-          <InkSeal text="奇思" size={52} />
+          <InkSeal text="HA" size={52} />
           <h1 className="text-5xl font-semibold mt-4 pb-1 leading-tight" style={{ background: "linear-gradient(135deg, #1f1c19, #9c3a26)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Try Something Bold
           </h1>

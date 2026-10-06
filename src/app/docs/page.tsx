@@ -262,7 +262,7 @@ export default function DocsPage() {
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/" className={`flex items-center gap-2 font-display text-xl font-semibold transition-colors ${t.brand}`}>
-              <InkSeal text="图" size={24} />
+              <InkSeal text="HA" size={24} />
               Hypothesis Atlas
             </Link>
             <span className={t.slash}>/</span>

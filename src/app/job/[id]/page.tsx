@@ -242,7 +242,7 @@ export default function JobPage() {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <InkSeal text="图谱" size={40} />
+            <InkSeal text="HA" size={40} />
             <div>
               <h1 className={`text-2xl font-bold ${t.title}`}>
                 {job.topicQuery}

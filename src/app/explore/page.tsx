@@ -330,7 +330,7 @@ export default function ExplorePage() {
             so navigation recedes: one consistent ghost style, color only in the icons. */}
         <nav className={`-mx-4 mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-4 pb-4 ${t.navBorder}`}>
           <Link href="/" className="flex items-center gap-2.5" title="Home">
-            <InkSeal text="图" size={28} />
+            <InkSeal text="HA" size={28} />
             <span className={`font-display text-2xl font-semibold tracking-tight ${t.text}`}>Hypothesis Atlas</span>
           </Link>
           <div className="flex flex-wrap items-center gap-1">

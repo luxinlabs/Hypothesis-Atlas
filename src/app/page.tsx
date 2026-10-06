@@ -258,15 +258,15 @@ export default function Home() {
           aria-hidden
           className={`hidden lg:flex absolute left-[5%] top-32 z-0 flex-col items-center gap-4 ${theme === "dark" ? "text-zinc-300/70" : theme === "vibrant" ? "text-teal-900/70" : "text-zinc-800/75"}`}
         >
-          <span className="ink-inscription text-4xl">格物致知</span>
-          <span className={`ink-inscription text-sm tracking-[0.4em] ${t.muted}`}>假说图谱</span>
-          <InkSeal text="图谱" size={38} />
+          <span className="font-display text-3xl italic" style={{ writingMode: "horizontal-tb" }}>Map the evidence</span>
+          <span className={`font-display text-sm uppercase tracking-[0.3em] ${t.muted}`} style={{ writingMode: "horizontal-tb" }}>Hypothesis Atlas</span>
+          <InkSeal text="HA" size={38} />
         </div>
 
         {/* Nav — extra right padding reserves room for the fixed Sign In widget (src/components/AuthWidget.tsx) in the corner, so the theme dropdown never sits underneath it. Docs/Pricing hide below sm so the row doesn't overflow into that reserved space on narrow viewports. */}
         <nav className="relative z-10 flex items-center justify-between px-4 sm:px-6 md:px-12 py-6 pr-20 sm:pr-24 md:pr-28">
           <span className="flex items-center gap-2.5">
-            <InkSeal text="图" size={26} />
+            <InkSeal text="HA" size={26} />
             <span className="font-display text-2xl font-semibold tracking-tight">
               Hypothesis Atlas
             </span>
@@ -466,7 +466,7 @@ export default function Home() {
                   className={`mx-auto mb-4 animate-float ${theme === "dark" ? "text-zinc-200" : theme === "vibrant" ? "text-teal-800" : "text-zinc-900"}`}
                 >
                   <span className="font-brush text-3xl">
-                    {["一", "二", "三"][i]}
+                    {["1", "2", "3"][i]}
                   </span>
                   <span className="sr-only">{s.step}</span>
                 </Enso>
@@ -482,7 +482,7 @@ export default function Home() {
           <div className={`ink-divider max-w-6xl mx-auto mb-8 ${theme === "dark" ? "ink-divider-light" : ""}`} />
           <div className="max-w-6xl mx-auto flex items-center justify-between text-xs">
             <span className={`flex items-center gap-2 ${t.footerText}`}>
-              <InkSeal text="图谱" size={22} />
+              <InkSeal text="HA" size={22} />
               Hypothesis Atlas &middot; MIT License
             </span>
             <div className="flex gap-4">

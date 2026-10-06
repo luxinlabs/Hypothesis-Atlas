@@ -141,7 +141,7 @@ function ThemeSwitcher() {
         }`}
       >
         <span className={`w-2.5 h-2.5 rounded-full ${THEME_DOT[theme]}`} />
-        {THEME_LABEL[theme]}
+        <span className="hidden sm:inline">{THEME_LABEL[theme]}</span>
         <svg className={`w-3 h-3 opacity-60 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -264,14 +264,15 @@ export default function Home() {
         </div>
 
         {/* Nav — extra right padding reserves room for the fixed Sign In widget (src/components/AuthWidget.tsx) in the corner, so the theme dropdown never sits underneath it. Docs/Pricing hide below sm so the row doesn't overflow into that reserved space on narrow viewports. */}
-        <nav className="relative z-10 flex items-center justify-between px-4 sm:px-6 md:px-12 py-6 pr-20 sm:pr-24 md:pr-28">
+        <nav className="relative z-10 flex items-center justify-between flex-wrap gap-y-3 px-4 sm:px-6 md:px-12 py-6 pr-24 sm:pr-48 md:pr-48">
           <span className="flex items-center gap-2.5">
             <InkSeal text="HA" size={26} />
             <span className="font-display text-2xl font-semibold tracking-tight">
               Hypothesis Atlas
             </span>
           </span>
-          <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* On phones this row drops below the brand, so the top-right corner stays free for the account pill. */}
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
             <Link
               href="/docs"
               className={`hidden sm:inline-block px-4 py-2 text-sm ${t.muted} hover:${t.text} transition-colors`}

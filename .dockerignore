@@ -1,0 +1,10 @@
+# Keep secrets and local artifacts out of the image — .env is injected at
+# run time by docker-compose, never baked in.
+.env
+.env.*
+node_modules
+.next
+.git
+*.log
+check-*.js
+tsconfig.tsbuildinfo

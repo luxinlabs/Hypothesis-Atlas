@@ -1,4 +1,14 @@
-version: "3.8"
+# Full local stack: Postgres, Redis, the web app, and the background worker.
+# `make image` builds hypothesis-atlas:latest; `make run` starts everything.
+name: hypothesis-atlas
+
+x-app-env: &app-env
+  env_file: .env
+  environment:
+    # Inside the compose network, services are reached by name, not localhost.
+    DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hypothesis_atlas?schema=public
+    REDIS_URL: redis://redis:6379
+    NEXTAUTH_URL: http://localhost:3000
 
 services:
   postgres:
@@ -9,9 +19,13 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: hypothesis_atlas
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hypothesis_atlas"]
+      interval: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -21,6 +35,32 @@ services:
     volumes:
       - redis_data:/data
 
+  app:
+    <<: *app-env
+    image: hypothesis-atlas:latest
+    ports:
+      - "3000:3000"
+    # Pushes the schema on every start (idempotent), then serves the app.
+    command: sh -c "npx prisma db push --skip-generate && npm start"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    <<: *app-env
+    image: hypothesis-atlas:latest
+    command: npm run worker
+    depends_on:
+      - app
+    restart: unless-stopped
+
 volumes:
+  # Reuse the volumes the existing local database and Redis already use,
+  # so `make run` doesn't start from empty data.
   postgres_data:
+    name: hypothesis-atlas_postgres_data
   redis_data:
+    name: atlas_redis_data

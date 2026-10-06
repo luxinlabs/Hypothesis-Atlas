@@ -69,7 +69,7 @@ export default function PricingPage() {
                   />
                 </svg>
                 <span className="text-gray-700 text-sm">
-                  MIT License - fully open source
+                  AGPL-3.0 License - fully open source
                 </span>
               </div>
               <div className="flex items-start gap-3">
@@ -144,11 +144,11 @@ export default function PricingPage() {
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Hosted</h3>
               <p className="text-gray-600 text-sm mb-4">We run it for you</p>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-bold text-gray-900">$1</span>
-                <span className="text-gray-600">/ round</span>
+                <span className="text-5xl font-bold text-gray-900">$19</span>
+                <span className="text-gray-600">/ month</span>
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                Pay only when you use it
+                Unlimited runs, billed monthly, cancel anytime
               </p>
             </div>
 
@@ -183,7 +183,7 @@ export default function PricingPage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="text-gray-700 text-sm">Automatic updates</span>
+                <span className="text-gray-700 text-sm">Unlimited evidence maps</span>
               </div>
               <div className="flex items-start gap-3">
                 <svg
@@ -200,7 +200,7 @@ export default function PricingPage() {
                   />
                 </svg>
                 <span className="text-gray-700 text-sm">
-                  Managed infrastructure
+                  No API keys to manage
                 </span>
               </div>
               <div className="flex items-start gap-3">
@@ -227,9 +227,9 @@ export default function PricingPage() {
               type="button"
               disabled
               className="w-full py-3 rounded-lg font-semibold border border-purple-200 bg-purple-50 text-purple-700 cursor-not-allowed text-center"
-              title="Hosted $1 mode will be available in a future update"
+              title="The $19/month hosted plan is coming soon"
             >
-              Hosted mode — available in the future
+              Hosted plan — coming soon
             </button>
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function PricingPage() {
                 What's included in self-hosted?
               </h3>
               <p className="text-gray-600">
-                Everything. The MIT license gives you full access to all
+                Everything. The AGPL-3.0 license gives you full access to all
                 features. You'll need your own server, database, and API keys.
               </p>
             </div>
@@ -266,11 +266,11 @@ export default function PricingPage() {
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">
-                What counts as a "round"?
+                What does the $19/month hosted plan include?
               </h3>
               <p className="text-gray-600">
-                One round = one complete evidence mapping job, from topic
-                selection to final knowledge tree generation.
+                Unlimited evidence-mapping runs, managed API access, and
+                automatic updates, billed monthly. Cancel anytime.
               </p>
             </div>
             <div>

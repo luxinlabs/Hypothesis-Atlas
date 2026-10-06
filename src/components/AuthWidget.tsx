@@ -18,6 +18,13 @@ import AuthModal from "./AuthModal";
  * / Settings / Sign out) instead of just a name + sign-out button — "click
  * the icon top-right to check your own profile."
  */
+function accountInitials(name: string | null | undefined, email: string | null | undefined): string {
+  const source = name?.trim() || email || "?";
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return source.slice(0, 2).toUpperCase();
+}
+
 export default function AuthWidget() {
   const { data: session, status } = useSession();
   const [modalOpen, setModalOpen] = useState(false);
@@ -52,8 +59,12 @@ export default function AuthWidget() {
               onClick={() => setMenuOpen((open) => !open)}
               className="flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full pl-3 pr-2 py-1 shadow-sm text-xs hover:bg-white transition-colors"
             >
-              <span className="text-gray-700 font-medium max-w-[140px] truncate">
+              {/* Full name on wider screens; a compact initials badge on phones so the pill can't run into the nav's theme switcher. */}
+              <span className="hidden sm:inline text-gray-700 font-medium max-w-[100px] truncate">
                 {session.user.name ?? session.user.email}
+              </span>
+              <span className="sm:hidden w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {accountInitials(session.user.name, session.user.email)}
               </span>
               <svg
                 className={`w-3 h-3 text-gray-400 transition-transform ${menuOpen ? "rotate-180" : ""}`}

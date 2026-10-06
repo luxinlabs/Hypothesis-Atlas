@@ -240,7 +240,7 @@ export default function BoldIdeaSessionPage({ params }: { params: { ideaId: stri
           <Link
             href="/bold-idea"
             className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
-            style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
+            style={{ background: "linear-gradient(135deg, #a87732, #9c3a26)" }}
           >
             + New Bold Idea
           </Link>

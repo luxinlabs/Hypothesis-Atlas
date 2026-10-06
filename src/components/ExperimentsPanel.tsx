@@ -93,7 +93,7 @@ export default function ExperimentsPanel({ jobId, messages }: ExperimentsPanelPr
           onClick={handleVerify}
           disabled={!ready || verifying}
           className="w-full py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
-          style={{ background: "linear-gradient(135deg, #8b5cf6, #6366f1)" }}
+          style={{ background: "linear-gradient(135deg, #76626b, #587380)" }}
         >
           {verifying ? "Checking claims…" : "Verify plan"}
         </button>

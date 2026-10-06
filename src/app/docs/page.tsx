@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import InkSeal from "@/components/ink/InkSeal";
 
 type Theme = "dark" | "light" | "vibrant";
 
 const THEME_STYLES = {
   dark: {
-    mainBg: "bg-[#0a0a0f]",
+    mainBg: "ink-night",
     header: "bg-zinc-900/90 border-zinc-800",
     brand: "text-zinc-100 hover:text-zinc-300",
     slash: "text-zinc-700",
@@ -20,7 +21,7 @@ const THEME_STYLES = {
     contentShell: "bg-white",
   },
   light: {
-    mainBg: "bg-zinc-50",
+    mainBg: "ink-paper",
     header: "bg-white/80 border-zinc-200",
     brand: "text-zinc-900 hover:text-zinc-700",
     slash: "text-zinc-300",
@@ -33,7 +34,7 @@ const THEME_STYLES = {
     contentShell: "bg-transparent",
   },
   vibrant: {
-    mainBg: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50",
+    mainBg: "ink-jade",
     header: "bg-white/85 border-rose-200",
     brand: "text-zinc-900 hover:text-zinc-700",
     slash: "text-zinc-300",
@@ -260,7 +261,8 @@ export default function DocsPage() {
       >
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/" className={`font-bold transition-colors ${t.brand}`}>
+            <Link href="/" className={`flex items-center gap-2 font-display text-xl font-semibold transition-colors ${t.brand}`}>
+              <InkSeal text="HA" size={24} />
               Hypothesis Atlas
             </Link>
             <span className={t.slash}>/</span>

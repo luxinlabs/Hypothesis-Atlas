@@ -365,7 +365,7 @@ function PaperPipelineInner() {
   const idea = ideas[selectedIdeaIndex];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen ink-paper">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -381,7 +381,7 @@ function PaperPipelineInner() {
             </Link>
             <span className="text-gray-200">|</span>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #9333ea)" }}>
+              <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #587380, #5f4e56)" }}>
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -581,7 +581,7 @@ function PaperPipelineInner() {
                     onClick={() => setStep("ars")}
                     disabled={ideasSource === "loading" || ideas.length === 0}
                     className="w-full py-3 px-4 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-                    style={{ background: "linear-gradient(to right, #7c3aed, #9333ea)" }}
+                    style={{ background: "linear-gradient(to right, #5f4e56, #5f4e56)" }}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -609,7 +609,7 @@ function PaperPipelineInner() {
                   onClick={() => setStep("ars")}
                   disabled={ideasSource === "loading" || ideas.length === 0}
                   className="w-full py-2 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-all"
-                  style={{ background: "#7c3aed" }}
+                  style={{ background: "#5f4e56" }}
                 >
                   Write Paper with This Idea →
                 </button>
@@ -659,7 +659,7 @@ function PaperPipelineInner() {
                   onClick={handleFetchPapers}
                   disabled={loadingPapers || !paperSearchDesc.trim()}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-all"
-                  style={{ background: "linear-gradient(to right, #0ea5e9, #6366f1)" }}
+                  style={{ background: "linear-gradient(to right, #4c777c, #587380)" }}
                 >
                   {loadingPapers ? (
                     <>
@@ -732,8 +732,8 @@ function PaperPipelineInner() {
                             <span
                               className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                               style={{
-                                background: (TIER_COLOR[paper.mapTier]?.fill ?? "#8b5cf6") + "22",
-                                color: TIER_COLOR[paper.mapTier]?.fill ?? "#8b5cf6",
+                                background: (TIER_COLOR[paper.mapTier]?.fill ?? "#76626b") + "22",
+                                color: TIER_COLOR[paper.mapTier]?.fill ?? "#76626b",
                               }}
                             >
                               {(TIER_COLOR[paper.mapTier] ?? { label: paper.mapTier }).label}
@@ -907,9 +907,9 @@ function PaperPipelineInner() {
 
             {/* Right sidebar: context export */}
             <div className="w-full xl:w-72 flex-shrink-0 space-y-4">
-              <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #9333ea, #4338ca)", color: "#fff" }}>
+              <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #5f4e56, #384a54)", color: "#fbf8f1" }}>
                 <h3 className="font-bold mb-1 text-sm">Two agents, one paper</h3>
-                <p className="text-xs leading-relaxed" style={{ color: "#e9d5ff" }}>
+                <p className="text-xs leading-relaxed" style={{ color: "#d6c9cf" }}>
                   <strong>ARS Plan</strong> (left) is the Socratic planner powered by Claude.{" "}
                   <strong>Atlas Assistant</strong> (middle) is grounded in your session evidence,
                   answers questions, and saves key replies to your notes.
@@ -1110,9 +1110,9 @@ function PaperPipelineInner() {
             </div>
 
             <div className="w-full xl:w-80 flex-shrink-0 space-y-4">
-              <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)", color: "#fff" }}>
+              <div className="rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #5f4e56, #455c68)", color: "#fbf8f1" }}>
                 <h3 className="font-bold mb-1 text-sm">Experiments, verified</h3>
-                <p className="text-xs leading-relaxed" style={{ color: "#ddd6fe" }}>
+                <p className="text-xs leading-relaxed" style={{ color: "#d6c9cf" }}>
                   Plan the experiment with the assistant, then run{" "}
                   <strong>Verify plan</strong> to re-evaluate every quantitative claim in the
                   plan — sample sizes, expected gains, metric math — with mathjs.

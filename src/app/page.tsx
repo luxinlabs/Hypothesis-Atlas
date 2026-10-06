@@ -3,17 +3,20 @@
 import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import InkLandscape, { type InkVariant } from "@/components/ink/InkLandscape";
+import InkSeal from "@/components/ink/InkSeal";
+import Enso from "@/components/ink/Enso";
 
 type Theme = "dark" | "light" | "vibrant";
 
 const themes = {
   dark: {
-    bg: "bg-[#0a0a0f]",
+    bg: "ink-night ink-plain",
     text: "text-white",
-    cardBg: "bg-zinc-900/50",
+    cardBg: "bg-zinc-900/60 backdrop-blur-[2px]",
     cardBorder: "border-zinc-800",
-    cardHover: "hover:border-indigo-500/40 hover:bg-zinc-900",
-    accent: "text-indigo-400",
+    cardHover: "hover:border-zinc-600 hover:bg-zinc-900/80",
+    accent: "text-zinc-200",
     muted: "text-zinc-400",
     mutedBg: "bg-zinc-900",
     codeBg: "bg-zinc-900",
@@ -23,22 +26,22 @@ const themes = {
     navHover: "hover:bg-white/10",
     glow1: "bg-indigo-600/20",
     glow2: "bg-cyan-500/15",
-    gradient: "from-indigo-400 via-cyan-400 to-emerald-400",
-    buttonPrimary: "bg-white text-black hover:bg-zinc-100",
+    gradient: "from-zinc-50 via-zinc-300 to-red-300",
+    buttonPrimary: "bg-zinc-100 text-zinc-900 hover:bg-white",
     buttonSecondary:
-      "border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white",
+      "bg-zinc-800/80 text-zinc-200 hover:bg-zinc-700/80 hover:text-white",
     ctaBg:
       "bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 border border-indigo-500/20",
     footerBorder: "border-zinc-800",
     footerText: "text-zinc-600",
   },
   light: {
-    bg: "bg-white",
+    bg: "ink-paper ink-plain",
     text: "text-zinc-900",
-    cardBg: "bg-zinc-50/50",
+    cardBg: "bg-white/70 backdrop-blur-[2px]",
     cardBorder: "border-zinc-200",
-    cardHover: "hover:border-blue-400/40 hover:bg-zinc-50",
-    accent: "text-blue-600",
+    cardHover: "hover:border-zinc-400 hover:bg-white/90",
+    accent: "text-zinc-800",
     muted: "text-zinc-600",
     mutedBg: "bg-zinc-100",
     codeBg: "bg-zinc-900",
@@ -48,21 +51,21 @@ const themes = {
     navHover: "hover:bg-zinc-200",
     glow1: "bg-blue-400/10",
     glow2: "bg-indigo-400/8",
-    gradient: "from-blue-800 via-indigo-800 to-purple-800",
+    gradient: "from-zinc-900 via-zinc-700 to-red-700",
     buttonPrimary: "bg-zinc-900 text-white hover:bg-zinc-800",
     buttonSecondary:
-      "border border-zinc-300 text-zinc-700 hover:border-zinc-400 hover:text-zinc-900",
+      "bg-zinc-300/70 text-zinc-900 hover:bg-zinc-300",
     ctaBg: "bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200",
     footerBorder: "border-zinc-200",
     footerText: "text-zinc-500",
   },
   vibrant: {
-    bg: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50",
+    bg: "ink-jade ink-plain",
     text: "text-zinc-900",
     cardBg: "bg-white/80 backdrop-blur-sm",
     cardBorder: "border-zinc-200",
-    cardHover: "hover:border-fuchsia-300/60 hover:bg-white",
-    accent: "text-fuchsia-600",
+    cardHover: "hover:border-teal-600/40 hover:bg-white",
+    accent: "text-teal-800",
     muted: "text-zinc-600",
     mutedBg: "bg-white",
     codeBg: "bg-zinc-900",
@@ -72,10 +75,10 @@ const themes = {
     navHover: "hover:bg-zinc-100",
     glow1: "bg-fuchsia-300/20",
     glow2: "bg-sky-300/20",
-    gradient: "from-fuchsia-600 via-orange-500 to-cyan-600",
-    buttonPrimary: "bg-zinc-900 text-white hover:bg-zinc-800",
+    gradient: "from-teal-800 via-emerald-700 to-amber-600",
+    buttonPrimary: "bg-teal-800 text-white hover:bg-teal-700",
     buttonSecondary:
-      "border border-zinc-300 text-zinc-700 hover:border-zinc-400 hover:text-zinc-900",
+      "bg-amber-100/80 text-teal-900 hover:bg-amber-200/80",
     ctaBg: "bg-gradient-to-br from-rose-50 to-sky-50 border border-rose-200",
     footerBorder: "border-zinc-200",
     footerText: "text-zinc-500",
@@ -91,15 +94,23 @@ const ThemeContext = createContext<{
 });
 
 const THEME_DOT: Record<Theme, string> = {
-  dark: "bg-zinc-900",
-  light: "bg-blue-500",
-  vibrant: "bg-fuchsia-500",
+  dark: "bg-zinc-900 ring-1 ring-zinc-500",
+  light: "bg-zinc-100 ring-1 ring-zinc-400",
+  vibrant: "bg-teal-600 ring-1 ring-amber-400",
 };
 
+// Same three theme keys (other pages read them from localStorage), named for
+// the painting each one evokes.
 const THEME_LABEL: Record<Theme, string> = {
-  dark: "Dark",
-  light: "Light",
-  vibrant: "Vibrant",
+  dark: "Ink Night",
+  light: "Xuan Paper",
+  vibrant: "Jade Hills",
+};
+
+const INK_VARIANT: Record<Theme, InkVariant> = {
+  dark: "night",
+  light: "paper",
+  vibrant: "jade",
 };
 
 /** A single compact dropdown instead of three separate buttons — frees up enough width in the nav that the fixed top-right Sign In widget (src/components/AuthWidget.tsx) no longer overlaps it. */
@@ -126,11 +137,11 @@ function ThemeSwitcher() {
             ? "bg-zinc-800/50 text-zinc-200 hover:bg-zinc-700/50"
             : theme === "light"
               ? "bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-              : "bg-white/10 border border-white/20 text-white hover:bg-white/20"
+              : "bg-white/70 border border-teal-700/30 text-teal-900 hover:bg-white"
         }`}
       >
         <span className={`w-2.5 h-2.5 rounded-full ${THEME_DOT[theme]}`} />
-        {THEME_LABEL[theme]}
+        <span className="hidden sm:inline">{THEME_LABEL[theme]}</span>
         <svg className={`w-3 h-3 opacity-60 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -138,7 +149,7 @@ function ThemeSwitcher() {
 
       {open && (
         <div
-          className={`absolute top-full right-0 mt-1.5 w-32 rounded-lg shadow-lg overflow-hidden z-20 ${
+          className={`absolute top-full right-0 mt-1.5 w-36 rounded-lg shadow-lg overflow-hidden z-20 ${
             theme === "dark" ? "bg-zinc-800 border border-zinc-700" : "bg-white border border-zinc-200"
           }`}
         >
@@ -236,12 +247,23 @@ export default function Home() {
       <main
         className={`min-h-screen ${t.bg} ${t.text} overflow-hidden transition-all duration-500`}
       >
+        {/* The painting: nav, hero and install scroll sit over one landscape. */}
+        <div className="relative">
+        <InkLandscape
+          variant={INK_VARIANT[theme]}
+          className="absolute inset-x-0 top-0 w-full h-[880px] md:h-[980px]"
+        />
+
         {/* Nav — extra right padding reserves room for the fixed Sign In widget (src/components/AuthWidget.tsx) in the corner, so the theme dropdown never sits underneath it. Docs/Pricing hide below sm so the row doesn't overflow into that reserved space on narrow viewports. */}
-        <nav className="relative z-10 flex items-center justify-between px-4 sm:px-6 md:px-12 py-6 pr-20 sm:pr-24 md:pr-28">
-          <span className="text-lg font-bold tracking-tight">
-            Hypothesis Atlas
+        <nav className="relative z-10 flex items-center justify-between flex-wrap gap-y-3 px-4 sm:px-6 md:px-12 py-6 pr-24 sm:pr-48 md:pr-48">
+          <span className="flex items-center gap-2.5">
+            <InkSeal text="HA" size={26} />
+            <span className="font-display text-2xl font-semibold tracking-tight">
+              Hypothesis Atlas
+            </span>
           </span>
-          <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* On phones this row drops below the brand, so the top-right corner stays free for the account pill. */}
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
             <Link
               href="/docs"
               className={`hidden sm:inline-block px-4 py-2 text-sm ${t.muted} hover:${t.text} transition-colors`}
@@ -257,7 +279,7 @@ export default function Home() {
             <Link
               href="/explore"
               onClick={requireSignInForExplorer}
-              className={`px-3 sm:px-4 py-2 text-sm font-semibold ${t.buttonPrimary} rounded-lg transition-colors whitespace-nowrap`}
+              className={`ink-stroke px-4 sm:px-5 py-2 text-sm font-semibold ${t.buttonPrimary} transition-colors whitespace-nowrap`}
             >
               Try Explorer
             </Link>
@@ -267,28 +289,21 @@ export default function Home() {
 
         {/* Hero */}
         <section className="relative px-6 md:px-12 pt-16 pb-24 max-w-6xl mx-auto">
-          {/* Glow orbs */}
-          <div
-            className={`absolute -top-20 left-1/4 w-96 h-96 ${t.glow1} rounded-full blur-[120px] pointer-events-none`}
-          />
-          <div
-            className={`absolute -top-10 right-1/4 w-72 h-72 ${t.glow2} rounded-full blur-[100px] pointer-events-none`}
-          />
 
-          <div className="relative z-10 text-center max-w-3xl mx-auto">
+          <div className="relative z-10 text-center max-w-4xl mx-auto">
             <div className="animate-slide-up">
               <span
-                className={`inline-block px-3 py-1 mb-6 text-xs font-semibold tracking-wider uppercase ${theme === "dark" ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : theme === "light" ? "bg-blue-100 text-blue-700 border border-blue-200" : "bg-pink-100 text-pink-700 border border-pink-300"} rounded-full`}
+                className={`inline-block px-3 py-1 mb-6 text-[11px] font-semibold tracking-[0.3em] uppercase rounded-sm border ${theme === "dark" ? "text-red-300 border-red-400/40 bg-zinc-950/40" : theme === "light" ? "text-red-700 border-red-700/40 bg-white/50" : "text-teal-800 border-teal-700/40 bg-white/50"}`}
               >
                 Open-source research platform
               </span>
             </div>
 
-            <h1 className="animate-slide-up delay-100 text-5xl md:text-7xl font-extrabold leading-[1.05] tracking-tight">
+            <h1 className="animate-slide-up delay-100 text-6xl md:text-[5.75rem] font-semibold leading-[1.02] tracking-tight">
               Map the evidence.
               <br />
               <span
-                className={`bg-gradient-to-r ${t.gradient} bg-clip-text text-transparent animate-gradient`}
+                className={`italic bg-gradient-to-r ${t.gradient} bg-clip-text text-transparent animate-gradient`}
               >
                 See the science.
               </span>
@@ -305,7 +320,7 @@ export default function Home() {
               <Link
                 href="/explore"
               onClick={requireSignInForExplorer}
-                className={`group px-6 py-3 ${t.buttonPrimary} font-semibold rounded-xl transition-all shadow-lg ${theme === "dark" ? "shadow-white/10" : "shadow-zinc-900/10"} flex items-center gap-2`}
+                className={`ink-stroke group px-8 py-3.5 ${t.buttonPrimary} font-semibold transition-all flex items-center gap-2`}
               >
                 Open Explorer
                 <svg
@@ -324,7 +339,7 @@ export default function Home() {
               </Link>
               <Link
                 href="/docs"
-                className={`px-6 py-3 ${t.buttonSecondary} font-semibold rounded-xl transition-all`}
+                className={`ink-stroke px-8 py-3.5 ${t.buttonSecondary} font-semibold transition-all`}
               >
                 Read the Docs
               </Link>
@@ -333,12 +348,14 @@ export default function Home() {
         </section>
 
         {/* Terminal Install */}
-        <section className="px-6 md:px-12 pb-24 max-w-3xl mx-auto">
+        <section className="relative px-6 md:px-12 pb-28 max-w-3xl mx-auto">
+          {/* Mounted as a hanging scroll: rollers top and bottom (.ink-scroll). */}
+          <div className="ink-scroll animate-slide-up delay-400 shadow-2xl">
           <div
-            className={`animate-slide-up delay-400 ${t.codeBg} ${t.cardBorder} rounded-2xl overflow-hidden animate-pulse-glow`}
+            className={`${t.codeBg} overflow-hidden`}
           >
             <div
-              className={`flex items-center gap-2 px-4 py-3 ${theme === "dark" ? "bg-zinc-800/50" : theme === "light" ? "bg-zinc-100" : "bg-black/30"}`}
+              className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800"
             >
               <div className="w-3 h-3 rounded-full bg-red-500/80" />
               <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
@@ -361,11 +378,7 @@ export default function Home() {
                 Open{" "}
                 <span
                   className={
-                    theme === "dark"
-                      ? "text-cyan-400"
-                      : theme === "light"
-                        ? "text-blue-600"
-                        : "text-pink-300"
+                    theme === "vibrant" ? "text-amber-300" : "text-red-300"
                   }
                 >
                   http://localhost:3000
@@ -373,13 +386,16 @@ export default function Home() {
               </div>
             </div>
           </div>
+          </div>
         </section>
+        </div>
 
         {/* Features */}
         <section className="px-6 md:px-12 pb-24 max-w-6xl mx-auto">
-          <h2 className="text-center text-3xl md:text-4xl font-bold mb-4">
+          <h2 className="text-center text-4xl md:text-5xl font-semibold mb-3">
             Everything you need
           </h2>
+          <div className={`ink-divider w-40 mx-auto mb-4 ${theme === "dark" ? "ink-divider-light" : ""}`} />
           <p className={`text-center ${t.muted} mb-12 max-w-lg mx-auto`}>
             From topic selection to structured knowledge &mdash; fully
             automated.
@@ -390,9 +406,7 @@ export default function Home() {
                 key={i}
                 className={`group ${t.cardBg} ${t.cardBorder} rounded-2xl p-6 ${t.cardHover} transition-all duration-300`}
               >
-                <div
-                  className={`w-10 h-10 mb-4 rounded-lg ${theme === "dark" ? "bg-indigo-500/10" : theme === "light" ? "bg-blue-100" : "bg-pink-500/20"} flex items-center justify-center ${theme === "dark" ? "group-hover:bg-indigo-500/20" : theme === "light" ? "group-hover:bg-blue-200" : "group-hover:bg-pink-500/30"} transition-colors`}
-                >
+                <Enso size={52} className={`mb-4 ${t.accent} opacity-90 group-hover:opacity-100 transition-opacity`}>
                   <svg
                     className={`w-5 h-5 ${t.accent}`}
                     fill="none"
@@ -406,8 +420,8 @@ export default function Home() {
                       d={f.icon}
                     />
                   </svg>
-                </div>
-                <h3 className={`font-semibold ${t.text} mb-1`}>{f.title}</h3>
+                </Enso>
+                <h3 className={`text-xl font-semibold ${t.text} mb-1`}>{f.title}</h3>
                 <p className={`text-sm ${t.muted} leading-relaxed`}>{f.desc}</p>
               </div>
             ))}
@@ -416,9 +430,10 @@ export default function Home() {
 
         {/* How it works */}
         <section className="px-6 md:px-12 pb-24 max-w-4xl mx-auto">
-          <h2 className="text-center text-3xl md:text-4xl font-bold mb-12">
+          <h2 className="text-center text-4xl md:text-5xl font-semibold mb-3">
             How it works
           </h2>
+          <div className={`ink-divider w-40 mx-auto mb-12 ${theme === "dark" ? "ink-divider-light" : ""}`} />
           <div className="grid md:grid-cols-3 gap-8 text-center">
             {[
               {
@@ -438,13 +453,16 @@ export default function Home() {
               },
             ].map((s, i) => (
               <div key={i}>
-                <div
-                  className={`mx-auto w-12 h-12 rounded-full bg-gradient-to-br ${theme === "dark" ? "from-indigo-500 to-cyan-500" : theme === "light" ? "from-blue-500 to-indigo-500" : "from-pink-400 to-purple-400"} flex items-center justify-center text-lg font-bold mb-4 animate-float`}
-                  style={{ animationDelay: `${i * 200}ms` }}
+                <Enso
+                  size={72}
+                  className={`mx-auto mb-4 animate-float ${theme === "dark" ? "text-zinc-200" : theme === "vibrant" ? "text-teal-800" : "text-zinc-900"}`}
                 >
-                  {s.step}
-                </div>
-                <h3 className={`font-semibold text-lg mb-2`}>{s.title}</h3>
+                  <span className="font-brush text-3xl">
+                    {["1", "2", "3"][i]}
+                  </span>
+                  <span className="sr-only">{s.step}</span>
+                </Enso>
+                <h3 className={`font-semibold text-2xl mb-2`}>{s.title}</h3>
                 <p className={`text-sm ${t.muted}`}>{s.desc}</p>
               </div>
             ))}
@@ -452,9 +470,11 @@ export default function Home() {
         </section>
 
         {/* Footer */}
-        <footer className={`border-t ${t.footerBorder} px-6 md:px-12 py-8`}>
+        <footer className="px-6 md:px-12 pb-8">
+          <div className={`ink-divider max-w-6xl mx-auto mb-8 ${theme === "dark" ? "ink-divider-light" : ""}`} />
           <div className="max-w-6xl mx-auto flex items-center justify-between text-xs">
-            <span className={t.footerText}>
+            <span className={`flex items-center gap-2 ${t.footerText}`}>
+              <InkSeal text="HA" size={22} />
               Hypothesis Atlas &middot; MIT License
             </span>
             <div className="flex gap-4">

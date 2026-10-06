@@ -1,9 +1,12 @@
 SHELL := /bin/bash
 
-.PHONY: help install laptop-install infra-up infra-down infra-restart db-push db-studio dev worker build start lint test deploy-web deploy-preview deploy-worker-note
+.PHONY: help image run stop install laptop-install infra-up infra-down infra-restart db-push db-studio dev worker build start lint test deploy-web deploy-preview deploy-worker-note
 
 help:
 	@echo "Available targets:"
+	@echo "  make image              Build the app Docker image (hypothesis-atlas:latest)"
+	@echo "  make run                Start the full stack in Docker (db, redis, app, worker)"
+	@echo "  make stop               Stop the Docker stack"
 	@echo "  make install            Install npm dependencies"
 	@echo "  make laptop-install     One-command local setup for laptops"
 	@echo "  make infra-up           Start local Postgres + Redis with Docker"
@@ -20,6 +23,19 @@ help:
 	@echo "  make deploy-preview     Deploy preview to Vercel"
 	@echo "  make deploy-web         Deploy production web app to Vercel"
 	@echo "  make deploy-worker-note Print worker deployment reminder"
+
+# Docker path: `make image` then `make run`. Needs a .env (copy .env.example).
+image:
+	docker build -t hypothesis-atlas:latest .
+
+run:
+	@test -f .env || (echo "Missing .env — copy .env.example to .env and fill it in." && exit 1)
+	docker compose up -d
+	@echo ""
+	@echo "Running at http://localhost:3000  (stop with: make stop)"
+
+stop:
+	docker compose down
 
 install:
 	npm install

@@ -5,13 +5,13 @@ import PaperReviewPanel from "@/components/PaperReviewPanel";
 
 export default function PeerReviewPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-white to-gray-50 text-gray-900">
+    <main className="min-h-screen ink-paper text-gray-900">
       <div className="max-w-6xl mx-auto px-6 py-8">
         <header className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #059669, #0d9488)" }}
+              style={{ background: "linear-gradient(135deg, #44664b, #44664b)" }}
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

@@ -117,8 +117,8 @@ export default function NotesPanel({ jobId, topic, theme = "light", hidden = fal
         onClick={() => setOpen((v) => !v)}
         className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl shadow-xl font-semibold text-sm transition-all hover:scale-105"
         style={{
-          background: open ? "#6366f1" : "linear-gradient(to right, #4f46e5, #9333ea)",
-          color: "#fff",
+          background: open ? "#587380" : "linear-gradient(to right, #455c68, #5f4e56)",
+          color: "#fbf8f1",
         }}
         title="Session Notes"
       >
@@ -215,7 +215,7 @@ export default function NotesPanel({ jobId, topic, theme = "light", hidden = fal
               />
               <button onClick={addManualNote} disabled={!draft.trim()}
                 className="mt-2 w-full py-2 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-40"
-                style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}>
+                style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}>
                 Add Note
               </button>
             </div>

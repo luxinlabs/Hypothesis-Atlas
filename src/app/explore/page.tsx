@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import WordCloudComponent from "@/components/WordCloud";
 import SubscribeModal from "@/components/SubscribeModal";
+import InkSeal from "@/components/ink/InkSeal";
 
 const DOMAIN_TERMS = {
   bio: [
@@ -162,7 +163,7 @@ const NAV_ITEMS: { href: string; label: string; icon: string; iconClass: string 
 
 const THEME_STYLES = {
   dark: {
-    mainBg: "bg-[#0a0a0f]",
+    mainBg: "ink-night",
     text: "text-white",
     subText: "text-zinc-400",
     navLink: "text-zinc-300 hover:bg-zinc-800/80 hover:text-white",
@@ -174,14 +175,14 @@ const THEME_STYLES = {
     cardMuted: "text-zinc-400",
     cloud: "bg-zinc-900/70 border border-zinc-700",
     futureButton: "bg-zinc-800/70 border border-zinc-600 text-zinc-300 cursor-not-allowed",
-    headingPlate: "inline-flex px-4 py-2 rounded-xl border border-zinc-600 bg-zinc-900/80 shadow-sm backdrop-blur-sm",
-    heading: "text-indigo-200",
+    headingPlate: "inline-flex",
+    heading: "text-zinc-100",
     toggleTrackOff: "bg-zinc-700",
     toggleTrackOn: "bg-indigo-500",
     subscribeCard: "bg-indigo-500/10 border-indigo-500/40 text-zinc-100",
   },
   light: {
-    mainBg: "bg-gradient-to-b from-white to-zinc-50",
+    mainBg: "ink-paper",
     text: "text-zinc-900",
     subText: "text-zinc-600",
     navLink: "text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900",
@@ -193,27 +194,27 @@ const THEME_STYLES = {
     cardMuted: "text-zinc-600",
     cloud: "bg-white/90 border border-gray-200/50",
     futureButton: "bg-white border border-slate-300 text-slate-700 cursor-not-allowed",
-    headingPlate: "inline-flex px-4 py-2 rounded-xl border border-slate-300/90 bg-white/95 shadow-md",
-    heading: "text-indigo-700",
+    headingPlate: "inline-flex",
+    heading: "text-zinc-900",
     toggleTrackOff: "bg-gray-300",
     toggleTrackOn: "bg-indigo-500",
     subscribeCard: "bg-indigo-50 border-indigo-200 text-gray-900",
   },
   vibrant: {
-    mainBg: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50",
+    mainBg: "ink-jade",
     text: "text-zinc-900",
     subText: "text-zinc-600",
     navLink: "text-zinc-600 hover:bg-white/80 hover:text-zinc-900",
-    navBorder: "border-rose-200",
-    banner: "border-rose-200 bg-white/70 text-rose-900",
-    panel: "bg-white/80 border border-rose-200",
-    card: "bg-white border border-zinc-200 hover:border-fuchsia-300",
-    cardActive: "bg-fuchsia-50 border-fuchsia-500 text-zinc-900",
+    navBorder: "border-teal-700/20",
+    banner: "border-amber-300 bg-white/70 text-amber-900",
+    panel: "bg-white/80 border border-teal-700/20",
+    card: "bg-white border border-zinc-200 hover:border-teal-600/50",
+    cardActive: "bg-teal-50 border-teal-600 text-zinc-900",
     cardMuted: "text-zinc-600",
     cloud: "bg-white/85 border border-zinc-200",
-    futureButton: "bg-white/90 border border-rose-300 text-zinc-700 cursor-not-allowed",
-    headingPlate: "inline-flex px-4 py-2 rounded-xl border border-rose-300/90 bg-white/92 shadow-md",
-    heading: "text-rose-700",
+    futureButton: "bg-white/90 border border-teal-700/30 text-zinc-700 cursor-not-allowed",
+    headingPlate: "inline-flex",
+    heading: "text-teal-900",
     toggleTrackOff: "bg-gray-300",
     toggleTrackOn: "bg-indigo-500",
     subscribeCard: "bg-indigo-50 border-indigo-200 text-zinc-900",
@@ -329,12 +330,8 @@ export default function ExplorePage() {
             so navigation recedes: one consistent ghost style, color only in the icons. */}
         <nav className={`-mx-4 mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-4 pb-4 ${t.navBorder}`}>
           <Link href="/" className="flex items-center gap-2.5" title="Home">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={BRAND_ICON} />
-              </svg>
-            </span>
-            <span className={`text-base font-bold tracking-tight ${t.text}`}>Hypothesis Atlas</span>
+            <InkSeal text="HA" size={28} />
+            <span className={`font-display text-2xl font-semibold tracking-tight ${t.text}`}>Hypothesis Atlas</span>
           </Link>
           <div className="flex flex-wrap items-center gap-1">
             {lastJobId && (
@@ -369,7 +366,7 @@ export default function ExplorePage() {
         <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
           <div>
             <div className={t.headingPlate}>
-              <h1 className={`text-4xl font-bold ${t.heading}`}>Topic Explorer</h1>
+              <h1 className={`text-5xl font-semibold ${t.heading}`}>Topic Explorer</h1>
             </div>
             <p className={`${t.subText} mt-3`}>
               {exploreMode
@@ -380,7 +377,7 @@ export default function ExplorePage() {
           <Link
             href="/bold-idea"
             className="flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-            style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
+            style={{ background: "linear-gradient(135deg, #a87732, #9c3a26)" }}
             title="Type any research idea, in your own words — no word cloud required"
           >
             <span>✨</span>
@@ -467,7 +464,7 @@ export default function ExplorePage() {
                   }}
                 />
                 {uploading ? (
-                  <svg className="w-4 h-4 animate-spin" style={{ color: "#4f46e5" }} fill="none" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 animate-spin" style={{ color: "#455c68" }} fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
@@ -482,13 +479,13 @@ export default function ExplorePage() {
                 type="button"
                 onClick={handleSearchTopic}
                 className="px-5 py-2.5 rounded-xl font-semibold text-sm flex-shrink-0 transition-opacity hover:opacity-90"
-                style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+                style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
               >
                 Search
               </button>
             </div>
-            {topicError && <p className="text-center text-xs mt-2" style={{ color: "#dc2626" }}>{topicError}</p>}
-            {uploadError && <p className="text-center text-xs mt-2" style={{ color: "#dc2626" }}>{uploadError}</p>}
+            {topicError && <p className="text-center text-xs mt-2" style={{ color: "#9c3a26" }}>{topicError}</p>}
+            {uploadError && <p className="text-center text-xs mt-2" style={{ color: "#9c3a26" }}>{uploadError}</p>}
             <p className={`text-center text-xs mt-2 ${t.subText}`}>2–5 words for best results — or upload a paper to start from it</p>
           </div>
 
@@ -509,7 +506,7 @@ export default function ExplorePage() {
             <div className={`mb-4 flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 ${t.subscribeCard}`}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #4f46e5, #9333ea)" }}>
+                  style={{ background: "linear-gradient(135deg, #455c68, #5f4e56)" }}>
                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                   </svg>
@@ -532,7 +529,7 @@ export default function ExplorePage() {
                   onClick={() => setShowSubscribe(true)}
                   title="Subscribe to weekly papers"
                   className="w-10 h-10 rounded-xl text-white flex items-center justify-center hover:opacity-90 transition-opacity flex-shrink-0"
-                  style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)" }}
+                  style={{ background: "linear-gradient(to right, #455c68, #5f4e56)" }}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -546,7 +543,7 @@ export default function ExplorePage() {
             {exploreMode && (
               <div className="absolute top-2 right-2 z-10">
                 <span className="text-xs font-semibold px-2 py-1 rounded-lg text-indigo-500"
-                  style={{ background: "rgba(79,70,229,0.12)" }}>
+                  style={{ background: "rgba(69, 92, 104, 0.12)" }}>
                   Explore ON
                 </span>
               </div>

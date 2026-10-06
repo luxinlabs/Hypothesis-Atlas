@@ -14,14 +14,14 @@ export default function UnsubscribedPage({ searchParams }: Props) {
   return (
     <div
       className="min-h-screen flex items-center justify-center p-6"
-      style={{ background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 50%, #ddd6fe 100%)" }}
+      style={{ background: "linear-gradient(135deg, #f5f2f3 0%, #ebe4e7 50%, #d6c9cf 100%)" }}
     >
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-10 max-w-md w-full text-center">
         {isSuccess ? (
           <>
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #9333ea)" }}
+              style={{ background: "linear-gradient(135deg, #455c68, #5f4e56)" }}
             >
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -70,7 +70,7 @@ export default function UnsubscribedPage({ searchParams }: Props) {
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm font-semibold text-white px-6 py-2.5 rounded-xl"
-          style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)" }}
+          style={{ background: "linear-gradient(to right, #455c68, #5f4e56)" }}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

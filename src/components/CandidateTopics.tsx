@@ -81,7 +81,7 @@ export default function CandidateTopics({
             onClick={handleAddCandidate}
             disabled={!newCandidate.trim() || isLoading || isAdding}
             className="px-3 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-            style={{ background: "linear-gradient(to right, #4f46e5, #7c3aed)" }}
+            style={{ background: "linear-gradient(to right, #455c68, #5f4e56)" }}
           >
             {isAdding ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

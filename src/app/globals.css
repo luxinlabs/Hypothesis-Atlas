@@ -2,21 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ink-wash (水墨) theme — colors mirror src/lib/inkPalette.ts. */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --border: 214.3 31.8% 91.4%;
+  --background: 43 47% 93%;  /* xuan paper  #f5f0e4 */
+  --foreground: 30 14% 9%;   /* dense ink   #1f1c19 */
+  --border: 41 25% 84%;      /* pale wash   #e0d9ca */
+
+  /* Paper fibre: fractal noise tinted warm grey, tiled. */
+  --ink-fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.22 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+
+  /* Painted backdrops — static renders of src/components/ink/InkLandscape.tsx
+     (regenerate with: npx tsx scripts/gen-ink-scenes.tsx). */
+  --ink-scene-paper: url("/ink/scene-paper.svg");
+  --ink-scene-night: url("/ink/scene-night.svg");
+  --ink-scene-jade: url("/ink/scene-jade.svg");
 }
 
 html,
 body {
-  background-color: #ffffff;
+  background-color: #f5f0e4;
 }
 
 body {
   color: hsl(var(--foreground));
-  background: hsl(var(--background));
   -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Page backgrounds. One class per theme key, so pages that use the
+ * dark/light/vibrant theme tokens and pages that don't share one treatment.
+ * Layers (top → bottom): paper fibre, painted landscape, ink blooms.
+ * The landscape and blooms are `fixed`, so content scrolls over a still
+ * painting. The scene keeps its centre empty (留白), where content sits.
+ */
+body,
+.ink-paper {
+  background-color: #f5f0e4;
+  background-image:
+    var(--ink-fibre),
+    var(--ink-scene-paper),
+    radial-gradient(ellipse 60% 45% at 8% 0%, rgba(31, 28, 25, 0.06), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 100% 18%, rgba(69, 92, 104, 0.05), transparent 70%);
+  background-size: 240px 240px, 100% 100vh, auto, auto;
+  background-position: 0 0, bottom center, 0 0, 0 0;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: scroll, fixed, fixed, fixed;
+}
+
+/* 墨夜 — ink night: moonlit ranges in pale mist over dense ink. */
+.ink-night {
+  background-color: #12100e;
+  background-image:
+    var(--ink-fibre),
+    var(--ink-scene-night),
+    radial-gradient(ellipse 50% 40% at 10% 0%, rgba(118, 144, 156, 0.08), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 95% 20%, rgba(247, 244, 236, 0.04), transparent 70%);
+  background-size: 240px 240px, 100% 100vh, auto, auto;
+  background-position: 0 0, bottom center, 0 0, 0 0;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: scroll, fixed, fixed, fixed;
+}
+
+/* 青绿山水 — blue-green landscape: mineral azurite/malachite peaks on paper. */
+.ink-jade {
+  background-color: #f3efe2;
+  background-image:
+    var(--ink-fibre),
+    var(--ink-scene-jade),
+    radial-gradient(ellipse 50% 35% at 85% 0%, rgba(193, 146, 72, 0.12), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 10% 5%, rgba(76, 119, 124, 0.08), transparent 70%);
+  background-size: 240px 240px, 100% 100vh, auto, auto;
+  background-position: 0 0, bottom center, 0 0, 0 0;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: scroll, fixed, fixed, fixed;
+}
+
+/* For pages that paint their own landscape (the landing page): paper only. */
+.ink-plain {
+  background-image: var(--ink-fibre);
+  background-size: 240px 240px;
+  background-attachment: scroll;
+}
+
+::selection {
+  background: rgba(181, 74, 51, 0.2); /* cinnabar wash */
 }
 
 @keyframes fadeIn {
@@ -40,8 +109,8 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.15); }
-  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.3); }
+  0%, 100% { box-shadow: 0 0 20px rgba(88, 115, 128, 0.15); }
+  50% { box-shadow: 0 0 40px rgba(88, 115, 128, 0.3); }
 }
 
 @keyframes slide-up {
@@ -71,13 +140,13 @@ body {
  * declaration on the input can't override it, only this inset-box-shadow
  * trick can (the shadow paints over the browser's own autofill background).
  * Without it, an autofilled email/password field looks tinted even though
- * our own CSS asks for a plain white input — see AuthModal.tsx.
+ * our own CSS asks for a plain paper-white input — see AuthModal.tsx.
  */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0px 1000px white inset !important;
-  -webkit-text-fill-color: #111827 !important; /* text-gray-900, to match the rest of the form */
+  -webkit-box-shadow: 0 0 0px 1000px #fbf8f1 inset !important; /* paper white, matches bg-white */
+  -webkit-text-fill-color: #1f1c19 !important; /* text-gray-900 (ink), to match the rest of the form */
   transition: background-color 9999s ease-in-out 0s; /* delays the browser's own repaint indefinitely so it never flashes back in */
 }

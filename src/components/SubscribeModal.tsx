@@ -84,7 +84,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
   const modal = (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+      style={{ background: "rgba(19, 17, 15, 0.55)", backdropFilter: "blur(4px)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
@@ -95,7 +95,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
           /* ── Success ── */
           <div className="text-center py-2">
             <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #9333ea)" }}>
+              style={{ background: "linear-gradient(135deg, #455c68, #5f4e56)" }}>
               <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
@@ -116,7 +116,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
             <button
               onClick={onClose}
               className="w-full py-2.5 rounded-xl font-semibold text-sm text-white"
-              style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)" }}
+              style={{ background: "linear-gradient(to right, #455c68, #5f4e56)" }}
             >
               Done
             </button>
@@ -202,7 +202,7 @@ export default function SubscribeModal({ topic, onClose, theme = "light" }: Subs
 
             <button type="submit" disabled={loading || !email}
               className="w-full py-2.5 rounded-xl font-semibold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)" }}>
+              style={{ background: "linear-gradient(to right, #455c68, #5f4e56)" }}>
               {loading ? (
                 <><div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> Subscribing…</>
               ) : (

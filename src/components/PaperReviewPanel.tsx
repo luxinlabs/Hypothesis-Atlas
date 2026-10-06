@@ -48,24 +48,24 @@ const CRITERIA_LABELS: [keyof ReviewScores, string][] = [
 ];
 
 const REC_STYLE: Record<string, { background: string; color: string }> = {
-  accept: { background: "#dcfce7", color: "#15803d" },
-  "minor revision": { background: "#fef9c3", color: "#a16207" },
-  "major revision": { background: "#ffedd5", color: "#c2410c" },
-  reject: { background: "#fee2e2", color: "#b91c1c" },
+  accept: { background: "#e0e9e1", color: "#37523d" },
+  "minor revision": { background: "#f3e7d1", color: "#6f4b21" },
+  "major revision": { background: "#f3e7d1", color: "#6f4b21" },
+  reject: { background: "#f6e2dc", color: "#7e2f20" },
 };
 
 const AGENT_HUES = [
-  { bg: "#eef2ff", text: "#4338ca", ring: "#6366f1" },
-  { bg: "#fdf4ff", text: "#a21caf", ring: "#d946ef" },
-  { bg: "#ecfeff", text: "#0e7490", ring: "#06b6d4" },
-  { bg: "#fff7ed", text: "#c2410c", ring: "#f97316" },
+  { bg: "#f1f4f5", text: "#384a54", ring: "#587380" },
+  { bg: "#fbf3f0", text: "#7e2f20", ring: "#b54a33" },
+  { bg: "#eff5f5", text: "#324e52", ring: "#4c777c" },
+  { bg: "#faf5ec", text: "#6f4b21", ring: "#a87732" },
 ];
 
 function scoreColor(v: number): string {
-  if (v >= 8) return "#16a34a";
-  if (v >= 6) return "#ca8a04";
-  if (v >= 4) return "#ea580c";
-  return "#dc2626";
+  if (v >= 8) return "#44664b";
+  if (v >= 6) return "#8b5f27";
+  if (v >= 4) return "#8b5f27";
+  return "#9c3a26";
 }
 
 function extractDraftFromKey(key: string): { text: string; savedAt: number } | null {
@@ -386,7 +386,7 @@ export default function PaperReviewPanel() {
             onClick={runReview}
             disabled={loading}
             className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)" }}
+            style={{ background: "linear-gradient(to right, #455c68, #5f4e56)" }}
           >
             {loading ? "Reviewers reading… (30–90s)" : result ? "Re-run Review" : "Start Review"}
           </button>
@@ -402,10 +402,10 @@ export default function PaperReviewPanel() {
       {result && (
         <>
           {/* Final verdict */}
-          <div className="rounded-2xl p-6 shadow-sm" style={{ background: "linear-gradient(135deg, #1e1b4b, #4338ca)", color: "#fff" }}>
+          <div className="rounded-2xl p-6 shadow-sm" style={{ background: "linear-gradient(135deg, #151c20, #384a54)", color: "#fbf8f1" }}>
             <div className="flex flex-wrap items-start gap-6">
               <div className="text-center flex-shrink-0">
-                <div className="text-5xl font-bold" style={{ color: "#a5b4fc" }}>
+                <div className="text-5xl font-bold" style={{ color: "#9fb2bb" }}>
                   {result.final.scores.overall}
                   <span className="text-lg font-medium text-indigo-300">/10</span>
                 </div>
@@ -416,7 +416,7 @@ export default function PaperReviewPanel() {
                   <h3 className="font-bold">Editor's Meta-Review — {result.venue.name}</h3>
                   <span
                     className="text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize"
-                    style={REC_STYLE[result.final.consensus] ?? { bg: "#e0e7ff", text: "#3730a3" }}
+                    style={REC_STYLE[result.final.consensus] ?? { bg: "#e1e8eb", text: "#2d3b43" }}
                   >
                     {result.final.consensus}
                   </span>
@@ -428,7 +428,7 @@ export default function PaperReviewPanel() {
                     ))}
                   </div>
                 )}
-                <p className="text-sm leading-relaxed" style={{ color: "#c7d2fe" }}>{result.final.metaReview}</p>
+                <p className="text-sm leading-relaxed" style={{ color: "#c4d1d7" }}>{result.final.metaReview}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-5">
@@ -441,7 +441,7 @@ export default function PaperReviewPanel() {
                   <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                     <div
                       className="h-full rounded-full"
-                      style={{ width: `${result.final.scores[key] * 10}%`, background: "#a5b4fc" }}
+                      style={{ width: `${result.final.scores[key] * 10}%`, background: "#9fb2bb" }}
                     />
                   </div>
                 </div>
@@ -476,7 +476,7 @@ export default function PaperReviewPanel() {
                   {agent.recommendation && (
                     <span
                       className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize flex-shrink-0"
-                      style={REC_STYLE[agent.recommendation] ?? { bg: "#f4f4f5", text: "#52525b" }}
+                      style={REC_STYLE[agent.recommendation] ?? { bg: "#efebe0", text: "#5e5850" }}
                     >
                       {agent.recommendation}
                     </span>

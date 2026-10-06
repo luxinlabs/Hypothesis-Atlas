@@ -4,6 +4,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import InkSeal from "@/components/ink/InkSeal";
 
 const EXAMPLE =
   "I want to have more knowledge and research about the new drug for Type 2 Diabetes.";
@@ -48,7 +49,7 @@ export default function BoldIdeaPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-pink-50 text-gray-900">
+    <main className="min-h-screen ink-paper text-gray-900">
       <div className="max-w-2xl mx-auto px-6 py-16">
         <Link
           href="/explore"
@@ -61,8 +62,8 @@ export default function BoldIdeaPage() {
         </Link>
 
         <div className="text-center mb-8">
-          <span className="text-5xl">✨</span>
-          <h1 className="text-3xl font-bold mt-3" style={{ background: "linear-gradient(135deg, #f97316, #db2777)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          <InkSeal text="奇思" size={52} />
+          <h1 className="text-5xl font-semibold mt-4 pb-1 leading-tight" style={{ background: "linear-gradient(135deg, #1f1c19, #9c3a26)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Try Something Bold
           </h1>
           <p className="text-gray-500 mt-2 max-w-md mx-auto">
@@ -91,7 +92,7 @@ export default function BoldIdeaPage() {
               onClick={handleSubmit}
               disabled={!text.trim() || submitting}
               className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all disabled:opacity-40 flex items-center gap-2"
-              style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
+              style={{ background: "linear-gradient(135deg, #a87732, #9c3a26)" }}
             >
               {submitting ? (
                 <>

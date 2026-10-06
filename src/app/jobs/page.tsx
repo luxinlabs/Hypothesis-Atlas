@@ -108,7 +108,7 @@ export default function JobsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
+    <div className="min-h-screen ink-paper">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -220,7 +220,7 @@ export default function JobsPage() {
                       <Link
                         href={`/job/${job.id}/paper`}
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
-                        style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+                        style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -254,7 +254,7 @@ export default function JobsPage() {
             <Link
               href="/bold-idea"
               className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
-              style={{ background: "linear-gradient(135deg, #f97316, #db2777)" }}
+              style={{ background: "linear-gradient(135deg, #a87732, #9c3a26)" }}
             >
               Try Something Bold →
             </Link>

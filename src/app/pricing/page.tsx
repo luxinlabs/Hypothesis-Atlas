@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-white to-zinc-50">
+    <main className="min-h-screen ink-paper">
       {/* Header */}
       <div className="container mx-auto px-4 py-8">
         <Link
@@ -135,7 +135,7 @@ export default function PricingPage() {
           </div>
 
           {/* Hosted */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all ring-4 ring-purple-500">
+          <div className="relative bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all ring-4 ring-purple-500">
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
               Hosted Service
             </div>

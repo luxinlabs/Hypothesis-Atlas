@@ -66,29 +66,29 @@ interface PaperMapProps {
 }
 
 export const TIER_COLOR: Record<string, { fill: string; stroke: string; label: string }> = {
-  peer_reviewed: { fill: "#3b82f6", stroke: "#1d4ed8", label: "Peer-reviewed" },
-  review:        { fill: "#14b8a6", stroke: "#0d9488", label: "Review" },
-  conference:    { fill: "#f97316", stroke: "#ea580c", label: "Conference" },
-  preprint:      { fill: "#facc15", stroke: "#ca8a04", label: "Preprint" },
-  book:          { fill: "#94a3b8", stroke: "#64748b", label: "Book" },
-  dissertation:  { fill: "#ec4899", stroke: "#db2777", label: "Dissertation" },
-  report:        { fill: "#8b5cf6", stroke: "#7c3aed", label: "Report" },
-  dataset:       { fill: "#10b981", stroke: "#047857", label: "Dataset" },
-  social_signal: { fill: "#f59e0b", stroke: "#b45309", label: "Social / Preprint" },
+  peer_reviewed: { fill: "#587380", stroke: "#384a54", label: "Peer-reviewed" },
+  review:        { fill: "#567d5e", stroke: "#44664b", label: "Review" },
+  conference:    { fill: "#a87732", stroke: "#8b5f27", label: "Conference" },
+  preprint:      { fill: "#c19248", stroke: "#8b5f27", label: "Preprint" },
+  book:          { fill: "#a39a89", stroke: "#7d756a", label: "Book" },
+  dissertation:  { fill: "#b54a33", stroke: "#9c3a26", label: "Dissertation" },
+  report:        { fill: "#76626b", stroke: "#5f4e56", label: "Report" },
+  dataset:       { fill: "#567d5e", stroke: "#37523d", label: "Dataset" },
+  social_signal: { fill: "#a87732", stroke: "#6f4b21", label: "Social / Preprint" },
 };
 
-const fallbackColor = { fill: "#8b5cf6", stroke: "#6d28d9", label: "Other" };
+const fallbackColor = { fill: "#76626b", stroke: "#4c3f45", label: "Other" };
 
 export const REL_COLOR: Record<string, { color: string; dash: string; label: string }> = {
-  CITES:        { color: "#6366f1", dash: "6,3",  label: "Cites" },
-  SUPPORTS:     { color: "#22c55e", dash: "",      label: "Supports" },
-  CONTRADICTS:  { color: "#ef4444", dash: "3,3",  label: "Contradicts" },
-  EXTENDS:      { color: "#f59e0b", dash: "8,4",  label: "Extends" },
-  SHARES_AUTHOR:{ color: "#06b6d4", dash: "2,4",  label: "Shared Author" },
-  BELONGS_TO:   { color: "#8b5cf6", dash: "",      label: "Belongs To" },
+  CITES:        { color: "#587380", dash: "6,3",  label: "Cites" },
+  SUPPORTS:     { color: "#567d5e", dash: "",      label: "Supports" },
+  CONTRADICTS:  { color: "#b54a33", dash: "3,3",  label: "Contradicts" },
+  EXTENDS:      { color: "#a87732", dash: "8,4",  label: "Extends" },
+  SHARES_AUTHOR:{ color: "#4c777c", dash: "2,4",  label: "Shared Author" },
+  BELONGS_TO:   { color: "#76626b", dash: "",      label: "Belongs To" },
 };
 
-export const REL_FALLBACK = { color: "#9ca3af", dash: "5,4", label: "Related" };
+export const REL_FALLBACK = { color: "#a39a89", dash: "5,4", label: "Related" };
 
 const W = 900;
 const H = 600;
@@ -427,9 +427,9 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                 className="px-4 py-2 rounded-xl text-sm font-semibold shadow transition-opacity hover:opacity-90"
                 style={{
                   background: graphMode === "neo4j"
-                    ? "linear-gradient(to right, #06b6d4, #3b82f6)"
-                    : isDark ? "#27272a" : "#f4f4f5",
-                  color: graphMode === "neo4j" ? "#fff" : isDark ? "#d4d4d8" : "#52525b",
+                    ? "linear-gradient(to right, #4c777c, #587380)"
+                    : isDark ? "#2f2b27" : "#efebe0",
+                  color: graphMode === "neo4j" ? "#fbf8f1" : isDark ? "#c9c0ae" : "#5e5850",
                 }}
               >
                 {graphMode === "neo4j" ? "Hub View" : "Neo4j Graph"}
@@ -449,9 +449,9 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
               className="px-4 py-2 rounded-xl text-sm font-semibold shadow transition-opacity hover:opacity-90"
               style={{
                 background: compareMode
-                  ? "#f59e0b"
-                  : "linear-gradient(to right, #4f46e5, #9333ea)",
-                color: "#fff",
+                  ? "#a87732"
+                  : "linear-gradient(to right, #455c68, #5f4e56)",
+                color: "#fbf8f1",
               }}
             >
               {compareMode ? "Exit Compare" : "Compare Papers"}
@@ -618,14 +618,14 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
           {/* Center hub circle (hub mode only) */}
           {graphMode === "hub" && (
             <>
-              <circle cx={CX} cy={CY} r={28} fill={isDark ? "#1e1b4b" : "#ede9fe"} />
+              <circle cx={CX} cy={CY} r={28} fill={isDark ? "#151c20" : "#ebe4e7"} />
               <text
                 x={CX}
                 y={CY}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize={10}
-                fill={isDark ? "#a5b4fc" : "#6d28d9"}
+                fill={isDark ? "#9fb2bb" : "#4c3f45"}
                 fontWeight="600"
               >
                 Research
@@ -660,7 +660,7 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                   <circle
                     r={r + 5}
                     fill="none"
-                    stroke="#f59e0b"
+                    stroke="#a87732"
                     strokeWidth={3}
                     strokeDasharray="6,3"
                   />
@@ -671,7 +671,7 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                     <circle
                       r={r + 5}
                       fill="none"
-                      stroke="#10b981"
+                      stroke="#567d5e"
                       strokeWidth={3}
                     />
                     <text
@@ -679,7 +679,7 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                       dominantBaseline="middle"
                       fontSize={8}
                       fontWeight="700"
-                      fill="#fff"
+                      fill="#fbf8f1"
                       style={{ pointerEvents: "none" }}
                     >
                       ✓
@@ -689,7 +689,7 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                 <circle
                   r={r}
                   fill={color.fill}
-                  stroke={isSelected ? "#fff" : isInCompare ? "#f59e0b" : color.stroke}
+                  stroke={isSelected ? "#fbf8f1" : isInCompare ? "#a87732" : color.stroke}
                   strokeWidth={isSelected ? 3 : isInCompare ? 2.5 : 1.5}
                   opacity={isDimmed ? 0.2 : 1}
                 />
@@ -700,7 +700,7 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                     dominantBaseline="middle"
                     fontSize={8}
                     fontWeight="700"
-                    fill="#fff"
+                    fill="#fbf8f1"
                     style={{ pointerEvents: "none" }}
                   >
                     {compareIndex + 1}
@@ -711,7 +711,7 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                     y={-r - 5}
                     textAnchor="middle"
                     fontSize={9}
-                    fill={isDark ? "#e4e4e7" : "#374151"}
+                    fill={isDark ? "#e0d9ca" : "#45403a"}
                     style={{ pointerEvents: "none" }}
                   >
                     {node.title.slice(0, 38)}
@@ -723,7 +723,7 @@ export default function PaperMap({ jobId, theme = "light", selectable = false, s
                     y={r + 14}
                     textAnchor="middle"
                     fontSize={8}
-                    fill={isDark ? "#a5b4fc" : "#6d28d9"}
+                    fill={isDark ? "#9fb2bb" : "#4c3f45"}
                     style={{ pointerEvents: "none" }}
                   >
                     {graphMode === "neo4j"
@@ -964,7 +964,7 @@ function ComparePanel({
         type="button"
         onClick={handleSaveToNotes}
         className="w-full py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90"
-        style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+        style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
       >
         {saved ? "✓ Saved to Notes" : "Save to Notes"}
       </button>

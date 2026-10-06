@@ -206,7 +206,7 @@ export default function QuestionBot({ jobId, topic }: QuestionBotProps) {
         className="fixed bottom-6 z-50 w-12 h-12 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95"
         style={{
           right: "11rem",
-          background: "linear-gradient(135deg, #f472b6, #a855f7)",
+          background: "linear-gradient(135deg, #cc6e57, #76626b)",
         }}
         title="Question Cat — ask anything about this session"
       >

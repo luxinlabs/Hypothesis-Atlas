@@ -111,9 +111,9 @@ export default function PaperQuizPanel({ jobId, idea, inline = false }: PaperQui
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
           style={{
             background: open
-              ? "#7c3aed"
-              : "linear-gradient(to right, #0ea5e9, #7c3aed)",
-            color: "#fff",
+              ? "#5f4e56"
+              : "linear-gradient(to right, #4c777c, #5f4e56)",
+            color: "#fbf8f1",
           }}
           title="Test your understanding of this paper idea"
         >
@@ -131,9 +131,9 @@ export default function PaperQuizPanel({ jobId, idea, inline = false }: PaperQui
           style={{
             right: "13rem",
             background: open
-              ? "#7c3aed"
-              : "linear-gradient(to right, #0ea5e9, #7c3aed)",
-            color: "#fff",
+              ? "#5f4e56"
+              : "linear-gradient(to right, #4c777c, #5f4e56)",
+            color: "#fbf8f1",
           }}
           title="Test your understanding of this paper idea"
         >

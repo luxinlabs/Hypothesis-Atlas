@@ -318,7 +318,7 @@ export default function KnowledgeTree({
             onClick={showPapers ? () => setShowPapers(false) : handleExplorePapers}
             disabled={exploringPapers}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-60 transition-all"
-            style={{ background: "linear-gradient(to right, #0ea5e9, #6366f1)" }}
+            style={{ background: "linear-gradient(to right, #4c777c, #587380)" }}
           >
             {exploringPapers ? (
               <>

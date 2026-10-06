@@ -106,15 +106,15 @@ export default function WordCloudComponent({
       const span = document.createElement("span");
       span.textContent = centerWord;
       span.style.fontSize = "42px";
-      span.style.color = "#4f46e5";
+      span.style.color = "#455c68";
       span.style.cursor = "pointer";
       span.style.position = "absolute";
       span.style.fontWeight = "800";
       span.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
       span.style.padding = "8px 18px";
       span.style.borderRadius = "12px";
-      span.style.background = "rgba(79, 70, 229, 0.08)";
-      span.style.border = "2px solid rgba(79, 70, 229, 0.25)";
+      span.style.background = "rgba(69, 92, 104, 0.08)";
+      span.style.border = "2px solid rgba(69, 92, 104, 0.25)";
       span.style.whiteSpace = "nowrap";
       span.style.userSelect = "none";
       span.style.opacity = "0";
@@ -135,12 +135,12 @@ export default function WordCloudComponent({
 
       span.addEventListener("mouseenter", () => {
         span.style.transform = "scale(1.08)";
-        span.style.background = "rgba(79, 70, 229, 0.14)";
-        span.style.boxShadow = "0 4px 20px rgba(79, 70, 229, 0.25)";
+        span.style.background = "rgba(69, 92, 104, 0.14)";
+        span.style.boxShadow = "0 4px 20px rgba(69, 92, 104, 0.25)";
       });
       span.addEventListener("mouseleave", () => {
         span.style.transform = "scale(1)";
-        span.style.background = "rgba(79, 70, 229, 0.08)";
+        span.style.background = "rgba(69, 92, 104, 0.08)";
         span.style.boxShadow = "none";
       });
       span.addEventListener("click", () => {
@@ -161,14 +161,14 @@ export default function WordCloudComponent({
       span.style.fontSize = `${normalizedSize}px`;
 
       const colorPalette = [
-        "rgb(59, 130, 246)",
-        "rgb(147, 51, 234)",
-        "rgb(236, 72, 153)",
-        "rgb(14, 165, 233)",
-        "rgb(168, 85, 247)",
-        "rgb(249, 115, 22)",
-        "rgb(34, 197, 94)",
-        "rgb(239, 68, 68)",
+        "rgb(88, 115, 128)",
+        "rgb(95, 78, 86)",
+        "rgb(181, 74, 51)",
+        "rgb(76, 119, 124)",
+        "rgb(118, 98, 107)",
+        "rgb(168, 119, 50)",
+        "rgb(86, 125, 94)",
+        "rgb(156, 58, 38)",
       ];
       span.style.color = colorPalette[index % colorPalette.length];
 
@@ -207,8 +207,8 @@ export default function WordCloudComponent({
 
         span.addEventListener("mouseenter", () => {
           span.style.transform = "scale(1.15) translateY(-2px)";
-          span.style.backgroundColor = "rgba(99, 102, 241, 0.1)";
-          span.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
+          span.style.backgroundColor = "rgba(88, 115, 128, 0.1)";
+          span.style.boxShadow = "0 4px 12px rgba(19, 17, 15, 0.15)";
           span.style.zIndex = "10";
         });
 

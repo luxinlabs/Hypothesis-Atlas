@@ -65,7 +65,7 @@ export default function PaperMapPicker({ jobId, onClose, onImport }: PaperMapPic
               onClick={() => onImport(selected)}
               disabled={selected.length === 0}
               className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-all"
-              style={{ background: "linear-gradient(to right, #0ea5e9, #6366f1)" }}
+              style={{ background: "linear-gradient(to right, #4c777c, #587380)" }}
             >
               Add to Session{selected.length > 0 ? ` (${selected.length})` : ""}
             </button>

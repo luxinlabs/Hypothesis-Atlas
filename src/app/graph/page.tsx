@@ -45,12 +45,12 @@ interface QueryResult {
 }
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
-  topic:      { label: "Topic",      color: "#6366f1", bg: "bg-indigo-500" },
-  hypothesis: { label: "Hypothesis", color: "#8b5cf6", bg: "bg-violet-500" },
-  method:     { label: "Method",     color: "#06b6d4", bg: "bg-cyan-500" },
-  evidence:   { label: "Evidence",   color: "#10b981", bg: "bg-emerald-500" },
-  gap:        { label: "Gap",        color: "#f59e0b", bg: "bg-amber-500" },
-  note:       { label: "Note",       color: "#f43f5e", bg: "bg-rose-500" },
+  topic:      { label: "Topic",      color: "#587380", bg: "bg-indigo-500" },
+  hypothesis: { label: "Hypothesis", color: "#76626b", bg: "bg-violet-500" },
+  method:     { label: "Method",     color: "#4c777c", bg: "bg-cyan-500" },
+  evidence:   { label: "Evidence",   color: "#567d5e", bg: "bg-emerald-500" },
+  gap:        { label: "Gap",        color: "#a87732", bg: "bg-amber-500" },
+  note:       { label: "Note",       color: "#b54a33", bg: "bg-rose-500" },
 };
 
 const EDGE_LABELS: Record<string, string> = {
@@ -64,18 +64,18 @@ const EDGE_LABELS: Record<string, string> = {
 };
 
 const EDGE_COLORS: Record<string, string> = {
-  motivates: "#8b5cf6",
-  provides: "#10b981",
-  uses_method: "#06b6d4",
-  contradicts: "#ef4444",
-  reveals: "#f59e0b",
-  related_to: "#94a3b8",
-  notes_on: "#f43f5e",
+  motivates: "#76626b",
+  provides: "#567d5e",
+  uses_method: "#4c777c",
+  contradicts: "#b54a33",
+  reveals: "#a87732",
+  related_to: "#a39a89",
+  notes_on: "#b54a33",
 };
 
 const THEME_STYLES = {
   dark: {
-    mainBg: "bg-[#0a0a0f]",
+    mainBg: "ink-night",
     text: "text-white",
     subText: "text-zinc-400",
     navButton: "bg-zinc-900 border border-zinc-700 text-zinc-200 hover:bg-zinc-800",
@@ -88,7 +88,7 @@ const THEME_STYLES = {
     chipOff: "bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-zinc-200",
   },
   light: {
-    mainBg: "bg-gradient-to-b from-white to-zinc-50",
+    mainBg: "ink-paper",
     text: "text-zinc-900",
     subText: "text-zinc-600",
     navButton: "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
@@ -101,7 +101,7 @@ const THEME_STYLES = {
     chipOff: "bg-white border border-gray-200 text-gray-400 hover:text-gray-700",
   },
   vibrant: {
-    mainBg: "bg-gradient-to-br from-rose-50 via-amber-50 to-sky-50",
+    mainBg: "ink-jade",
     text: "text-zinc-900",
     subText: "text-zinc-600",
     navButton: "bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50",
@@ -585,7 +585,7 @@ export default function ResearchGraphPage() {
               onClick={handleQuery}
               disabled={querying || !queryText.trim()}
               className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40"
-              style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+              style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
             >
               {querying ? "Thinking…" : "Ask"}
             </button>
@@ -664,7 +664,7 @@ export default function ResearchGraphPage() {
           <button
             onClick={() => setShowAddForm((v) => !v)}
             className="px-4 py-1.5 rounded-xl text-xs font-semibold transition-opacity"
-            style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+            style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
           >
             + Add Entity
           </button>
@@ -728,7 +728,7 @@ export default function ResearchGraphPage() {
                 onClick={handleAddEntity}
                 disabled={saving || !addLabel.trim()}
                 className="px-5 py-2 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40"
-                style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+                style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
               >
                 {saving ? "Saving…" : "Create"}
               </button>
@@ -780,7 +780,7 @@ export default function ResearchGraphPage() {
                     const from = nodePos.get(edge.fromId);
                     const to = nodePos.get(edge.toId);
                     if (!from || !to) return null;
-                    const color = EDGE_COLORS[edge.type] ?? "#94a3b8";
+                    const color = EDGE_COLORS[edge.type] ?? "#a39a89";
                     const touched = edge.fromId === selectedId || edge.toId === selectedId || edge.fromId === hoveredId || edge.toId === hoveredId;
                     return (
                       <line
@@ -811,12 +811,12 @@ export default function ResearchGraphPage() {
                         className="cursor-pointer"
                       >
                         {(isSel || isMatch) && (
-                          <circle r={r + 6} fill="none" stroke={isSel ? "#fff" : "#f43f5e"} strokeWidth={2} opacity={0.8} />
+                          <circle r={r + 6} fill="none" stroke={isSel ? "#fbf8f1" : "#b54a33"} strokeWidth={2} opacity={0.8} />
                         )}
                         <circle
                           r={r}
                           fill={meta.color}
-                          stroke={n.entity.origin === "user" ? "#fff" : "none"}
+                          stroke={n.entity.origin === "user" ? "#fbf8f1" : "none"}
                           strokeWidth={1.5}
                           opacity={0.92}
                         />
@@ -827,7 +827,7 @@ export default function ResearchGraphPage() {
                             fontSize={11}
                             fill="currentColor"
                             className={theme === "dark" ? "" : ""}
-                            style={{ paintOrder: "stroke", stroke: theme === "dark" ? "#0a0a0f" : "#fff", strokeWidth: 3, fontWeight: 600 }}
+                            style={{ paintOrder: "stroke", stroke: theme === "dark" ? "#12100e" : "#fbf8f1", strokeWidth: 3, fontWeight: 600 }}
                           >
                             {n.entity.label.length > 34 ? n.entity.label.slice(0, 33) + "…" : n.entity.label}
                           </text>
@@ -839,7 +839,7 @@ export default function ResearchGraphPage() {
               </svg>
             )}
             {/* View controls */}
-            <div className="flex items-center justify-between px-3 py-2 border-t text-xs" style={{ borderColor: theme === "dark" ? "#3f3f46" : "#e5e7eb" }}>
+            <div className="flex items-center justify-between px-3 py-2 border-t text-xs" style={{ borderColor: theme === "dark" ? "#45403a" : "#e0d9ca" }}>
               <span className={t.subText}>Scroll to zoom · drag to pan · click a node to inspect</span>
               <button onClick={resetView} className={`px-2 py-1 rounded-lg border ${t.navButton}`}>Reset view</button>
             </div>
@@ -853,7 +853,7 @@ export default function ResearchGraphPage() {
                   <div className="flex items-center gap-2 min-w-0">
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0"
-                      style={{ background: TYPE_META[selected.type]?.color ?? "#6366f1" }}
+                      style={{ background: TYPE_META[selected.type]?.color ?? "#587380" }}
                     >
                       {TYPE_META[selected.type]?.label ?? selected.type}
                     </span>
@@ -970,7 +970,7 @@ export default function ResearchGraphPage() {
                               key={m.id}
                               onClick={() => handleAddEdge(m.id)}
                               className="text-xs px-2 py-1 rounded-full text-white font-medium hover:opacity-80"
-                              style={{ background: TYPE_META[m.type]?.color ?? "#6366f1" }}
+                              style={{ background: TYPE_META[m.type]?.color ?? "#587380" }}
                             >
                               {m.label.slice(0, 22)}
                             </button>
@@ -1004,7 +1004,7 @@ export default function ResearchGraphPage() {
                         onClick={handleSaveEdit}
                         disabled={saving || !editLabel.trim()}
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity disabled:opacity-40"
-                        style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+                        style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
                       >
                         {saving ? "Saving…" : "Save"}
                       </button>
@@ -1046,7 +1046,7 @@ export default function ResearchGraphPage() {
             </span>
           ))}
           <span className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded-full border-2 border-white" style={{ background: "#6366f1", boxShadow: "0 0 0 1px #6366f1" }} />
+            <span className="inline-block w-3 h-3 rounded-full border-2 border-white" style={{ background: "#587380", boxShadow: "0 0 0 1px #587380" }} />
             white ring = user-created/edited
           </span>
         </div>

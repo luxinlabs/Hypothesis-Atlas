@@ -242,7 +242,7 @@ export default function NotesTab({ jobId, topic, theme = "light" }: NotesTabProp
                   <>
                     <button onClick={saveEdit}
                       className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-opacity"
-                      style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}>
+                      style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}>
                       Save
                     </button>
                     <button onClick={() => setEditing(false)}
@@ -311,7 +311,7 @@ export default function NotesTab({ jobId, topic, theme = "light" }: NotesTabProp
               onClick={addNote}
               disabled={!draft.trim()}
               className="py-2.5 px-6 rounded-xl font-semibold text-sm self-start transition-opacity disabled:opacity-40"
-              style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+              style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
             >
               Add Note
             </button>

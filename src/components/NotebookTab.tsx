@@ -443,7 +443,7 @@ ${notesSection}
               <button
                 onClick={handleSaveChatToNotes}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
-                style={{ background: savedChat ? "#10b981" : "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+                style={{ background: savedChat ? "#567d5e" : "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -456,7 +456,7 @@ ${notesSection}
                 onClick={handleConverge}
                 disabled={isLoading}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50 flex items-center gap-1.5"
-                style={{ background: "linear-gradient(to right, #2563eb, #9333ea)" }}
+                style={{ background: "linear-gradient(to right, #455c68, #5f4e56)" }}
               >
                 {isLoading ? (
                   <div className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
@@ -481,7 +481,7 @@ ${notesSection}
             <Link
               href={`/job/${jobId}/paper`}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-              style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+              style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -517,7 +517,7 @@ ${notesSection}
                     setTimeout(() => setSavedInsight(false), 2000);
                   }}
                   className="text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-opacity"
-                  style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+                  style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
                 >
                   {savedInsight ? "✓ Saved" : "Save to Notes"}
                 </button>
@@ -541,7 +541,7 @@ ${notesSection}
             <Link
               href={`/job/${jobId}/paper`}
               className="flex items-center gap-3 mb-5 p-3 rounded-xl transition-all shadow-md"
-              style={{ background: "linear-gradient(to right, #4f46e5, #9333ea)", color: "#fff" }}
+              style={{ background: "linear-gradient(to right, #455c68, #5f4e56)", color: "#fbf8f1" }}
             >
               <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

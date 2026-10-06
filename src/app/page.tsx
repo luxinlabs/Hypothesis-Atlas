@@ -253,15 +253,6 @@ export default function Home() {
           variant={INK_VARIANT[theme]}
           className="absolute inset-x-0 top-0 w-full h-[880px] md:h-[980px]"
         />
-        {/* Inscription (题字) and seal in the sky, upper left. */}
-        <div
-          aria-hidden
-          className={`hidden lg:flex absolute left-[5%] top-32 z-0 flex-col items-center gap-4 ${theme === "dark" ? "text-zinc-300/70" : theme === "vibrant" ? "text-teal-900/70" : "text-zinc-800/75"}`}
-        >
-          <span className="font-display text-3xl italic" style={{ writingMode: "horizontal-tb" }}>Map the evidence</span>
-          <span className={`font-display text-sm uppercase tracking-[0.3em] ${t.muted}`} style={{ writingMode: "horizontal-tb" }}>Hypothesis Atlas</span>
-          <InkSeal text="HA" size={38} />
-        </div>
 
         {/* Nav — extra right padding reserves room for the fixed Sign In widget (src/components/AuthWidget.tsx) in the corner, so the theme dropdown never sits underneath it. Docs/Pricing hide below sm so the row doesn't overflow into that reserved space on narrow viewports. */}
         <nav className="relative z-10 flex items-center justify-between flex-wrap gap-y-3 px-4 sm:px-6 md:px-12 py-6 pr-24 sm:pr-48 md:pr-48">
